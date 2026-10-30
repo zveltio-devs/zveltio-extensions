@@ -6,36 +6,59 @@
   "resources": [
     {
       "id": "periods",
-      "dataSource": "/ext/hr/payroll/periods/{masterId}/entries",
-      "dataPath": "data",
+      "dataSource": "/api/data/payroll_entries?period_id[eq]={masterId}&sort=employee_name&order=asc&limit=500",
+      "dataPath": "records",
       "master": {
-        "dataSource": "/ext/hr/payroll/periods",
-        "dataPath": "data",
+        "dataSource": "/api/data/payroll_periods?sort=year&order=desc&limit=500",
+        "dataPath": "records",
         "idKey": "id",
-        "titleKey": "name",
+        "titleKey": "year",
         "subtitle": {
           "keys": [
-            "period_start",
-            "period_end"
+            "month"
           ],
-          "sep": " → "
+          "sep": " "
         },
         "badgeKey": "status"
       },
       "detailActions": [
         {
           "id": "generate",
-          "icon": "Plus",
+          "icon": "Calculator",
           "label": "hr.payroll.btn.generate",
           "method": "POST",
-          "endpoint": "/ext/hr/payroll/periods/{id}/generate"
+          "endpoint": "/ext/hr/payroll/actions/generatePayroll",
+          "body": {
+            "period_id": "{id}"
+          }
+        },
+        {
+          "id": "approve",
+          "icon": "CheckCircle",
+          "label": "hr.payroll.btn.approve",
+          "method": "POST",
+          "endpoint": "/ext/hr/payroll/actions/approvePeriod",
+          "body": {
+            "id": "{id}"
+          }
+        },
+        {
+          "id": "pay",
+          "icon": "Banknote",
+          "label": "hr.payroll.btn.pay",
+          "method": "POST",
+          "endpoint": "/ext/hr/payroll/actions/payPeriod",
+          "body": {
+            "id": "{id}"
+          }
         },
         {
           "id": "revisal",
-          "kind": "download",
-          "icon": "Download",
+          "icon": "FileText",
           "label": "hr.payroll.btn.revisal",
-          "endpoint": "/ext/hr/payroll/revisal"
+          "method": "POST",
+          "endpoint": "/ext/hr/payroll/actions/exportRevisal",
+          "body": {}
         }
       ],
       "columns": [
@@ -52,7 +75,7 @@
           }
         },
         {
-          "key": "cas",
+          "key": "cas_employee",
           "label": "CAS 25%",
           "type": "currency",
           "currency": {
@@ -60,7 +83,7 @@
           }
         },
         {
-          "key": "cass",
+          "key": "cass_employee",
           "label": "CASS 10%",
           "type": "currency",
           "currency": {
@@ -85,7 +108,7 @@
         }
       ],
       "form": {
-        "endpoint": "/ext/hr/payroll/periods",
+        "endpoint": "/api/data/payroll_periods",
         "fields": [
           {
             "name": "year",

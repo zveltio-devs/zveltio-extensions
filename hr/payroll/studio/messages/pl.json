@@ -1,6 +1,8 @@
 {
+  "hr.payroll.btn.approve": "Zatwierdź",
   "hr.payroll.btn.generate": "Generuj",
   "hr.payroll.btn.newPeriod": "Nowy okres",
+  "hr.payroll.btn.pay": "Oznacz jako opłacone",
   "hr.payroll.btn.revisal": "Revisal XML",
   "hr.payroll.col.gross": "Brutto",
   "hr.payroll.col.net": "Netto",

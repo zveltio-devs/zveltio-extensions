@@ -1,0 +1,69 @@
+{
+  "name": "payroll_meal_vouchers",
+  "fields": [
+    {
+      "name": "period_id",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "payroll_periods"
+      }
+    },
+    {
+      "name": "employee_id",
+      "type": "uuid",
+      "required": true
+    },
+    {
+      "name": "quantity",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "face_value",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 40
+    }
+  ],
+  "indexes": [
+    {
+      "fields": [
+        "period_id",
+        "employee_id"
+      ],
+      "unique": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "payroll_meal_vouchers_period_id",
+      "type": "m2o",
+      "field": "period_id",
+      "target": "payroll_periods",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "quantity",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "This figure is not negative."
+    },
+    {
+      "field": "face_value",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "This figure is not negative."
+    }
+  ]
+}

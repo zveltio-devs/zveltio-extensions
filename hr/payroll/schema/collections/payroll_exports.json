@@ -1,0 +1,40 @@
+{
+  "name": "payroll_exports",
+  "fields": [
+    {
+      "name": "period_id",
+      "type": "m2o",
+      "options": {
+        "related_collection": "payroll_periods"
+      }
+    },
+    {
+      "name": "type",
+      "type": "enum",
+      "required": true,
+      "options": {
+        "values": [
+          "d112",
+          "revisal"
+        ]
+      }
+    },
+    {
+      "name": "file_content",
+      "type": "textarea",
+      "required": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "payroll_exports_period_id",
+      "type": "m2o",
+      "field": "period_id",
+      "target": "payroll_periods",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

@@ -1,0 +1,84 @@
+{
+  "name": "payroll_overtime",
+  "fields": [
+    {
+      "name": "period_id",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "payroll_periods"
+      }
+    },
+    {
+      "name": "employee_id",
+      "type": "uuid",
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "hours",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "rate_multiplier",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 1.75
+    },
+    {
+      "name": "amount",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "is_night_shift",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": false
+    },
+    {
+      "name": "description",
+      "type": "text"
+    }
+  ],
+  "relations": [
+    {
+      "name": "payroll_overtime_period_id",
+      "type": "m2o",
+      "field": "period_id",
+      "target": "payroll_periods",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "hours",
+      "rule": "min",
+      "config": {
+        "value": 0.01
+      },
+      "message": "Overtime is a positive number of hours."
+    },
+    {
+      "field": "rate_multiplier",
+      "rule": "min",
+      "config": {
+        "value": 0.01
+      },
+      "message": "A multiplier is positive."
+    },
+    {
+      "field": "amount",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "This figure is not negative."
+    }
+  ]
+}

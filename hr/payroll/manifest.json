@@ -3,12 +3,12 @@
   "displayName": "Payroll RO",
   "category": "hr",
   "description": "Romanian payroll: CAS, CASS, income tax calculations, meal vouchers and Revisal XML export",
-  "version": "1.1.15",
-  "zveltioMinVersion": "1.0.0",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.92",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-payroll",
   "permissions": [
-    "database"
+    "data:write"
   ],
   "i18nPrefixes": [
     "hr.payroll",
@@ -17,7 +17,7 @@
   "dependencies": [
     {
       "name": "hr/employees",
-      "minVersion": "1.0.0"
+      "minVersion": "2.0.0"
     }
   ],
   "contributes": {
@@ -44,13 +44,305 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "86e7b87774afe7ce34f43b2d1b6cf500f14c5c75571ca60f650231b696517ae4",
-    "sourceSha256": "625907f7aece7e03cc82ef089480452f5e31b87492f2e1f54394dfd02d4537b2"
+    "engineSha256": "ade030cf7a889e74ed39462b17e5edb5aba37c1141949661b3ea2ba5a5f10c39",
+    "sourceSha256": "fa7e260ca71520629d0605cde90016a2ed4dca6859019655bff1ce0a8335c39b",
+    "schemaSha256": "fe8d87838131d76920f23ee479f8de5073761e3697e9164bea50995c05e5bec2"
   },
-  "resources": [
-    "payroll"
+  "collections": [
+    "payroll_rates",
+    "payroll_periods",
+    "payroll_entries",
+    "payroll_adjustments",
+    "payroll_sick_leave",
+    "payroll_meal_vouchers",
+    "payroll_overtime",
+    "payroll_exports"
   ],
-  "sensitiveResources": [
-    "payroll"
+  "actions": [
+    {
+      "name": "generatePayroll",
+      "permission": {
+        "resource": "payroll_entries",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "period_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "period_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "employees",
+        "employment_contracts",
+        "payroll_rates",
+        "payroll_periods",
+        "payroll_entries",
+        "payroll_adjustments",
+        "payroll_sick_leave",
+        "payroll_meal_vouchers",
+        "payroll_overtime"
+      ],
+      "writes": [
+        "payroll_entries",
+        "payroll_periods"
+      ]
+    },
+    {
+      "name": "approvePeriod",
+      "permission": {
+        "resource": "payroll_periods",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "payroll_periods",
+        "payroll_entries"
+      ],
+      "writes": [
+        "payroll_periods",
+        "payroll_entries"
+      ]
+    },
+    {
+      "name": "payPeriod",
+      "permission": {
+        "resource": "payroll_periods",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "payroll_periods",
+        "payroll_entries"
+      ],
+      "writes": [
+        "payroll_periods",
+        "payroll_entries"
+      ]
+    },
+    {
+      "name": "recordSickLeave",
+      "permission": {
+        "resource": "payroll_sick_leave",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "period_id",
+          "employee_id",
+          "days"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "period_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "employee_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 31
+          },
+          "leave_request_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        }
+      },
+      "reads": [
+        "employees",
+        "employment_contracts",
+        "payroll_periods"
+      ],
+      "writes": [
+        "payroll_sick_leave"
+      ]
+    },
+    {
+      "name": "recordOvertime",
+      "permission": {
+        "resource": "payroll_overtime",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "period_id",
+          "employee_id",
+          "hours"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "period_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "employee_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "hours": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 400
+          },
+          "rate_multiplier": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 10
+          },
+          "is_night_shift": {
+            "type": "boolean"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        }
+      },
+      "reads": [
+        "employees",
+        "employment_contracts",
+        "payroll_periods"
+      ],
+      "writes": [
+        "payroll_overtime"
+      ]
+    },
+    {
+      "name": "exportD112",
+      "permission": {
+        "resource": "payroll_exports",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "period_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "period_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "employees",
+        "payroll_periods",
+        "payroll_entries"
+      ],
+      "writes": [
+        "payroll_exports"
+      ]
+    },
+    {
+      "name": "exportRevisal",
+      "permission": {
+        "resource": "payroll_exports",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [],
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "reads": [
+        "employees",
+        "employment_contracts"
+      ],
+      "writes": [
+        "payroll_exports"
+      ]
+    },
+    {
+      "name": "simulate",
+      "permission": {
+        "resource": "payroll_rates",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "gross_salary"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "gross_salary": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "meal_vouchers": {
+            "type": "number",
+            "minimum": 0
+          },
+          "overtime_amount": {
+            "type": "number",
+            "minimum": 0
+          },
+          "night_shift_bonus": {
+            "type": "number",
+            "minimum": 0
+          },
+          "taxable_bonuses": {
+            "type": "number",
+            "minimum": 0
+          },
+          "deductions": {
+            "type": "number",
+            "minimum": 0
+          },
+          "personal_deduction": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      },
+      "reads": [
+        "payroll_rates"
+      ],
+      "writes": []
+    }
   ]
 }

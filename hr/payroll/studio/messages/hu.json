@@ -1,6 +1,8 @@
 {
+  "hr.payroll.btn.approve": "Jóváhagyás",
   "hr.payroll.btn.generate": "Létrehozás",
   "hr.payroll.btn.newPeriod": "Új időszak",
+  "hr.payroll.btn.pay": "Kifizetettnek jelöl",
   "hr.payroll.btn.revisal": "Revisal XML",
   "hr.payroll.col.gross": "Bruttó",
   "hr.payroll.col.net": "Nettó",
