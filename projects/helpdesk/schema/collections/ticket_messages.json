@@ -1,0 +1,12 @@
+{
+  "name": "ticket_messages",
+  "fields": [
+    { "name": "ticket_id", "type": "m2o", "required": true, "indexed": true, "options": { "related_collection": "tickets" } },
+    { "name": "author_name", "type": "text" },
+    { "name": "author_email", "type": "email" },
+    { "name": "content", "type": "textarea", "required": true },
+    { "name": "is_internal", "type": "boolean", "required": true, "defaultValue": false },
+    { "name": "attachments", "type": "json" }
+  ],
+  "relations": [{ "name": "ticket_messages_ticket_id", "type": "m2o", "field": "ticket_id", "target": "tickets", "targetField": "id", "onDelete": "CASCADE", "onUpdate": "CASCADE", "metadata": {} }]
+}

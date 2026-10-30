@@ -1,0 +1,15 @@
+{
+  "name": "ticket_categories",
+  "fields": [
+    { "name": "name", "type": "text", "required": true },
+    { "name": "description", "type": "textarea" },
+    { "name": "color", "type": "color", "required": true, "defaultValue": "#6366f1" },
+    { "name": "default_priority", "type": "enum", "required": true, "defaultValue": "medium", "options": { "values": ["low", "medium", "high", "critical"] } },
+    { "name": "sla_hours", "type": "integer", "required": true, "defaultValue": 24 },
+    { "name": "sla_response_hours", "type": "integer", "required": true, "defaultValue": 4 }
+  ],
+  "validation": [
+    { "field": "sla_hours", "rule": "min", "config": { "value": 1 }, "message": "The resolution SLA is at least one hour." },
+    { "field": "sla_response_hours", "rule": "min", "config": { "value": 1 }, "message": "The response SLA is at least one hour." }
+  ]
+}

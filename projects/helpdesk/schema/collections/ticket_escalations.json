@@ -1,0 +1,10 @@
+{
+  "name": "ticket_escalations",
+  "fields": [
+    { "name": "ticket_id", "type": "m2o", "required": true, "options": { "related_collection": "tickets" } },
+    { "name": "rule_id", "type": "m2o", "options": { "related_collection": "escalation_rules" } },
+    { "name": "reason", "type": "text", "required": true }
+  ],
+  "indexes": [{ "fields": ["ticket_id", "rule_id"], "unique": true }],
+  "relations": [{ "name": "ticket_escalations_ticket_id", "type": "m2o", "field": "ticket_id", "target": "tickets", "targetField": "id", "onDelete": "CASCADE", "onUpdate": "CASCADE", "metadata": {} }, { "name": "ticket_escalations_rule_id", "type": "m2o", "field": "rule_id", "target": "escalation_rules", "targetField": "id", "onDelete": "SET NULL", "onUpdate": "CASCADE", "metadata": {} }]
+}
