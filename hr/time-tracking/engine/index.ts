@@ -1,5 +1,5 @@
-import type { ZveltioExtension } from '@zveltio/sdk/extension';
-import { timeTrackingActions } from './actions.js';
+import type { ZveltioExtension } from "@zveltio/sdk/extension";
+import { timeTrackingActions } from "./actions.js";
 
 // Projects, time entries, timesheets and running timers are collections this
 // extension declares in `schema/collections/` (manifest `collections`); the
@@ -8,13 +8,13 @@ import { timeTrackingActions } from './actions.js';
 // left in code is what time tracking does beyond a plain edit: the actions in
 // `actions.ts`.
 const extension: ZveltioExtension = {
-  name: 'hr/time-tracking',
-  category: 'hr',
-  mountStrategy: 'subapp',
+	name: "hr/time-tracking",
+	category: "hr",
+	mountStrategy: "subapp",
 
-  actions: timeTrackingActions,
+	actions: timeTrackingActions,
 
-  async register() {},
+	async register() {},
 };
 
 export default extension;

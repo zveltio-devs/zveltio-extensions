@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.0 (2026-10-30)
+
+- feat: `invoiceEntries` bills a project's billable, unbilled entries as one invoice through `finance/invoicing`'s own `createInvoice` (an optional dependency, 2.0.0 or later): a number from the invoice series, hours at the rate each entry carries, and each entry marked billed only if it still is not — two invoices for the same hours fail one of them
+
 ## 2.0.0 (2026-10-30)
 
 - feat!: projects, time entries, timesheets and running timers are collections declared in `schema/collections/`, created and owned by the engine; no SQL migrations
