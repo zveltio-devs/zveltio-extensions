@@ -14,6 +14,7 @@
   "invoicing.col.total": "Gesamt",
   "invoicing.deleteConfirm": "Diese Rechnung löschen?",
   "invoicing.doc.deliveryNote": "Lieferschein",
+  "invoicing.doc.quote": "Angebot",
   "invoicing.doc.invoice": "Rechnung",
   "invoicing.doc.proforma": "Proformarechnung",
   "invoicing.empty": "Noch keine Rechnungen. Erstellen Sie Ihre erste Rechnung.",

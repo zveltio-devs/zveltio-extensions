@@ -14,6 +14,7 @@
   "invoicing.col.total": "Összesen",
   "invoicing.deleteConfirm": "Törli ezt a számlát?",
   "invoicing.doc.deliveryNote": "Szállítólevél",
+  "invoicing.doc.quote": "Árajánlat",
   "invoicing.doc.invoice": "Számla",
   "invoicing.doc.proforma": "Díjbekérő",
   "invoicing.empty": "Még nincsenek számlák. Hozd létre az első számlát.",

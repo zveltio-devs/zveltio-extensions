@@ -12,6 +12,7 @@
 - fix: the create form's "due in N days" is honoured; reverse-charge and exempt lines carry no VAT in their totals; a generated recurring invoice keeps its lines' units
 - fix: two concurrent first saves of the company profile leave one profile (`singleton` is unique)
 - fix: the outstanding-invoices widget reads every open invoice, not the first 500, and sums in cents
+- feat: a document series may be a `quote` series, which `finance/quotes` numbers its quotes from
 - requires engine 3.0.0-beta.92
 
 ## 1.3.2 (2026-10-26)

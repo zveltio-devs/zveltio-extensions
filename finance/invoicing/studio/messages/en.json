@@ -14,6 +14,7 @@
   "invoicing.col.total": "Total",
   "invoicing.deleteConfirm": "Delete this invoice?",
   "invoicing.doc.deliveryNote": "Delivery note",
+  "invoicing.doc.quote": "Quote",
   "invoicing.doc.invoice": "Invoice",
   "invoicing.doc.proforma": "Pro forma invoice",
   "invoicing.empty": "No invoices yet. Create your first invoice.",

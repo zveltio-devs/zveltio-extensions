@@ -17,12 +17,14 @@
             "colors": {
               "invoice": "badge-primary",
               "proforma": "badge-ghost",
-              "delivery_note": "badge-info"
+              "delivery_note": "badge-info",
+              "quote": "badge-accent"
             },
             "labels": {
               "invoice": "invoicing.doc.invoice",
               "proforma": "invoicing.doc.proforma",
-              "delivery_note": "invoicing.doc.deliveryNote"
+              "delivery_note": "invoicing.doc.deliveryNote",
+              "quote": "invoicing.doc.quote"
             }
           }
         },
@@ -86,6 +88,10 @@
               {
                 "value": "delivery_note",
                 "label": "invoicing.doc.deliveryNote"
+              },
+              {
+                "value": "quote",
+                "label": "invoicing.doc.quote"
               },
               {
                 "value": "credit_note",

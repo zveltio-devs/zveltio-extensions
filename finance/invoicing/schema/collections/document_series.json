@@ -12,7 +12,8 @@
           "proforma",
           "credit_note",
           "receipt",
-          "delivery_note"
+          "delivery_note",
+          "quote"
         ]
       }
     },

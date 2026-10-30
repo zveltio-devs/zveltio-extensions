@@ -14,6 +14,7 @@
   "invoicing.col.total": "Total",
   "invoicing.deleteConfirm": "Ștergeți această factură?",
   "invoicing.doc.deliveryNote": "Aviz de însoțire",
+  "invoicing.doc.quote": "Ofertă",
   "invoicing.doc.invoice": "Factură",
   "invoicing.doc.proforma": "Factură proformă",
   "invoicing.empty": "Nicio factură încă. Creează prima factură.",

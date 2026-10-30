@@ -14,6 +14,7 @@
   "invoicing.col.total": "Total",
   "invoicing.deleteConfirm": "¿Eliminar esta factura?",
   "invoicing.doc.deliveryNote": "Albarán",
+  "invoicing.doc.quote": "Presupuesto",
   "invoicing.doc.invoice": "Factura",
   "invoicing.doc.proforma": "Factura proforma",
   "invoicing.empty": "Aún no hay facturas. Crea tu primera factura.",

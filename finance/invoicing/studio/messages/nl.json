@@ -14,6 +14,7 @@
   "invoicing.col.total": "Totaal",
   "invoicing.deleteConfirm": "Deze factuur verwijderen?",
   "invoicing.doc.deliveryNote": "Pakbon",
+  "invoicing.doc.quote": "Offerte",
   "invoicing.doc.invoice": "Factuur",
   "invoicing.doc.proforma": "Proformafactuur",
   "invoicing.empty": "Nog geen facturen. Maak je eerste factuur.",

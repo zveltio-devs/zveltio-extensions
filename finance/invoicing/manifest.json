@@ -56,7 +56,7 @@
   "integrity": {
     "engineSha256": "00ffeb07947ea5e4dccabb542f5c1aa5b06437cd50554bf3b94bcdb8fe9d28df",
     "sourceSha256": "d9c122b66d508f5652255cc3a4bcb6dfb333bf332d3b64ccc723e24a77a8194b",
-    "schemaSha256": "d1bfcc79a3147ddb1606f3018f29f1e55dc1b700c81dedeae0aec983c872b0c4"
+    "schemaSha256": "80c50d9d875802702ea33a8762b5346ea9b8c2d490f39b771ea53672e63ffa60"
   },
   "collections": [
     "company_profile",

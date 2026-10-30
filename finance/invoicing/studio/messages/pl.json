@@ -14,6 +14,7 @@
   "invoicing.col.total": "Razem",
   "invoicing.deleteConfirm": "Usunąć tę fakturę?",
   "invoicing.doc.deliveryNote": "List przewozowy",
+  "invoicing.doc.quote": "Oferta",
   "invoicing.doc.invoice": "Faktura",
   "invoicing.doc.proforma": "Faktura proforma",
   "invoicing.empty": "Brak faktur. Utwórz pierwszą fakturę.",
