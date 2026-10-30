@@ -1,4 +1,9 @@
 import { ActionRefusal, type ExtensionAction } from '@zveltio/sdk/extension';
+// ponytail: invoicing's own code, inlined into this bundle when it is packed —
+// billed hours become an invoice exactly as invoicing issues one. A change to
+// invoicing's actions needs a repack of time-tracking too; check-bundle-sources
+// hashes only this extension's engine/, so it will not say so.
+import { invoicingActions } from '../../../finance/invoicing/engine/actions.js';
 
 // What time tracking does beyond plain edits, as actions
 // (`POST /ext/hr/time-tracking/actions/<name>`). The engine runs each as the
@@ -96,4 +101,51 @@ const computeTimesheet: ExtensionAction = async (input, host) => {
   return host.collections.update('timesheets', sheet.id as string, { total_hours }, { expect: { status: ['draft'] } });
 };
 
-export const timeTrackingActions = { logTime, startTimer, stopTimer, computeTimesheet };
+/**
+ * Billable, unbilled entries of one project become one invoice, through
+ * invoicing's own `createInvoice` (`finance/invoicing`, an optional
+ * dependency: without it the action is refused). Each entry is marked billed
+ * only if it still is not (`expect`), so two invoices running together for the
+ * same hours fail one of them, rolling back its invoice and its number.
+ */
+const invoiceEntries: ExtensionAction = async (input, host) => {
+  const d = input as { project_id: string; entry_ids: string[]; invoice_date?: string; due_days?: number; client_name?: string; client_tax_id?: string; notes?: string; series?: string; exchange_rate?: number };
+  const project = await load(host, P, d.project_id, 'project');
+  const entries: Row[] = [];
+  for (const id of new Set(d.entry_ids)) {
+    const e = await load(host, E, id, 'entry');
+    if (e.project_id !== d.project_id || !e.is_billable || e.is_billed) {
+      throw new ActionRefusal(409, 'entry_not_billable', `Entry ${id} is not billable, already billed, or of another project.`);
+    }
+    entries.push(e);
+  }
+  const client_name = d.client_name || (project.client_name as string | null);
+  if (!client_name) throw new ActionRefusal(400, 'client_required', 'The project names no client; give client_name.');
+  const inv = (await invoicingActions.createInvoice(
+    {
+      client_name,
+      ...(d.client_tax_id && { client_tax_id: d.client_tax_id }),
+      currency: project.currency ?? 'RON',
+      ...(d.invoice_date && { issue_date: d.invoice_date }),
+      ...(d.due_days !== undefined && { due_days: d.due_days }),
+      ...(d.series && { series: d.series }),
+      ...(d.exchange_rate && { exchange_rate: d.exchange_rate }),
+      ...(d.notes && { notes: d.notes }),
+      lines: entries.map((e, i) => ({
+        description: String(e.task_description || 'Time entry'),
+        quantity: Math.round((Number(e.duration_minutes) / 60) * 100) / 100,
+        unit: 'h',
+        unit_price: Number(e.hourly_rate ?? project.hourly_rate ?? 0),
+        sort_order: i,
+        metadata: { time_entry_id: e.id },
+      })),
+    },
+    host,
+  )) as Row;
+  for (const e of entries) {
+    await host.collections.update(E, String(e.id), { is_billed: true, invoice_id: inv.id }, { expect: { is_billed: [false] } });
+  }
+  return inv;
+};
+
+export const timeTrackingActions = { logTime, startTimer, stopTimer, computeTimesheet, invoiceEntries };

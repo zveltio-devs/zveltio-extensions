@@ -117,3 +117,40 @@ describe('hr/time-tracking actions', () => {
     await refusal(a.computeTimesheet({ employee_id: EMP, week_start: '2026-08-17' }, host), 'timesheet_not_draft');
   });
 });
+
+describe('invoiceEntries', () => {
+  async function billable() {
+    const f = await setup();
+    f.project.client_name = 'Client SRL';
+    await f.host.collections.insert('document_series', { doc_type: 'invoice', series: 'INV', next_number: 1, padding: 3, is_default: true });
+    const e1 = await a.logTime({ employee_id: EMP, project_id: f.project.id, date: '2026-08-18', duration_minutes: 90, is_billable: true, is_billed: false, task_description: 'Build' }, f.host);
+    const e2 = await a.logTime({ employee_id: EMP, project_id: f.project.id, date: '2026-08-19', duration_minutes: 30, is_billable: true, is_billed: false }, f.host);
+    return { ...f, ids: [e1.id, e2.id] as string[] };
+  }
+
+  it('bills the hours once, at the rate each entry carries', async () => {
+    const { host, rows, project, ids } = await billable();
+    const inv = await a.invoiceEntries({ project_id: project.id, entry_ids: ids }, host);
+    expect(inv).toMatchObject({ number: 'INV-001', client_name: 'Client SRL', subtotal: 200 });
+    expect(rows('invoice_lines').map((l) => [l.description, l.quantity, l.unit_price])).toEqual([
+      ['Build', 1.5, 100],
+      ['Time entry', 0.5, 100],
+    ]);
+    expect(rows('time_entries').every((e) => e.is_billed && e.invoice_id === inv.id)).toBe(true);
+    await refusal(a.invoiceEntries({ project_id: project.id, entry_ids: ids }, host), 'entry_not_billable');
+  });
+
+  it('two invoices for the same hours: the second fails', async () => {
+    const { host, rows, project, ids } = await billable();
+    const read = host.collections.read;
+    // Both read the entries unbilled; the other one marks them billed first.
+    host.collections.read = async (c: string, id: string) => {
+      const r = await read(c, id);
+      const copy = r && { ...r };
+      if (c === 'time_entries' && r) r.is_billed = true;
+      return copy;
+    };
+    await refusal(a.invoiceEntries({ project_id: project.id, entry_ids: ids }, host), 'precondition_failed');
+    expect(rows('time_entries').some((e) => e.invoice_id)).toBe(false);
+  });
+});
