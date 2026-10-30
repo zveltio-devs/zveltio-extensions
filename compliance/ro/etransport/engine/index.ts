@@ -1,23 +1,18 @@
 import type { ZveltioExtension } from '@zveltio/sdk/extension';
-import { join } from 'path';
-import { etransportRoutes } from './routes.js';
+import { etransportActions } from './actions.js';
 
+// Declarations are a collection this extension declares in `schema/collections/`
+// (manifest `collections`); the engine creates it, owns its rules and serves it
+// through the data API. What is left in code is the declaration's life: the
+// `recordUit`, `complete` and `cancel` actions.
 const extension: ZveltioExtension = {
   name: 'compliance/ro/etransport',
   category: 'compliance',
-  // S3-01: sub-app mounted at /ext/compliance/ro/etransport by the engine.
   mountStrategy: 'subapp',
 
-  getMigrations() {
-    return [
-      join(import.meta.dir, 'migrations/001_etransport.sql'),
-      join(import.meta.dir, 'migrations/002_tenant_rls.sql'),
-    ];
-  },
+  actions: etransportActions,
 
-  async register(app, ctx) {
-    app.route('/', etransportRoutes(ctx));
-  },
+  async register() {},
 };
 
 export default extension;

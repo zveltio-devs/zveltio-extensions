@@ -1,0 +1,52 @@
+{
+  "name": "etransport_declarations",
+  "fields": [
+    { "name": "uit", "type": "text", "indexed": true },
+    { "name": "transport_date", "type": "date", "required": true, "indexed": true },
+    { "name": "vehicle_plate", "type": "text", "required": true, "indexed": true },
+    { "name": "driver_name", "type": "text", "required": true },
+    { "name": "driver_cnp", "type": "text" },
+    { "name": "departure_address", "type": "text", "required": true },
+    { "name": "departure_county", "type": "text", "required": true },
+    { "name": "departure_country", "type": "text", "required": true, "defaultValue": "RO" },
+    { "name": "destination_address", "type": "text", "required": true },
+    { "name": "destination_county", "type": "text", "required": true },
+    { "name": "destination_country", "type": "text", "required": true, "defaultValue": "RO" },
+    { "name": "goods", "type": "json", "required": true, "defaultValue": [] },
+    { "name": "total_weight_kg", "type": "decimal", "required": true, "defaultValue": 0 },
+    {
+      "name": "purpose",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "commercial",
+      "options": { "values": ["commercial", "personal", "return"] }
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "required": true,
+      "indexed": true,
+      "defaultValue": "draft",
+      "options": { "values": ["draft", "declared", "in_transit", "completed", "cancelled"] }
+    },
+    { "name": "anaf_response", "type": "json" }
+  ],
+  "validation": [
+    {
+      "field": "status",
+      "rule": "transition",
+      "config": {
+        "expression": "previous == null ? value == null || value == \"draft\" : previous == \"draft\" ? value in [\"draft\", \"declared\", \"cancelled\"] : previous == \"declared\" || previous == \"in_transit\" ? value in [previous, \"in_transit\", \"completed\", \"cancelled\"] : value == previous"
+      },
+      "message": "A declaration starts as draft; draft goes to declared or cancelled; declared or in transit goes to in transit, completed or cancelled; completed and cancelled are final."
+    },
+    {
+      "field": "uit",
+      "rule": "transition",
+      "config": {
+        "expression": "previous == null || previous == \"\" || value == previous"
+      },
+      "message": "A UIT, once recorded, does not change: it is the code ANAF issued for this transport."
+    }
+  ]
+}

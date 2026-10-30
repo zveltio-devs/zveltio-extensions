@@ -1,7 +1,6 @@
 {
   "compliance.ro.etransport.action.cancel": "Cancel",
   "compliance.ro.etransport.action.complete": "Mark completed",
-  "compliance.ro.etransport.action.declare": "Declare to ANAF",
   "compliance.ro.etransport.btn.createDeclaration": "Create Declaration",
   "compliance.ro.etransport.btn.newDeclaration": "New Declaration",
   "compliance.ro.etransport.col.driver": "Driver",
@@ -12,7 +11,6 @@
   "compliance.ro.etransport.col.weightKg": "Weight (kg)",
   "compliance.ro.etransport.confirmCancel": "Cancel declaration?",
   "compliance.ro.etransport.confirmDelete": "Delete declaration?",
-  "compliance.ro.etransport.confirmSend": "Send declaration to ANAF e-Transport?",
   "compliance.ro.etransport.empty": "No data yet.",
   "compliance.ro.etransport.empty.declarations": "No transport declarations",
   "compliance.ro.etransport.section.departure": "Departure",
