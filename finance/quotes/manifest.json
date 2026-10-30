@@ -3,7 +3,7 @@
   "displayName": "Quotes & Proposals",
   "category": "finance",
   "description": "Quotes and proposals linked to CRM contacts, converted into invoices",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "zveltioMinVersion": "3.0.0-beta.92",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-quotes",
@@ -221,7 +221,7 @@
     }
   ],
   "integrity": {
-    "engineSha256": "6eb926277e219c6b45a1d244713bf870b8c63ad8019d4592765f448624f97d84",
+    "engineSha256": "a6fa0372a55b9947d56157cf3f9e405bc7e5aab93e830bdfe2506d32b8628c4e",
     "sourceSha256": "72b458f4d0515be5aa00bb976dd9b54150ec4e36af97095d88fe2a672184c4c2",
     "schemaSha256": "e05ed125316c2f2fb0e081ca1d54aa26608f67423a32c6c3785f6444675b026a"
   }

@@ -208,10 +208,11 @@ describe('payments and credit notes', () => {
       { client_name: 'Client SRL', reason: 'Return', original_invoice_id: id, lines: [{ description: 'x', quantity: 2, unit_price: 100 }] },
       host as never,
     )) as Row;
-    expect(cn.number).toBe('CN-001');
+    expect(cn.number).toBeUndefined();
     expect(cn.total).toBe(238);
     await refusal(a.applyCreditNote({ id: cn.id, invoice_id: id }, host as never), 'credit_note_not_issued');
-    await host.collections.update('credit_notes', String(cn.id), { status: 'issued' });
+    expect(await a.issueCreditNote({ id: cn.id }, host as never)).toMatchObject({ status: 'issued', number: 'CN-001' });
+    await refusal(a.issueCreditNote({ id: cn.id }, host as never), 'credit_note_not_draft');
     expect(await a.applyCreditNote({ id: cn.id, invoice_id: id }, host as never)).toEqual({
       applied_amount: 119,
       credit_note_left: 119,
@@ -226,7 +227,7 @@ describe('payments and credit notes', () => {
     await refusal(a.applyCreditNote({ id: cn.id, invoice_id: other.id }, host as never), 'credit_note_not_issued');
     const eur = await issue(host, { ...BASE, currency: 'EUR', exchange_rate: 5 });
     const cn2 = (await a.createCreditNote({ client_name: 'C', reason: 'R', lines: [{ description: 'x' }] }, host as never)) as Row;
-    await host.collections.update('credit_notes', String(cn2.id), { status: 'issued' });
+    await a.issueCreditNote({ id: cn2.id }, host as never);
     await refusal(a.applyCreditNote({ id: cn2.id, invoice_id: eur.id }, host as never), 'currency_mismatch');
   });
 });

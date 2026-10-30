@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.0 (2026-10-30)
+
+- feat: a draft credit note holds no number; `issueCreditNote` issues it and claims the next number of the credit note series, so deleting a draft leaves no gap (a draft numbered before keeps its number)
+
 ## 2.1.0 (2026-10-30)
 
 - feat: a draft holds no number; `sendInvoice` issues it and claims the next number of its series, so deleting a draft leaves no gap (a draft numbered by 2.0.0 keeps its number)

@@ -395,9 +395,8 @@ var createCreditNote = async (input, host) => {
   });
   const subtotal = lines.reduce((s, l) => s + l.base, 0);
   const tax = lines.reduce((s, l) => s + l.base * l.tax_rate / 100, 0);
-  const claimed = await claimNumber(host, "credit_note");
+  await findSeries(host, "credit_note");
   const cn = await host.collections.insert(CN, {
-    number: claimed.number,
     original_invoice_id: d.original_invoice_id ?? null,
     client_id: original?.client_id ?? null,
     client_name: d.client_name,
@@ -422,6 +421,14 @@ var createCreditNote = async (input, host) => {
     });
   }
   return cn;
+};
+var issueCreditNote = async (input, host) => {
+  const { id } = input;
+  const cn = await load(host, CN, id, "credit_note");
+  if (cn.status !== "draft")
+    throw new ActionRefusal(409, "credit_note_not_draft", "Only a draft credit note is issued.");
+  const number = cn.number ?? (await claimNumber(host, "credit_note")).number;
+  return host.collections.update(CN, id, { status: "issued", number }, { expect: { status: ["draft"] } });
 };
 var applyCreditNote = async (input, host) => {
   const { id, invoice_id } = input;
@@ -545,6 +552,7 @@ var invoicingActions = {
   sendInvoice,
   deleteDraft,
   createCreditNote,
+  issueCreditNote,
   applyCreditNote,
   renderInvoice
 };

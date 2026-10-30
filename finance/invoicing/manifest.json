@@ -3,7 +3,7 @@
   "displayName": "Invoicing",
   "category": "finance",
   "description": "Recurring invoices, payment tracking and overdue management",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "zveltioMinVersion": "3.0.0-beta.92",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-invoicing",
@@ -54,9 +54,9 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "c962b6b7307dee7b902abec120c655fd1c2d71f17dc0808aba55cf85bf3de30c",
-    "sourceSha256": "b45cc9e6ff61215ce706e396fc7849b6a67816a1842f380f9c99f961dea397a1",
-    "schemaSha256": "79979dbd58e8c6b09fcd08cb53ea99cf2bdb39e9d6e135ec906d0b9ff7d2bf10"
+    "engineSha256": "7462343dbadc4e9a9c3620830390e9fbf49008f55ca3d216e442123d202da788",
+    "sourceSha256": "2216656840b0bf0f086f46b5e165c9b48c759d82fec516b7f5290f2342a89a7d",
+    "schemaSha256": "e34c445f5481825eafc3159f99798fdd8df14f58e306a1d4aa45e2b35cbb0655"
   },
   "collections": [
     "company_profile",
@@ -627,7 +627,34 @@
       ],
       "writes": [
         "credit_notes",
-        "credit_note_lines",
+        "credit_note_lines"
+      ]
+    },
+    {
+      "name": "issueCreditNote",
+      "permission": {
+        "resource": "credit_notes",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "credit_notes",
+        "document_series"
+      ],
+      "writes": [
+        "credit_notes",
         "document_series"
       ]
     },

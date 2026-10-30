@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.2 (2026-10-30)
+
+- fix: bundles finance/invoicing 2.2.0 (credit notes numbered when issued)
+
 ## 2.0.1 (2026-10-30)
 
 - fix: bundles finance/invoicing 2.1.0: an invoice created here is a draft without a number until it is sent (`sendInvoice`)

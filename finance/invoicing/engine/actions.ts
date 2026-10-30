@@ -455,9 +455,9 @@ const createCreditNote: ExtensionAction = async (input, host) => {
   });
   const subtotal = lines.reduce((s, l) => s + l.base, 0);
   const tax = lines.reduce((s, l) => s + (l.base * l.tax_rate) / 100, 0);
-  const claimed = await claimNumber(host, 'credit_note');
+  // The series must exist now; the note's number is claimed when it is issued.
+  await findSeries(host, 'credit_note');
   const cn = await host.collections.insert(CN, {
-    number: claimed.number,
     original_invoice_id: d.original_invoice_id ?? null,
     client_id: original?.client_id ?? null,
     client_name: d.client_name,
@@ -482,6 +482,20 @@ const createCreditNote: ExtensionAction = async (input, host) => {
     });
   }
   return cn;
+};
+
+/**
+ * Issue a draft credit note: it takes the next number of the credit note series
+ * and becomes `issued`, so a deleted draft leaves no gap. Only from draft
+ * (`expect`), so a note is numbered once; a draft numbered before 2.2.0 keeps
+ * its number.
+ */
+const issueCreditNote: ExtensionAction = async (input, host) => {
+  const { id } = input as { id: string };
+  const cn = await load(host, CN, id, 'credit_note');
+  if (cn.status !== 'draft') throw new ActionRefusal(409, 'credit_note_not_draft', 'Only a draft credit note is issued.');
+  const number = cn.number ?? (await claimNumber(host, 'credit_note')).number;
+  return host.collections.update(CN, id, { status: 'issued', number }, { expect: { status: ['draft'] } });
 };
 
 /**
@@ -637,6 +651,7 @@ export const invoicingActions: Record<string, ExtensionAction> = {
   sendInvoice,
   deleteDraft,
   createCreditNote,
+  issueCreditNote,
   applyCreditNote,
   renderInvoice,
 };
