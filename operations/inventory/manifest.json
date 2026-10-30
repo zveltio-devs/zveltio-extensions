@@ -3,17 +3,22 @@
   "displayName": "Inventory",
   "category": "operations",
   "description": "Warehouses, SKUs, stock movements, reorder alerts and barcode support",
-  "version": "1.1.1",
-  "zveltioMinVersion": "1.0.0",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.92",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-inventory",
   "permissions": [
-    "database"
+    "data:write"
   ],
   "i18nPrefixes": [
     "inventory",
     "operations.inventory"
   ],
+  "contributes": {
+    "engine": true,
+    "studio": true,
+    "fieldTypes": []
+  },
   "studio": {
     "pages": [
       {
@@ -25,11 +30,6 @@
     ],
     "navGroup": "operations"
   },
-  "contributes": {
-    "engine": true,
-    "studio": true,
-    "fieldTypes": []
-  },
   "engine": {
     "entry": "engine/index.js",
     "format": "esm",
@@ -37,11 +37,290 @@
     "bundled": true,
     "bundlePeers": false
   },
+  "collections": [
+    "warehouses",
+    "suppliers",
+    "products",
+    "product_variants",
+    "stock_levels",
+    "purchase_orders",
+    "purchase_order_lines",
+    "product_batches",
+    "stock_movements"
+  ],
+  "actions": [
+    {
+      "name": "moveStock",
+      "permission": {
+        "resource": "stock_movements",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "product_id",
+          "warehouse_id",
+          "type",
+          "quantity"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "in",
+              "out",
+              "transfer",
+              "adjustment"
+            ]
+          },
+          "quantity": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "destination_warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "unit_cost": {
+            "type": "number",
+            "minimum": 0
+          },
+          "reference": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      },
+      "reads": [
+        "stock_levels",
+        "products"
+      ],
+      "writes": [
+        "stock_levels",
+        "products",
+        "stock_movements"
+      ]
+    },
+    {
+      "name": "createPurchaseOrder",
+      "permission": {
+        "resource": "purchase_orders",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "supplier_id",
+          "lines"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "supplier_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expected_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "currency": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3
+          },
+          "notes": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": [
+                "product_id",
+                "quantity_ordered",
+                "unit_cost"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "product_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "quantity_ordered": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "unit_cost": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "tax_rate": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                }
+              }
+            }
+          }
+        }
+      },
+      "reads": [
+        "purchase_orders"
+      ],
+      "writes": [
+        "purchase_orders",
+        "purchase_order_lines"
+      ]
+    },
+    {
+      "name": "receivePurchaseOrder",
+      "permission": {
+        "resource": "purchase_orders",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "lines"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "received_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "lines": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": [
+                "line_id",
+                "quantity_received"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "line_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "quantity_received": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "batch_number": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "expiry_date": {
+                  "type": "string",
+                  "format": "date"
+                }
+              }
+            }
+          }
+        }
+      },
+      "reads": [
+        "purchase_orders",
+        "purchase_order_lines",
+        "product_batches",
+        "stock_levels",
+        "products"
+      ],
+      "writes": [
+        "purchase_orders",
+        "purchase_order_lines",
+        "product_batches",
+        "stock_levels",
+        "products",
+        "stock_movements"
+      ]
+    },
+    {
+      "name": "lowStock",
+      "permission": {
+        "resource": "products",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [],
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "reads": [
+        "products",
+        "stock_levels"
+      ],
+      "writes": []
+    },
+    {
+      "name": "valuation",
+      "permission": {
+        "resource": "products",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [],
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "reads": [
+        "products",
+        "stock_levels"
+      ],
+      "writes": []
+    },
+    {
+      "name": "expiringBatches",
+      "permission": {
+        "resource": "product_batches",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [],
+        "additionalProperties": false,
+        "properties": {
+          "days": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3650
+          }
+        }
+      },
+      "reads": [
+        "product_batches"
+      ],
+      "writes": []
+    }
+  ],
   "integrity": {
-    "engineSha256": "276819dd67c1f7a2485d52b901cf635a35ebed9252885d8dde3153d439aa64db",
-    "sourceSha256": "4a003f5854cea0deb01bfcf4c7864d873f35d00ad981c7515e9bcd6b095fb5d9"
-  },
-  "resources": [
-    "inventory"
-  ]
+    "engineSha256": "2ed2dcf3e2b9aa975ce0b7d1c504b93cbb3d7e779593f3f661bc1f31bf23c429",
+    "sourceSha256": "aedb8e5f8cca8007ceda991194ea843588aa77801a0e535df74e3182bf2f97bc",
+    "schemaSha256": "28d489131ce8043a2421361111fad4b8f368b23d64b97a8a50857ae77cd4babb"
+  }
 }

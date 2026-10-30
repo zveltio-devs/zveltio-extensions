@@ -1,0 +1,62 @@
+{
+  "name": "suppliers",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "contact_name",
+      "type": "text"
+    },
+    {
+      "name": "email",
+      "type": "email"
+    },
+    {
+      "name": "phone",
+      "type": "phone"
+    },
+    {
+      "name": "address",
+      "type": "textarea"
+    },
+    {
+      "name": "tax_id",
+      "type": "text"
+    },
+    {
+      "name": "payment_terms",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 30
+    },
+    {
+      "name": "currency",
+      "type": "text",
+      "required": true,
+      "defaultValue": "RON"
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true
+    }
+  ],
+  "validation": [
+    {
+      "field": "payment_terms",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "Payment terms are not negative."
+    }
+  ]
+}

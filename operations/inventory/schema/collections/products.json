@@ -1,0 +1,140 @@
+{
+  "name": "products",
+  "fields": [
+    {
+      "name": "sku",
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    {
+      "name": "barcode",
+      "type": "text",
+      "indexed": true
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "description",
+      "type": "textarea"
+    },
+    {
+      "name": "category",
+      "type": "text",
+      "indexed": true
+    },
+    {
+      "name": "unit",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "piece",
+      "options": {
+        "values": [
+          "piece",
+          "kg",
+          "liter",
+          "box",
+          "meter",
+          "hour",
+          "other"
+        ]
+      }
+    },
+    {
+      "name": "cost_price",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "sale_price",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "currency",
+      "type": "text",
+      "required": true,
+      "defaultValue": "RON"
+    },
+    {
+      "name": "tax_rate",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 19
+    },
+    {
+      "name": "reorder_point",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "reorder_qty",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "avg_cost",
+      "type": "decimal"
+    },
+    {
+      "name": "image_url",
+      "type": "url"
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true
+    }
+  ],
+  "validation": [
+    {
+      "field": "cost_price",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "A cost price is not negative."
+    },
+    {
+      "field": "sale_price",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "A sale price is not negative."
+    },
+    {
+      "field": "tax_rate",
+      "rule": "range",
+      "config": {
+        "min": 0,
+        "max": 100
+      },
+      "message": "A tax rate is 0 to 100."
+    },
+    {
+      "field": "reorder_point",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "A reorder point is not negative."
+    },
+    {
+      "field": "reorder_qty",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "A reorder quantity is not negative."
+    }
+  ]
+}

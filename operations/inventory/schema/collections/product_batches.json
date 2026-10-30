@@ -1,0 +1,97 @@
+{
+  "name": "product_batches",
+  "fields": [
+    {
+      "name": "product_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "products"
+      }
+    },
+    {
+      "name": "warehouse_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "warehouses"
+      }
+    },
+    {
+      "name": "batch_number",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "lot_number",
+      "type": "text"
+    },
+    {
+      "name": "quantity",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "expiry_date",
+      "type": "date",
+      "indexed": true
+    },
+    {
+      "name": "manufactured_date",
+      "type": "date"
+    },
+    {
+      "name": "unit_cost",
+      "type": "decimal"
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    }
+  ],
+  "indexes": [
+    {
+      "fields": [
+        "product_id",
+        "warehouse_id",
+        "batch_number"
+      ],
+      "unique": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "product_batches_product_id",
+      "type": "m2o",
+      "field": "product_id",
+      "target": "products",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "product_batches_warehouse_id",
+      "type": "m2o",
+      "field": "warehouse_id",
+      "target": "warehouses",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "quantity",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "A batch quantity is not negative."
+    }
+  ]
+}

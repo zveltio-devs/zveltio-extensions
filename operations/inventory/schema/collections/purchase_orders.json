@@ -1,0 +1,112 @@
+{
+  "name": "purchase_orders",
+  "fields": [
+    {
+      "name": "number",
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    {
+      "name": "supplier_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "suppliers"
+      }
+    },
+    {
+      "name": "warehouse_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "warehouses"
+      }
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "required": true,
+      "indexed": true,
+      "defaultValue": "draft",
+      "options": {
+        "values": [
+          "draft",
+          "sent",
+          "partial",
+          "received",
+          "cancelled"
+        ]
+      }
+    },
+    {
+      "name": "expected_date",
+      "type": "date"
+    },
+    {
+      "name": "received_date",
+      "type": "date"
+    },
+    {
+      "name": "currency",
+      "type": "text",
+      "required": true,
+      "defaultValue": "RON"
+    },
+    {
+      "name": "subtotal",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "tax_amount",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "total",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    }
+  ],
+  "relations": [
+    {
+      "name": "purchase_orders_supplier_id",
+      "type": "m2o",
+      "field": "supplier_id",
+      "target": "suppliers",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "purchase_orders_warehouse_id",
+      "type": "m2o",
+      "field": "warehouse_id",
+      "target": "warehouses",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "status",
+      "rule": "transition",
+      "config": {
+        "expression": "previous == null ? value == null || value == 'draft' : previous == 'draft' ? value in ['draft', 'sent', 'partial', 'received', 'cancelled'] : previous in ['sent', 'partial'] ? value in ['sent', 'partial', 'received', 'cancelled'] : value == previous"
+      },
+      "message": "A purchase order goes draft, sent, partly received, received; received and cancelled orders stay so."
+    }
+  ]
+}
