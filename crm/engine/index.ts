@@ -1,138 +1,18 @@
 import type { ZveltioExtension } from '@zveltio/sdk/extension';
-import { join } from 'path';
-import { sql } from 'kysely';
-import { crmRoutes } from './routes.js';
-import { adoptCrmCollections } from './adopt.js';
 import { crmActions } from './actions.js';
 
-/**
- * CRM extension — canonical owner of `zvd_contacts`, `zvd_organizations`,
- * and `zvd_transactions` (plus CRM-only pipeline / activities tables).
- *
- * Owns CREATE (migrations), Studio metadata adopt (`adoptCrmCollections`), and
- * `GET /ext/crm/briefing`. The engine must not CREATE or adopt these tables.
- *
- * Publishes the following services for cross-extension consumption:
- *   crm.contacts.lookup(idOrEmail)         → contact row | null
- *   crm.contacts.create(input)             → created contact
- *   crm.contacts.findByEmail(email)        → contact row | null
- *   crm.organizations.lookup(idOrName)     → organization row | null
- *   crm.organizations.findByName(name)     → organization row | null
- *
- * Other extensions (invoicing, ecommerce, pos, subscriptions) consume these
- * to share a single customer identity instead of maintaining their own copies.
- *
- * Also emits events on the engine event bus that other extensions can react to:
- *   contact.created    { id, contact }
- *   contact.updated    { id, contact, before }
- *   contact.deleted    { id }
- *   organization.created/updated/deleted   (same shape with `organization`)
- */
+// Contacts, organizations and transactions are collections this extension
+// declares in `schema/collections/` (manifest `collections`); the engine creates
+// them, owns their rules and serves them through the data API. What is left in
+// code is business logic: the `markPaid` action.
 const extension: ZveltioExtension = {
   name: 'crm',
   category: 'business',
-  // S3-01: sub-app mounted at /ext/crm by the engine. Internal routes
-  // (/contacts, /organizations, /transactions) are exposed under that prefix.
   mountStrategy: 'subapp',
 
   actions: crmActions,
 
-  getMigrations() {
-    return [
-      join(import.meta.dir, 'migrations/001_initial.sql'),
-      join(import.meta.dir, 'migrations/002_tenant_rls.sql'),
-      join(import.meta.dir, 'migrations/003_tenant_scoped_unique_keys.sql'),
-      join(import.meta.dir, 'migrations/004_contact_organization_role.sql'),
-      join(import.meta.dir, 'migrations/005_contact_org_relation.sql'),
-      join(import.meta.dir, 'migrations/006_payment_status_compat.sql'),
-      join(import.meta.dir, 'migrations/007_jsonb_unwrap_string.sql'),
-      join(import.meta.dir, 'migrations/008_updated_by.sql'),
-      join(import.meta.dir, 'migrations/009_contact_organization_id.sql'),
-    ];
-  },
-
-  async register(app, ctx) {
-    const routes = crmRoutes(ctx);
-    app.route('/', routes);
-
-    await adoptCrmCollections(ctx);
-
-    // ── Service registry — canonical contacts/organizations API ─────────────
-    // Every lookup is the own tenant's (the `tenant_id` column default's
-    // expression): the row policy admits the caller's READ REACH — every firm
-    // for a god — so an id, email or name alone could answer with another
-    // firm's row, which the caller then links its own records to.
-    const ownTenant = sql`COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
-                                   '00000000-0000-0000-0000-000000000001'::uuid)`;
-
-    ctx.services.register('crm.contacts.lookup', async (idOrEmail: string) => {
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrEmail);
-      const r = await sql<any>`
-        SELECT * FROM zvd_contacts
-        WHERE ${isUuid ? sql`id = ${idOrEmail}::uuid` : sql`email = ${idOrEmail}`} AND tenant_id = ${ownTenant}
-        LIMIT 1
-      `.execute(ctx.db);
-      return r.rows[0] ?? null;
-    });
-
-    ctx.services.register('crm.contacts.findByEmail', async (email: string) => {
-      const r = await sql<any>`
-        SELECT * FROM zvd_contacts WHERE email = ${email} AND tenant_id = ${ownTenant} LIMIT 1
-      `.execute(ctx.db);
-      return r.rows[0] ?? null;
-    });
-
-    ctx.services.register('crm.contacts.create', async (input: {
-      first_name: string;
-      last_name?: string;
-      email?: string;
-      phone?: string;
-      organization_id?: string;
-      created_by: string;
-    }) => {
-      const r = await sql<any>`
-        INSERT INTO zvd_contacts (first_name, last_name, email, phone, organization_id, created_by)
-        VALUES (${input.first_name}, ${input.last_name ?? null}, ${input.email ?? null},
-                ${input.phone ?? null}, ${input.organization_id ?? null}, ${input.created_by})
-        RETURNING *
-      `.execute(ctx.db);
-      const contact = r.rows[0];
-      // `organization_id` above is the legacy column on `zvd_contacts` —
-      // nothing reads it (see routes.ts's comment on the same column). The
-      // relation every route actually joins through is
-      // `zvd_contact_organizations`. Without this insert, a contact created
-      // through this service (pos, ecommerce) would accept `organization_id`
-      // and silently show no organization anywhere in the API — the same
-      // "accepted and thrown away" shape this extension's own CONTEXT.md
-      // already names for `notes`.
-      if (input.organization_id) {
-        await sql`
-          INSERT INTO zvd_contact_organizations (contact_id, organization_id, is_primary)
-          VALUES (${contact.id}, ${input.organization_id}, TRUE)
-          ON CONFLICT (contact_id, organization_id) DO UPDATE SET is_primary = TRUE
-        `.execute(ctx.db);
-      }
-      ctx.events.emit('contact.created', { id: contact.id, contact });
-      return contact;
-    });
-
-    ctx.services.register('crm.organizations.lookup', async (idOrName: string) => {
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrName);
-      const r = await sql<any>`
-        SELECT * FROM zvd_organizations
-        WHERE ${isUuid ? sql`id = ${idOrName}::uuid` : sql`name = ${idOrName}`} AND tenant_id = ${ownTenant}
-        LIMIT 1
-      `.execute(ctx.db);
-      return r.rows[0] ?? null;
-    });
-
-    ctx.services.register('crm.organizations.findByName', async (name: string) => {
-      const r = await sql<any>`
-        SELECT * FROM zvd_organizations WHERE name = ${name} AND tenant_id = ${ownTenant} LIMIT 1
-      `.execute(ctx.db);
-      return r.rows[0] ?? null;
-    });
-  },
+  async register() {},
 };
 
 export default extension;

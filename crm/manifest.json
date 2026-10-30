@@ -3,13 +3,17 @@
   "displayName": "CRM",
   "category": "business",
   "description": "Contacts, Organizations, and Transactions — owned by this extension, not the engine core",
-  "version": "1.0.21",
-  "zveltioMinVersion": "3.0.0-beta.83",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.92",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-crm",
   "permissions": [
-    "database",
     "data:write"
+  ],
+  "collections": [
+    "organizations",
+    "contacts",
+    "transactions"
   ],
   "i18nPrefixes": [
     "briefing",
@@ -42,16 +46,10 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "8cc52f25cc92015dd965dfdc2bfeb8d89909199e174bbfd73a87e81897c4c885",
-    "sourceSha256": "04107d675baca7c9ba151732c6478522a000b77e37ac0adc5e4794c1b5a10877"
+    "engineSha256": "a87e52f9f1cad712dd8bbbfe7982c6e1d2ce6147be2f3db557fb0e43d910d01d",
+    "sourceSha256": "5fe9ebed9d625bd8ec8a035fe6781046ac6208bd500347188081a613a774698e",
+    "schemaSha256": "2595cc30d01e44be558b1115b63c119bfce69c4cb5bc6fa3d302c27a02f9ef2e"
   },
-  "resources": [
-    "crm",
-    "contacts",
-    "organizations",
-    "transactions",
-    "contact_organizations"
-  ],
   "actions": [
     {
       "name": "markPaid",

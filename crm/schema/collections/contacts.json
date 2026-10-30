@@ -1,0 +1,74 @@
+{
+  "name": "contacts",
+  "fields": [
+    {
+      "name": "first_name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "last_name",
+      "type": "text"
+    },
+    {
+      "name": "email",
+      "type": "email",
+      "indexed": true
+    },
+    {
+      "name": "phone",
+      "type": "phone"
+    },
+    {
+      "name": "company",
+      "type": "text"
+    },
+    {
+      "name": "organization_id",
+      "type": "m2o",
+      "options": {
+        "related_collection": "organizations"
+      }
+    },
+    {
+      "name": "organization_role",
+      "type": "text"
+    },
+    {
+      "name": "job_title",
+      "type": "text"
+    },
+    {
+      "name": "avatar_url",
+      "type": "url"
+    },
+    {
+      "name": "source",
+      "type": "text"
+    },
+    {
+      "name": "tags",
+      "type": "tags"
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    },
+    {
+      "name": "metadata",
+      "type": "json"
+    }
+  ],
+  "relations": [
+    {
+      "name": "contacts_organization_id",
+      "type": "m2o",
+      "field": "organization_id",
+      "target": "organizations",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

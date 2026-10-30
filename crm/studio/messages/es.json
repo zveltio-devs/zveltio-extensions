@@ -105,5 +105,6 @@
   "crm.ui.search_organizations": "Buscar organizaciones...",
   "crm.ui.tax": "Impuesto",
   "crm.ui.tax_id_cui": "NIF (CUI)",
+  "crm.ui.vat_payer": "Sujeto a IVA (RO)",
   "crm.ui.type": "Tipo *"
 }

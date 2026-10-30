@@ -8,8 +8,8 @@
       "id": "contacts",
       "label": "crm.tab.contacts",
       "icon": "Users",
-      "dataSource": "/ext/crm/contacts",
-      "dataPath": "data",
+      "dataSource": "/api/data/contacts?expand=organization_id&sort=created_at&order=desc&limit=500",
+      "dataPath": "records",
       "search": {
         "fields": [
           "first_name",
@@ -36,7 +36,7 @@
           "label": "crm.col.email"
         },
         {
-          "key": "organization_name",
+          "key": "organization_id_expanded.name",
           "label": "crm.col.organization"
         },
         {
@@ -60,12 +60,12 @@
           "variant": "text-error",
           "label": "common.delete",
           "method": "DELETE",
-          "endpoint": "/ext/crm/contacts/{id}",
+          "endpoint": "/api/data/contacts/{id}",
           "confirm": "ext.confirmDelete"
         }
       ],
       "form": {
-        "endpoint": "/ext/crm/contacts",
+        "endpoint": "/api/data/contacts",
         "fields": [
           {
             "name": "first_name",
@@ -84,8 +84,8 @@
             "type": "relation",
             "colSpan": 1,
             "relation": {
-              "dataSource": "/ext/crm/organizations",
-              "dataPath": "data",
+              "dataSource": "/api/data/organizations?sort=name&order=asc&limit=500",
+              "dataPath": "records",
               "valueKey": "id",
               "labelKey": "name"
             }
@@ -130,8 +130,8 @@
       "id": "organizations",
       "label": "crm.tab.organizations",
       "icon": "Building2",
-      "dataSource": "/ext/crm/organizations",
-      "dataPath": "data",
+      "dataSource": "/api/data/organizations?sort=name&order=asc&limit=500",
+      "dataPath": "records",
       "search": {
         "fields": [
           "name"
@@ -152,10 +152,6 @@
           "label": "crm.col.email"
         },
         {
-          "key": "city",
-          "label": "crm.col.city"
-        },
-        {
           "key": "created_at",
           "label": "common.added",
           "type": "date"
@@ -168,12 +164,12 @@
           "variant": "text-error",
           "label": "common.delete",
           "method": "DELETE",
-          "endpoint": "/ext/crm/organizations/{id}",
+          "endpoint": "/api/data/organizations/{id}",
           "confirm": "ext.confirmDelete"
         }
       ],
       "form": {
-        "endpoint": "/ext/crm/organizations",
+        "endpoint": "/api/data/organizations",
         "fields": [
           {
             "name": "name",
@@ -217,6 +213,12 @@
             "colSpan": 1
           },
           {
+            "name": "vat_payer",
+            "label": "crm.ui.vat_payer",
+            "type": "boolean",
+            "colSpan": 1
+          },
+          {
             "name": "registration_no",
             "label": "crm.form.registrationNo",
             "colSpan": 1
@@ -256,8 +258,8 @@
       "id": "deals",
       "label": "crm.tab.deals",
       "icon": "TrendingUp",
-      "dataSource": "/ext/crm/transactions",
-      "dataPath": "data",
+      "dataSource": "/api/data/transactions?sort=created_at&order=desc&limit=500",
+      "dataPath": "records",
       "search": {
         "fields": [
           "number"
@@ -339,7 +341,7 @@
           "variant": "text-error",
           "label": "common.delete",
           "method": "DELETE",
-          "endpoint": "/ext/crm/transactions/{id}",
+          "endpoint": "/api/data/transactions/{id}",
           "confirm": "ext.confirmDelete"
         },
         {
@@ -348,12 +350,21 @@
           "label": "crm.action.markPaid",
           "method": "POST",
           "endpoint": "/ext/crm/actions/markPaid",
-          "body": { "id": "{id}", "paid_date": "{today}" },
-          "visibleWhen": { "field": "status", "in": ["draft", "pending"] }
+          "body": {
+            "id": "{id}",
+            "paid_date": "{today}"
+          },
+          "visibleWhen": {
+            "field": "status",
+            "in": [
+              "draft",
+              "pending"
+            ]
+          }
         }
       ],
       "form": {
-        "endpoint": "/ext/crm/transactions",
+        "endpoint": "/api/data/transactions",
         "fields": [
           {
             "name": "type",

@@ -105,5 +105,6 @@
   "crm.ui.search_organizations": "Szervezetek keresése...",
   "crm.ui.tax": "Adó",
   "crm.ui.tax_id_cui": "Adószám (CUI)",
+  "crm.ui.vat_payer": "ÁFA-alany (RO)",
   "crm.ui.type": "Típus *"
 }

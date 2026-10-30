@@ -1,0 +1,129 @@
+{
+  "name": "transactions",
+  "fields": [
+    {
+      "name": "type",
+      "type": "enum",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "values": [
+          "invoice",
+          "payment",
+          "credit_note",
+          "expense",
+          "transfer",
+          "other"
+        ]
+      }
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "required": true,
+      "indexed": true,
+      "defaultValue": "draft",
+      "options": {
+        "values": [
+          "draft",
+          "pending",
+          "completed",
+          "cancelled",
+          "refunded"
+        ]
+      }
+    },
+    {
+      "name": "number",
+      "type": "text"
+    },
+    {
+      "name": "organization_id",
+      "type": "m2o",
+      "options": {
+        "related_collection": "organizations"
+      }
+    },
+    {
+      "name": "contact_id",
+      "type": "m2o",
+      "options": {
+        "related_collection": "contacts"
+      }
+    },
+    {
+      "name": "currency",
+      "type": "text",
+      "required": true,
+      "defaultValue": "RON"
+    },
+    {
+      "name": "amount",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "tax_amount",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "total_amount",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "due_date",
+      "type": "date"
+    },
+    {
+      "name": "paid_date",
+      "type": "date"
+    },
+    {
+      "name": "line_items",
+      "type": "json"
+    },
+    {
+      "name": "reference",
+      "type": "text"
+    },
+    {
+      "name": "tags",
+      "type": "tags"
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    },
+    {
+      "name": "metadata",
+      "type": "json"
+    }
+  ],
+  "relations": [
+    {
+      "name": "transactions_organization_id",
+      "type": "m2o",
+      "field": "organization_id",
+      "target": "organizations",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "transactions_contact_id",
+      "type": "m2o",
+      "field": "contact_id",
+      "target": "contacts",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}
