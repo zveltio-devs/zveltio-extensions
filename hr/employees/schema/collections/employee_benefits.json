@@ -1,0 +1,14 @@
+{
+  "name": "employee_benefits",
+  "fields": [
+    {"name": "employee_id", "type": "m2o", "required": true, "options": {"related_collection": "employees"}},
+    {"name": "type", "type": "text", "required": true},
+    {"name": "description", "type": "textarea"},
+    {"name": "value", "type": "decimal"},
+    {"name": "start_date", "type": "date", "required": true},
+    {"name": "end_date", "type": "date"}
+  ],
+  "relations": [
+    {"name": "employee_benefits_employee_id", "type": "m2o", "field": "employee_id", "target": "employees", "targetField": "id", "onDelete": "CASCADE", "onUpdate": "CASCADE", "metadata": {}}
+  ]
+}

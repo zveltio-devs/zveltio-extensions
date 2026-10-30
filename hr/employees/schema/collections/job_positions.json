@@ -1,0 +1,19 @@
+{
+  "name": "job_positions",
+  "fields": [
+    {"name": "title", "type": "text", "required": true},
+    {"name": "description", "type": "textarea"},
+    {"name": "department_id", "type": "m2o", "options": {"related_collection": "departments"}},
+    {"name": "level", "type": "enum", "required": true, "defaultValue": "mid", "options": {"values": ["junior", "mid", "senior", "lead", "manager", "director", "executive"]}},
+    {"name": "min_salary", "type": "decimal"},
+    {"name": "max_salary", "type": "decimal"},
+    {"name": "is_active", "type": "boolean", "required": true, "defaultValue": true}
+  ],
+  "relations": [
+    {"name": "job_positions_department_id", "type": "m2o", "field": "department_id", "target": "departments", "targetField": "id", "onDelete": "SET NULL", "onUpdate": "CASCADE", "metadata": {}}
+  ],
+  "validation": [
+    {"field": "min_salary", "rule": "min", "config": {"value": 0}, "message": "A salary is not negative."},
+    {"field": "max_salary", "rule": "min", "config": {"value": 0}, "message": "A salary is not negative."}
+  ]
+}

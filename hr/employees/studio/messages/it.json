@@ -1,4 +1,5 @@
 {
+  "hr.employees.btn.terminate": "Cessa",
   "hr.employees.col.department": "Reparto",
   "hr.employees.col.email": "E-mail",
   "hr.employees.col.hireDate": "Data di assunzione",
@@ -20,6 +21,7 @@
   "hr.employees.form.department": "Reparto",
   "hr.employees.form.email": "E-mail",
   "hr.employees.form.employmentType": "Tipo di impiego",
+  "hr.employees.form.endDate": "Data di fine",
   "hr.employees.form.firstName": "Nome",
   "hr.employees.form.hireDate": "Data di assunzione",
   "hr.employees.form.lastName": "Cognome",

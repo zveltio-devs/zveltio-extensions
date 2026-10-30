@@ -1,4 +1,5 @@
 {
+  "hr.employees.btn.terminate": "Uit dienst",
   "hr.employees.col.department": "Afdeling",
   "hr.employees.col.email": "E-mail",
   "hr.employees.col.hireDate": "Datum in dienst",
@@ -20,6 +21,7 @@
   "hr.employees.form.department": "Afdeling",
   "hr.employees.form.email": "E-mail",
   "hr.employees.form.employmentType": "Dienstverband",
+  "hr.employees.form.endDate": "Einddatum",
   "hr.employees.form.firstName": "Voornaam",
   "hr.employees.form.hireDate": "Datum in dienst",
   "hr.employees.form.lastName": "Achternaam",

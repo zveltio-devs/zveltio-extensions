@@ -1,0 +1,13 @@
+{
+  "name": "employee_documents",
+  "fields": [
+    {"name": "employee_id", "type": "m2o", "required": true, "options": {"related_collection": "employees"}},
+    {"name": "type", "type": "enum", "required": true, "defaultValue": "other", "options": {"values": ["contract", "id_card", "diploma", "certificate", "other"]}},
+    {"name": "name", "type": "text", "required": true},
+    {"name": "file_url", "type": "text", "required": true},
+    {"name": "expires_at", "type": "date", "indexed": true}
+  ],
+  "relations": [
+    {"name": "employee_documents_employee_id", "type": "m2o", "field": "employee_id", "target": "employees", "targetField": "id", "onDelete": "CASCADE", "onUpdate": "CASCADE", "metadata": {}}
+  ]
+}

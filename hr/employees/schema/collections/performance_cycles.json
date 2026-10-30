@@ -1,0 +1,12 @@
+{
+  "name": "performance_cycles",
+  "fields": [
+    {"name": "name", "type": "text", "required": true},
+    {"name": "start_date", "type": "date", "required": true},
+    {"name": "end_date", "type": "date", "required": true},
+    {"name": "status", "type": "enum", "required": true, "defaultValue": "open", "options": {"values": ["open", "closed"]}}
+  ],
+  "validation": [
+    {"field": "status", "rule": "transition", "config": {"expression": "previous != 'closed' || value == 'closed'"}, "message": "A closed cycle stays closed: its ratings are final."}
+  ]
+}

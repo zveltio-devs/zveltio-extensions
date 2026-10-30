@@ -1,4 +1,5 @@
 {
+  "hr.employees.btn.terminate": "Megszüntetés",
   "hr.employees.col.department": "Osztály",
   "hr.employees.col.email": "E-mail",
   "hr.employees.col.hireDate": "Felvétel dátuma",
@@ -20,6 +21,7 @@
   "hr.employees.form.department": "Osztály",
   "hr.employees.form.email": "E-mail",
   "hr.employees.form.employmentType": "Foglalkoztatás típusa",
+  "hr.employees.form.endDate": "Befejezés dátuma",
   "hr.employees.form.firstName": "Keresztnév",
   "hr.employees.form.hireDate": "Felvétel dátuma",
   "hr.employees.form.lastName": "Vezetéknév",

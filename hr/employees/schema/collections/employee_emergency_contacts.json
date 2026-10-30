@@ -1,0 +1,14 @@
+{
+  "name": "employee_emergency_contacts",
+  "fields": [
+    {"name": "employee_id", "type": "m2o", "required": true, "options": {"related_collection": "employees"}},
+    {"name": "name", "type": "text", "required": true},
+    {"name": "relationship", "type": "text", "required": true},
+    {"name": "phone", "type": "phone", "required": true},
+    {"name": "email", "type": "email"},
+    {"name": "is_primary", "type": "boolean", "required": true, "defaultValue": false}
+  ],
+  "relations": [
+    {"name": "employee_emergency_contacts_employee_id", "type": "m2o", "field": "employee_id", "target": "employees", "targetField": "id", "onDelete": "CASCADE", "onUpdate": "CASCADE", "metadata": {}}
+  ]
+}
