@@ -4,7 +4,6 @@
     {
       "name": "number",
       "type": "text",
-      "required": true,
       "unique": true
     },
     {
