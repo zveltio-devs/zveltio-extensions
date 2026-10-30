@@ -6,11 +6,11 @@
   "resources": [
     {
       "id": "declarations",
-      "dataSource": "/ext/compliance/ro/etransport",
-      "dataPath": "declarations",
+      "dataSource": "/api/data/etransport_declarations?sort=transport_date&order=desc&limit=500",
+      "dataPath": "records",
       "filters": [
         {
-          "param": "status",
+          "param": "status[eq]",
           "options": [
             { "value": "all", "label": "common.filter.all" },
             { "value": "draft", "label": "compliance.ro.etransport.status.draft" },
@@ -56,21 +56,11 @@
       ],
       "rowActions": [
         {
-          "id": "declare",
-          "label": "compliance.ro.etransport.action.declare",
-          "icon": "Send",
-          "variant": "text-primary",
-          "method": "POST",
-          "endpoint": "/ext/compliance/ro/etransport/{id}/declare",
-          "visibleWhen": { "field": "status", "equals": "draft" },
-          "confirm": "compliance.ro.etransport.confirmSend"
-        },
-        {
           "id": "delete",
           "icon": "Trash2",
           "variant": "text-error",
           "method": "DELETE",
-          "endpoint": "/ext/compliance/ro/etransport/{id}",
+          "endpoint": "/api/data/etransport_declarations/{id}",
           "visibleWhen": { "field": "status", "equals": "draft" },
           "confirm": "compliance.ro.etransport.confirmDelete"
         },
@@ -80,7 +70,8 @@
           "icon": "CheckCircle",
           "variant": "text-success",
           "method": "POST",
-          "endpoint": "/ext/compliance/ro/etransport/{id}/complete",
+          "endpoint": "/ext/compliance/ro/etransport/actions/complete",
+          "body": { "id": "{id}" },
           "visibleWhen": { "field": "status", "in": ["declared", "in_transit"] }
         },
         {
@@ -89,13 +80,14 @@
           "icon": "XCircle",
           "variant": "text-error",
           "method": "POST",
-          "endpoint": "/ext/compliance/ro/etransport/{id}/cancel",
+          "endpoint": "/ext/compliance/ro/etransport/actions/cancel",
+          "body": { "id": "{id}" },
           "visibleWhen": { "field": "status", "in": ["declared", "in_transit"] },
           "confirm": "compliance.ro.etransport.confirmCancel"
         }
       ],
       "form": {
-        "endpoint": "/ext/compliance/ro/etransport",
+        "endpoint": "/api/data/etransport_declarations",
         "fields": [
           { "name": "transport_date", "label": "compliance.ro.etransport.ui.transport_date", "type": "date", "colSpan": 1, "default": "today" },
           {

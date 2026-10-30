@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.0.0 (2026-10-30)
+
+- feat!: declarations are the `etransport_declarations` collection, declared in `schema/collections/` and created and owned by the engine; no SQL migrations
+- feat!: the hand-written `/ext/compliance/ro/etransport` routes are gone — read and write through `/api/data/etransport_declarations`; recording a UIT, completing and cancelling are the actions `recordUit`, `complete` and `cancel`
+- feat!: the `etransport` resource and the separate `etransport:cancel` check are gone; who may run an action or edit a declaration is the engine's rules on the collection
+- feat: the declaration's order (draft → declared → completed, cancellable until closed) and a recorded UIT's immutability are validation rules, so a PATCH keeps them too
+- fix: the "Declare to ANAF" button, which only ever answered 501, is gone
+- requires engine 3.0.0-beta.92
+
 ## 1.0.3 (2026-10-11)
 
 - Merge pull request #79 from zveltio-devs/feat/ext-i18n-on-wire

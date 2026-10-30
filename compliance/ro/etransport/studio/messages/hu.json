@@ -1,7 +1,6 @@
 {
   "compliance.ro.etransport.action.cancel": "Mégse",
   "compliance.ro.etransport.action.complete": "Befejezettként jelölés",
-  "compliance.ro.etransport.action.declare": "Declare to ANAF",
   "compliance.ro.etransport.btn.createDeclaration": "Nyilatkozat létrehozása",
   "compliance.ro.etransport.btn.newDeclaration": "Új nyilatkozat",
   "compliance.ro.etransport.col.driver": "Sofőr",
@@ -12,7 +11,6 @@
   "compliance.ro.etransport.col.weightKg": "Súly (kg)",
   "compliance.ro.etransport.confirmCancel": "Törli a nyilatkozatot?",
   "compliance.ro.etransport.confirmDelete": "Törli a nyilatkozatot?",
-  "compliance.ro.etransport.confirmSend": "Send declaration to ANAF e-Transport?",
   "compliance.ro.etransport.empty": "Még nincsenek adatok.",
   "compliance.ro.etransport.empty.declarations": "Nincsenek szállítási nyilatkozatok",
   "compliance.ro.etransport.section.departure": "Indulás",

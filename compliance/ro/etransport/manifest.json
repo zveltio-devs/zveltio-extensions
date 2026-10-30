@@ -3,12 +3,12 @@
   "displayName": "e-Transport RO",
   "category": "compliance/ro",
   "description": "Romanian e-Transport monitoring system — declare and track road transport of goods via ANAF",
-  "version": "1.0.3",
-  "zveltioMinVersion": "1.0.0",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.92",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-ro-etransport",
   "permissions": [
-    "database"
+    "data:write"
   ],
   "i18nPrefixes": [
     "compliance.ro.etransport"
@@ -37,10 +37,102 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "9465d1f776944560ef767f6997a947d7fd13ec454ea5fc068ea71bccee5dadb6",
-    "sourceSha256": "db612207cd58c87930a6ed6665f8087f44546519d4b03524b5ae5bfd1db410c7"
+    "engineSha256": "45578d1d9b58a7a497faf4705f2eda8f820133e15ebc0adc441c765a90c66643",
+    "sourceSha256": "f054fadfa4cf58da5dc6759ad38d96eaa72560fcd54399b4a1a009d2dd71c788",
+    "schemaSha256": "5ede95e6e2616d2e30c063f66086931551587158f892751a87fb7e18c1e13cb6"
   },
-  "resources": [
-    "etransport"
+  "collections": [
+    "etransport_declarations"
+  ],
+  "actions": [
+    {
+      "name": "recordUit",
+      "permission": {
+        "resource": "etransport_declarations",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "uit"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "uit": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 64,
+            "pattern": "\\S"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        }
+      },
+      "reads": [
+        "etransport_declarations"
+      ],
+      "writes": [
+        "etransport_declarations"
+      ]
+    },
+    {
+      "name": "complete",
+      "permission": {
+        "resource": "etransport_declarations",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "etransport_declarations"
+      ],
+      "writes": [
+        "etransport_declarations"
+      ]
+    },
+    {
+      "name": "cancel",
+      "permission": {
+        "resource": "etransport_declarations",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "etransport_declarations"
+      ],
+      "writes": [
+        "etransport_declarations"
+      ]
+    }
   ]
 }
