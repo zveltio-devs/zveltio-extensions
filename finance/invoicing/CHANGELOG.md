@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.0 (2026-10-30)
+
+- feat: a draft holds no number; `sendInvoice` issues it and claims the next number of its series, so deleting a draft leaves no gap (a draft numbered by 2.0.0 keeps its number)
+- feat: `deleteDraft` deletes a draft and refuses an issued invoice; the Studio's Send and Delete use these actions
+- feat: a credit note applies in parts: `applied_amount` records what it credited, `partially_applied` keeps the rest for another invoice, and each application is a `credit_note` payment on the invoice naming the note (`credit_note_id`); a note and an invoice in different currencies are refused
+
 ## 2.0.0 (2026-10-30)
 
 - feat!: invoices, their lines, payments, reminders, credit notes and their lines, document series, the company profile and the catalogue are collections declared in `schema/collections/`, created and owned by the engine; no SQL migrations

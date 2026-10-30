@@ -1,7 +1,7 @@
 // @bun
-// ../zveltio-extensions/finance/banking/engine/actions.ts
+// engine/actions.ts
 import { createHash } from "crypto";
-// packages/sdk/src/extension/action-refusal.ts
+// /zveltio-extension/packages/sdk/src/extension/action-refusal.ts
 var ACTION_REFUSAL = Symbol.for("zveltio.extension.action-refusal");
 
 class ActionRefusal extends Error {
@@ -15,7 +15,7 @@ class ActionRefusal extends Error {
     this.name = "ActionRefusal";
   }
 }
-// packages/sdk/src/extension/dates.ts
+// /zveltio-extension/packages/sdk/src/extension/dates.ts
 function todayIn(timeZone, now = new Date) {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone,
@@ -24,7 +24,7 @@ function todayIn(timeZone, now = new Date) {
     day: "2-digit"
   }).format(now);
 }
-// packages/sdk/src/extension/reserved-paths.ts
+// /zveltio-extension/packages/sdk/src/extension/reserved-paths.ts
 var RESERVED_PATH_SEGMENTS = Object.freeze([
   "api",
   "ext",
@@ -37,7 +37,7 @@ var RESERVED_PATH_SEGMENTS = Object.freeze([
   "robots.txt",
   "sitemap.xml"
 ]);
-// ../zveltio-extensions/finance/invoicing/engine/actions.ts
+// ../invoicing/engine/actions.ts
 var I = "invoices";
 var L = "invoice_lines";
 var CN = "credit_notes";
@@ -93,17 +93,21 @@ function isValidCui(value) {
     sum += Number(padded[i]) * Number(key[i]);
   return sum * 10 % 11 % 10 === Number(digits.slice(-1));
 }
+async function findSeries(host, docType, series) {
+  const found = records(await host.collections.list("document_series", {
+    filter: { doc_type: docType, ...series && { series } },
+    limit: 100,
+    count: "none"
+  })).sort((a, b) => Number(Boolean(b.is_default)) - Number(Boolean(a.is_default)) || String(a.created_at).localeCompare(String(b.created_at)));
+  const s = found[0];
+  if (!s) {
+    throw new ActionRefusal(400, "no_series", series ? `There is no ${docType} series "${series}".` : `No ${docType} series is configured.`);
+  }
+  return s;
+}
 async function claimNumber(host, docType, series) {
   for (let attempt = 0;attempt < 5; attempt++) {
-    const found = records(await host.collections.list("document_series", {
-      filter: { doc_type: docType, ...series && { series } },
-      limit: 100,
-      count: "none"
-    })).sort((a, b) => Number(Boolean(b.is_default)) - Number(Boolean(a.is_default)) || String(a.created_at).localeCompare(String(b.created_at)));
-    const s = found[0];
-    if (!s) {
-      throw new ActionRefusal(400, "no_series", series ? `There is no ${docType} series "${series}".` : `No ${docType} series is configured.`);
-    }
+    const s = await findSeries(host, docType, series);
     const next = n(s.next_number);
     try {
       await host.collections.update("document_series", String(s.id), { next_number: next + 1 }, { expect: { next_number: [String(s.next_number)] } });
@@ -257,13 +261,12 @@ var createInvoice = async (input, host) => {
     e.vat += x.vat;
     byRate.set(x.tax_rate, e);
   }
-  const claimed = await claimNumber(host, docType, d.series);
+  await findSeries(host, docType, d.series);
   const inv = await host.collections.insert(I, {
     ...pick(d, PARTY.filter((k) => k.startsWith("client_"))),
     ...await seller(host),
     ...pick(d, ["delegate_name", "delegate_id_card", "delegate_vehicle", "delivery_date", "exchange_date", "notes", "footer_notes", "po_number", "recurring_interval", "vat_exemption_reason"]),
-    number: claimed.number,
-    series: claimed.series,
+    series: d.series ?? null,
     doc_type: docType,
     issue_date: issue,
     due_date: due,
@@ -331,14 +334,12 @@ var convertProforma = async (input, host) => {
   const p = await load(host, I, id, "invoice");
   if (p.doc_type !== "proforma")
     throw new ActionRefusal(409, "not_a_proforma", "Only a proforma converts to an invoice.");
-  const claimed = await claimNumber(host, "invoice");
+  await host.collections.update(I, id, { status: p.status }, { expect: { status: [String(p.status)] } });
   const done = records(await host.collections.list(I, { filter: { converted_from_id: id }, limit: 1, count: "none" }))[0];
   if (done)
     throw new ActionRefusal(409, "already_converted", `Already converted to ${done.number}.`);
   const inv = await host.collections.insert(I, {
     ...pick(p, [...PARTY, ...AMOUNTS, "delivery_date", "due_date"]),
-    number: claimed.number,
-    series: claimed.series,
     doc_type: "invoice",
     issue_date: todayIn(host.timezone),
     converted_from_id: id
@@ -356,17 +357,32 @@ var generateNext = async (input, host) => {
     throw new ActionRefusal(409, "invoice_not_issued", "Only an issued invoice generates the next one.");
   }
   const issue = addDays(day(i.due_date), 1);
-  const claimed = await claimNumber(host, "invoice", i.series ? String(i.series) : undefined);
   const inv = await host.collections.insert(I, {
     ...pick(i, [...PARTY, ...AMOUNTS, "recurring_interval"]),
-    number: claimed.number,
-    series: claimed.series,
+    series: i.series ?? null,
     doc_type: i.doc_type,
     issue_date: issue,
     due_date: addMonths(issue, months)
   });
   await copyLines(host, id, String(inv.id));
   return inv;
+};
+var sendInvoice = async (input, host) => {
+  const { id } = input;
+  const inv = await load(host, I, id, "invoice");
+  if (inv.status !== "draft")
+    throw new ActionRefusal(409, "invoice_not_draft", "Only a draft is sent.");
+  const claimed = inv.number ? { number: inv.number, series: inv.series } : await claimNumber(host, String(inv.doc_type), inv.series ? String(inv.series) : undefined);
+  return host.collections.update(I, id, { status: "sent", number: claimed.number, series: claimed.series }, { expect: { status: ["draft"] } });
+};
+var deleteDraft = async (input, host) => {
+  const { id } = input;
+  const inv = await load(host, I, id, "invoice");
+  if (inv.status !== "draft")
+    throw new ActionRefusal(409, "invoice_not_draft", "Only a draft is deleted; cancel an issued invoice.");
+  await host.collections.update(I, id, { status: "draft" }, { expect: { status: ["draft"] } });
+  await host.collections.delete(I, id);
+  return { deleted: id };
 };
 var createCreditNote = async (input, host) => {
   const d = blankless(input);
@@ -410,18 +426,35 @@ var createCreditNote = async (input, host) => {
 var applyCreditNote = async (input, host) => {
   const { id, invoice_id } = input;
   const cn = await load(host, CN, id, "credit_note");
-  if (cn.status !== "issued")
-    throw new ActionRefusal(409, "credit_note_not_issued", "Only an issued credit note can be applied.");
+  if (cn.status !== "issued" && cn.status !== "partially_applied") {
+    throw new ActionRefusal(409, "credit_note_not_issued", "Only an issued credit note with a balance left can be applied.");
+  }
   const inv = await load(host, I, invoice_id, "invoice");
   if (!PAYABLE.includes(String(inv.status))) {
     throw new ActionRefusal(409, "invoice_not_payable", "A credit note applies to a sent, overdue or partly paid invoice.");
   }
-  await host.collections.update(CN, id, { status: "applied" }, { expect: { status: ["issued"] } });
-  const applied = round2(Math.max(0, Math.min(n(cn.total), n(inv.total) - n(inv.amount_paid))));
+  if (cn.currency !== inv.currency) {
+    throw new ActionRefusal(409, "currency_mismatch", `The credit note is in ${cn.currency}, the invoice in ${inv.currency}.`);
+  }
+  const used = n(cn.applied_amount);
+  const applied = round2(Math.min(n(cn.total) - used, n(inv.total) - n(inv.amount_paid)));
+  if (applied <= 0)
+    throw new ActionRefusal(409, "nothing_to_apply", "Nothing is left to credit.");
+  const left = round2(n(cn.total) - used - applied);
+  await host.collections.update(CN, id, { applied_amount: round2(used + applied), status: left > 0 ? "partially_applied" : "applied" }, { expect: { status: [String(cn.status)], applied_amount: [String(cn.applied_amount)] } });
   const paid = round2(n(inv.amount_paid) + applied);
   const full = paid >= n(inv.total);
   const invoice = await host.collections.update(I, invoice_id, { amount_paid: paid, status: full ? "paid" : "partially_paid", ...full && { paid_at: new Date().toISOString() } }, { expect: { amount_paid: [String(inv.amount_paid)], status: [String(inv.status)] } });
-  return { applied_amount: applied, invoice_status: invoice.status };
+  await host.collections.insert("invoice_payments", {
+    invoice_id,
+    amount: applied,
+    currency: inv.currency,
+    payment_date: todayIn(host.timezone),
+    payment_method: "credit_note",
+    reference: cn.number,
+    credit_note_id: id
+  });
+  return { applied_amount: applied, credit_note_left: left, invoice_status: invoice.status };
 };
 function esc(value) {
   if (value === null || value === undefined)
@@ -509,12 +542,14 @@ var invoicingActions = {
   markOverdue,
   convertProforma,
   generateNext,
+  sendInvoice,
+  deleteDraft,
   createCreditNote,
   applyCreditNote,
   renderInvoice
 };
 
-// ../zveltio-extensions/finance/banking/engine/mt940.ts
+// engine/mt940.ts
 var MT940_LINE = /^:61:(\d{6})(\d{4})?(RC|RD|C|D)([A-Z])?(\d+,\d*)([NSF]\w{0,3})(.*)?$/;
 function parseMT940(text) {
   const lines = text.replace(/\r\n/g, `
@@ -566,7 +601,7 @@ function parseMT940(text) {
   return { transactions, unparsed };
 }
 
-// ../zveltio-extensions/finance/banking/engine/actions.ts
+// engine/actions.ts
 var A = "bank_accounts";
 var T = "bank_transactions";
 var PAGE2 = 500;
@@ -827,7 +862,7 @@ var bankingActions = {
   refreshBalance
 };
 
-// ../zveltio-extensions/finance/banking/engine/index.ts
+// engine/index.ts
 var extension = {
   name: "finance/banking",
   category: "finance",

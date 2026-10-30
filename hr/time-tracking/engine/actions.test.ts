@@ -247,7 +247,6 @@ describe("invoiceEntries", () => {
 			host,
 		);
 		expect(inv).toMatchObject({
-			number: "INV-001",
 			client_name: "Client SRL",
 			subtotal: 200,
 		});

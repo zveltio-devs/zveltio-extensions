@@ -72,9 +72,16 @@
         "values": [
           "draft",
           "issued",
+          "partially_applied",
           "applied"
         ]
       }
+    },
+    {
+      "name": "applied_amount",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
     }
   ],
   "relations": [
@@ -94,9 +101,17 @@
       "field": "status",
       "rule": "transition",
       "config": {
-        "expression": "value == previous || (previous == 'draft' && value == 'issued') || (previous == 'issued' && value == 'applied')"
+        "expression": "value == previous || (previous == 'draft' && value == 'issued') || (previous in ['issued', 'partially_applied'] && value in ['partially_applied', 'applied'])"
       },
-      "message": "A credit note goes draft, issued, then applied."
+      "message": "A credit note goes draft, issued, then applied, in one or more parts."
+    },
+    {
+      "field": "applied_amount",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "An applied amount is not negative."
     }
   ]
 }
