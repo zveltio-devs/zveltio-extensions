@@ -1,0 +1,79 @@
+{
+  "name": "recurring_journal_lines",
+  "fields": [
+    {
+      "name": "recurring_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "recurring_journals"
+      }
+    },
+    {
+      "name": "account_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "accounts"
+      }
+    },
+    {
+      "name": "debit",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "credit",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "description",
+      "type": "text"
+    }
+  ],
+  "relations": [
+    {
+      "name": "recurring_journal_lines_recurring_id",
+      "type": "m2o",
+      "field": "recurring_id",
+      "target": "recurring_journals",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "recurring_journal_lines_account_id",
+      "type": "m2o",
+      "field": "account_id",
+      "target": "accounts",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "debit",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "A debit is not negative."
+    },
+    {
+      "field": "credit",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "A credit is not negative."
+    }
+  ]
+}

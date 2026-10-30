@@ -1,0 +1,80 @@
+{
+  "name": "budgets",
+  "fields": [
+    {
+      "name": "fiscal_year_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "fiscal_years"
+      }
+    },
+    {
+      "name": "account_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "accounts"
+      }
+    },
+    {
+      "name": "month",
+      "type": "integer"
+    },
+    {
+      "name": "amount",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    }
+  ],
+  "relations": [
+    {
+      "name": "budgets_fiscal_year_id",
+      "type": "m2o",
+      "field": "fiscal_year_id",
+      "target": "fiscal_years",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "budgets_account_id",
+      "type": "m2o",
+      "field": "account_id",
+      "target": "accounts",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "indexes": [
+    {
+      "fields": [
+        "fiscal_year_id",
+        "account_id",
+        "month"
+      ],
+      "unique": true
+    }
+  ],
+  "validation": [
+    {
+      "field": "month",
+      "rule": "range",
+      "config": {
+        "min": 1,
+        "max": 12
+      },
+      "message": "A month is 1 to 12."
+    }
+  ]
+}

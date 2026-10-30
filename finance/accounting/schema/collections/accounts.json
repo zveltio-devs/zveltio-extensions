@@ -1,0 +1,85 @@
+{
+  "name": "accounts",
+  "fields": [
+    {
+      "name": "code",
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "type",
+      "type": "enum",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "values": [
+          "asset",
+          "liability",
+          "equity",
+          "revenue",
+          "expense"
+        ]
+      }
+    },
+    {
+      "name": "parent_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "accounts"
+      }
+    },
+    {
+      "name": "description",
+      "type": "textarea"
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true
+    },
+    {
+      "name": "currency",
+      "type": "text",
+      "required": true,
+      "defaultValue": "RON"
+    },
+    {
+      "name": "cost_center_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "cost_centers"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "name": "accounts_parent_id",
+      "type": "m2o",
+      "field": "parent_id",
+      "target": "accounts",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "accounts_cost_center_id",
+      "type": "m2o",
+      "field": "cost_center_id",
+      "target": "cost_centers",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

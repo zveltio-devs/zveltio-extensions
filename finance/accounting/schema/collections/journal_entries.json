@@ -1,0 +1,64 @@
+{
+  "name": "journal_entries",
+  "fields": [
+    {
+      "name": "date",
+      "type": "date",
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "description",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "reference",
+      "type": "text"
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "required": true,
+      "indexed": true,
+      "defaultValue": "draft",
+      "options": {
+        "values": [
+          "draft",
+          "posted",
+          "voided"
+        ]
+      }
+    },
+    {
+      "name": "fiscal_year_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "fiscal_years"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "name": "journal_entries_fiscal_year_id",
+      "type": "m2o",
+      "field": "fiscal_year_id",
+      "target": "fiscal_years",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "status",
+      "rule": "transition",
+      "config": {
+        "expression": "previous == null ? value == null || value == 'draft' : previous == 'draft' ? value in ['draft', 'posted'] : previous == 'posted' ? value in ['posted', 'voided'] : value == previous"
+      },
+      "message": "An entry is written as a draft, then posted; a posted entry is only voided; a voided entry is final."
+    }
+  ]
+}

@@ -12,6 +12,9 @@
   "accounting.tab.trialBalance": "Balanță de verificare",
   "accounting.yes": "Da",
   "finance.accounting.actions": "Acțiuni jurnal",
+  "finance.accounting.closeConfirm": "Închizi anul fiscal? După închidere nu se mai pot înregistra note în el.",
+  "finance.accounting.closeYear": "Închide anul",
+  "finance.accounting.deleteConfirm": "Ștergi nota ciornă și liniile ei?",
   "finance.accounting.empty": "Niciun date încă.",
   "finance.accounting.newEntry": "Înregistrare nouă",
   "finance.accounting.postEntry": "Contabilizează nota",
@@ -38,5 +41,7 @@
   "finance.accounting.ui.offBy": "Diferență",
   "finance.accounting.ui.parent_code_optional": "Cod părinte (opțional)",
   "finance.accounting.ui.revenue": "Venituri",
-  "finance.accounting.ui.totals": "Totaluri"
+  "finance.accounting.ui.totals": "Totaluri",
+  "finance.accounting.voidConfirm": "Anulezi nota? O notă de stornare datată azi o scoate din evidență.",
+  "finance.accounting.voidEntry": "Anulează nota"
 }

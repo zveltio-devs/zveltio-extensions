@@ -12,6 +12,9 @@
   "accounting.tab.trialBalance": "Trial balance",
   "accounting.yes": "Yes",
   "finance.accounting.actions": "Journal actions",
+  "finance.accounting.closeConfirm": "Close this fiscal year? No entry can be written to it afterwards.",
+  "finance.accounting.closeYear": "Close year",
+  "finance.accounting.deleteConfirm": "Delete this draft entry and its lines?",
   "finance.accounting.empty": "No data yet.",
   "finance.accounting.newEntry": "New entry",
   "finance.accounting.postEntry": "Post entry",
@@ -38,5 +41,7 @@
   "finance.accounting.ui.offBy": "Off by",
   "finance.accounting.ui.parent_code_optional": "Parent code (optional)",
   "finance.accounting.ui.revenue": "Revenue",
-  "finance.accounting.ui.totals": "Totals"
+  "finance.accounting.ui.totals": "Totals",
+  "finance.accounting.voidConfirm": "Void this entry? A reversing entry dated today takes it back out of the books.",
+  "finance.accounting.voidEntry": "Void entry"
 }

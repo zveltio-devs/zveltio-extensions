@@ -1,0 +1,64 @@
+{
+  "name": "tax_reports",
+  "fields": [
+    {
+      "name": "type",
+      "type": "enum",
+      "required": true,
+      "options": {
+        "values": [
+          "D300",
+          "D394",
+          "D390"
+        ]
+      }
+    },
+    {
+      "name": "period_from",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "period_to",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "required": true,
+      "indexed": true,
+      "defaultValue": "draft",
+      "options": {
+        "values": [
+          "draft",
+          "submitted",
+          "accepted",
+          "rejected"
+        ]
+      }
+    },
+    {
+      "name": "xml_content",
+      "type": "textarea"
+    },
+    {
+      "name": "submitted_at",
+      "type": "datetime"
+    },
+    {
+      "name": "anaf_ref",
+      "type": "text"
+    }
+  ],
+  "validation": [
+    {
+      "field": "status",
+      "rule": "transition",
+      "config": {
+        "expression": "previous == null ? value == null || value == 'draft' : previous == 'draft' ? value in ['draft', 'submitted'] : previous == 'submitted' ? value in ['submitted', 'accepted', 'rejected'] : value == previous"
+      },
+      "message": "A tax report is drafted, then submitted, then accepted or rejected."
+    }
+  ]
+}

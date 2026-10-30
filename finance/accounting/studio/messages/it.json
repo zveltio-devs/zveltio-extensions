@@ -12,6 +12,9 @@
   "accounting.tab.trialBalance": "Bilancio di verifica",
   "accounting.yes": "Sì",
   "finance.accounting.actions": "Azioni del giornale",
+  "finance.accounting.closeConfirm": "Chiudere questo esercizio? In seguito non si potrà registrare nulla al suo interno.",
+  "finance.accounting.closeYear": "Chiudi esercizio",
+  "finance.accounting.deleteConfirm": "Eliminare questa bozza e le sue righe?",
   "finance.accounting.empty": "Ancora nessun dato.",
   "finance.accounting.newEntry": "Nuova voce",
   "finance.accounting.postEntry": "Registra la scrittura",
@@ -38,5 +41,7 @@
   "finance.accounting.ui.offBy": "Off by",
   "finance.accounting.ui.parent_code_optional": "Codice padre (facoltativo)",
   "finance.accounting.ui.revenue": "Ricavi",
-  "finance.accounting.ui.totals": "Totali"
+  "finance.accounting.ui.totals": "Totali",
+  "finance.accounting.voidConfirm": "Stornare questa registrazione? Una registrazione di storno con data odierna la toglie dai libri.",
+  "finance.accounting.voidEntry": "Storna registrazione"
 }

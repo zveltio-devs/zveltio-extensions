@@ -12,6 +12,9 @@
   "accounting.tab.trialBalance": "Balance générale",
   "accounting.yes": "Oui",
   "finance.accounting.actions": "Actions du journal",
+  "finance.accounting.closeConfirm": "Clôturer cet exercice ? Aucune écriture ne pourra plus y être passée.",
+  "finance.accounting.closeYear": "Clôturer l'exercice",
+  "finance.accounting.deleteConfirm": "Supprimer ce brouillon et ses lignes ?",
   "finance.accounting.empty": "Aucune donnée pour l'instant.",
   "finance.accounting.newEntry": "Nouvelle entrée",
   "finance.accounting.postEntry": "Comptabiliser l'écriture",
@@ -38,5 +41,7 @@
   "finance.accounting.ui.offBy": "Off by",
   "finance.accounting.ui.parent_code_optional": "Code parent (facultatif)",
   "finance.accounting.ui.revenue": "Chiffre d'affaires",
-  "finance.accounting.ui.totals": "Totaux"
+  "finance.accounting.ui.totals": "Totaux",
+  "finance.accounting.voidConfirm": "Annuler cette écriture ? Une écriture d'extourne datée d'aujourd'hui la retire des livres.",
+  "finance.accounting.voidEntry": "Annuler l'écriture"
 }

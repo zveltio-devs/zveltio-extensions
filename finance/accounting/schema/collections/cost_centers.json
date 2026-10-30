@@ -1,0 +1,42 @@
+{
+  "name": "cost_centers",
+  "fields": [
+    {
+      "name": "code",
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "parent_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "cost_centers"
+      }
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "cost_centers_parent_id",
+      "type": "m2o",
+      "field": "parent_id",
+      "target": "cost_centers",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

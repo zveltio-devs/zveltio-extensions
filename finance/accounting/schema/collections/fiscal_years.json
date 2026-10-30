@@ -1,0 +1,56 @@
+{
+  "name": "fiscal_years",
+  "fields": [
+    {
+      "name": "year",
+      "type": "integer",
+      "required": true,
+      "unique": true
+    },
+    {
+      "name": "start_date",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "end_date",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "open",
+      "options": {
+        "values": [
+          "open",
+          "closed"
+        ]
+      }
+    },
+    {
+      "name": "closed_at",
+      "type": "datetime"
+    }
+  ],
+  "validation": [
+    {
+      "field": "year",
+      "rule": "range",
+      "config": {
+        "min": 2000,
+        "max": 2100
+      },
+      "message": "A fiscal year is 2000 to 2100."
+    },
+    {
+      "field": "status",
+      "rule": "transition",
+      "config": {
+        "expression": "previous == null ? value == null || value == 'open' : previous == 'open' ? value in ['open', 'closed'] : value == previous"
+      },
+      "message": "A fiscal year opens, then closes; a closed year stays closed."
+    }
+  ]
+}

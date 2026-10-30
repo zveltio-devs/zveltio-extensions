@@ -1,0 +1,52 @@
+{
+  "name": "exchange_rates",
+  "fields": [
+    {
+      "name": "from_currency",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "to_currency",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "rate",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "date",
+      "type": "date",
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "source",
+      "type": "text",
+      "required": true,
+      "defaultValue": "manual"
+    }
+  ],
+  "indexes": [
+    {
+      "fields": [
+        "from_currency",
+        "to_currency",
+        "date"
+      ],
+      "unique": true
+    }
+  ],
+  "validation": [
+    {
+      "field": "rate",
+      "rule": "min",
+      "config": {
+        "value": 1e-06
+      },
+      "message": "A rate is positive."
+    }
+  ]
+}

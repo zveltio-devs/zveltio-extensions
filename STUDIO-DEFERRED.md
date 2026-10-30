@@ -38,6 +38,7 @@ Tier-3 pages appear only where the product calls for them (e.g.
 | Extension | Gap |
 |-----------|-----|
 | `billing` | Usage progress bars / upgrade CTA |
+| `finance/accounting` | Journal entry editor with lines (`createEntry`), recurring templates, budgets, exchange rates, tax reports, and the report views (`trialBalance`, `profitAndLoss`, `balanceSheet`, `budgetVsActual`): SDUI reads lists by GET and the reports are POST actions |
 | `compliance/ro/efactura` | Line totals are manual (no live recalculation as in the old form) |
 | `content/documents` | Template variables are a JSON bag, not per-variable fields |
 | `hr/time-tracking` | Live "running" timer banner |

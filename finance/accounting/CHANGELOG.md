@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.0.0 (2026-10-30)
+
+- feat!: accounts, cost centres, fiscal years, exchange rates, budgets, journal entries and lines, recurring templates and their lines, and tax reports are collections declared in `schema/collections/`, created and owned by the engine; no SQL migrations
+- feat!: the hand-written `/ext/finance/accounting/*` routes are gone — plain reads and edits go through `/api/data/<collection>`; the rest is the actions `createEntry`, `postEntry`, `voidEntry`, `deleteEntry`, `closeFiscalYear`, `createRecurring`, `runRecurring`, `generateD300` and the reports `trialBalance`, `profitAndLoss`, `balanceSheet`, `budgetVsActual` (`POST /ext/finance/accounting/actions/<name>`)
+- feat!: who may post, void, close a year or submit a tax report is the engine's rules on these collections; `accounting:post`, `accounting:void`, `accounting:close` and `accounting:submit` are gone
+- feat!: the balance and closed-period database triggers are gone; the actions check both, and a direct edit of a posted entry's lines or a raw status change is the operator's rules on the collections
+- feat!: exchange rates and budgets are no longer upserted: the unique key refuses a second row, and the existing one is edited; a fiscal year's dates are entered, not derived from the year
+- fix: a voided entry counts in the reports with its reversal, so a void no longer takes the amount out twice
+- fix: amounts are summed in cents; the D300 draft escapes account names in its XML; a void is refused in a closed year
+- requires engine 3.0.0-beta.92
+
 ## 1.0.12 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)

@@ -2,13 +2,13 @@
   "name": "finance/accounting",
   "displayName": "Accounting",
   "category": "finance",
-  "description": "Double-entry bookkeeping, chart of accounts, journal entries, P&L and balance sheet reports",
-  "version": "1.0.12",
-  "zveltioMinVersion": "1.0.0",
+  "description": "Double-entry bookkeeping: chart of accounts, journal entries, fiscal years, budgets, trial balance, P&L and balance sheet",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.92",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-accounting",
   "permissions": [
-    "database"
+    "data:write"
   ],
   "i18nPrefixes": [
     "accounting",
@@ -37,14 +37,464 @@
     "bundled": true,
     "bundlePeers": false
   },
-  "integrity": {
-    "engineSha256": "920f26aae54a42ef33adaf8a511b61560ba40d2d5f1f6450d43704e23627cdee",
-    "sourceSha256": "43bf338a0443db9e7784ab4036247a82023a2a8b482603d9f130223af5e2286c"
-  },
-  "resources": [
-    "accounting"
+  "collections": [
+    "cost_centers",
+    "accounts",
+    "fiscal_years",
+    "exchange_rates",
+    "budgets",
+    "journal_entries",
+    "journal_lines",
+    "recurring_journals",
+    "recurring_journal_lines",
+    "tax_reports"
   ],
-  "sensitiveResources": [
-    "accounting"
-  ]
+  "actions": [
+    {
+      "name": "createEntry",
+      "permission": {
+        "resource": "journal_entries",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "date",
+          "description",
+          "lines"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reference": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "object",
+              "required": [
+                "account_id"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "account_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "debit": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "credit": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "description": {
+                  "type": "string"
+                },
+                "currency": {
+                  "type": "string",
+                  "minLength": 3,
+                  "maxLength": 3
+                },
+                "exchange_rate": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "amount_foreign": {
+                  "type": "number"
+                },
+                "cost_center_id": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          }
+        }
+      },
+      "reads": [
+        "fiscal_years"
+      ],
+      "writes": [
+        "journal_entries",
+        "journal_lines"
+      ]
+    },
+    {
+      "name": "postEntry",
+      "permission": {
+        "resource": "journal_entries",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "journal_entries",
+        "journal_lines",
+        "fiscal_years"
+      ],
+      "writes": [
+        "journal_entries"
+      ]
+    },
+    {
+      "name": "voidEntry",
+      "permission": {
+        "resource": "journal_entries",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "journal_entries",
+        "journal_lines",
+        "fiscal_years"
+      ],
+      "writes": [
+        "journal_entries",
+        "journal_lines"
+      ]
+    },
+    {
+      "name": "deleteEntry",
+      "permission": {
+        "resource": "journal_entries",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "journal_entries"
+      ],
+      "writes": [
+        "journal_entries",
+        "journal_lines"
+      ]
+    },
+    {
+      "name": "closeFiscalYear",
+      "permission": {
+        "resource": "fiscal_years",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "fiscal_years",
+        "journal_entries"
+      ],
+      "writes": [
+        "fiscal_years"
+      ]
+    },
+    {
+      "name": "createRecurring",
+      "permission": {
+        "resource": "recurring_journals",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "description",
+          "frequency",
+          "next_run_date",
+          "lines"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reference": {
+            "type": "string"
+          },
+          "frequency": {
+            "enum": [
+              "daily",
+              "weekly",
+              "monthly",
+              "quarterly",
+              "yearly"
+            ]
+          },
+          "next_run_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "end_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "lines": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "object",
+              "required": [
+                "account_id"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "account_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "debit": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "credit": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "description": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "reads": [],
+      "writes": [
+        "recurring_journals",
+        "recurring_journal_lines"
+      ]
+    },
+    {
+      "name": "runRecurring",
+      "permission": {
+        "resource": "recurring_journals",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "recurring_journals",
+        "recurring_journal_lines",
+        "fiscal_years"
+      ],
+      "writes": [
+        "recurring_journals",
+        "journal_entries",
+        "journal_lines"
+      ]
+    },
+    {
+      "name": "trialBalance",
+      "permission": {
+        "resource": "journal_entries",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [],
+        "additionalProperties": false,
+        "properties": {
+          "fiscal_year_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "reads": [
+        "journal_entries",
+        "journal_lines",
+        "accounts"
+      ],
+      "writes": []
+    },
+    {
+      "name": "profitAndLoss",
+      "permission": {
+        "resource": "journal_entries",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [],
+        "additionalProperties": false,
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "cost_center_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "journal_entries",
+        "journal_lines",
+        "accounts"
+      ],
+      "writes": []
+    },
+    {
+      "name": "balanceSheet",
+      "permission": {
+        "resource": "journal_entries",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [],
+        "additionalProperties": false,
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "reads": [
+        "journal_entries",
+        "journal_lines",
+        "accounts"
+      ],
+      "writes": []
+    },
+    {
+      "name": "budgetVsActual",
+      "permission": {
+        "resource": "budgets",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "fiscal_year_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "fiscal_year_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "journal_entries",
+        "journal_lines",
+        "accounts",
+        "budgets"
+      ],
+      "writes": []
+    },
+    {
+      "name": "generateD300",
+      "permission": {
+        "resource": "tax_reports",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "period_from",
+          "period_to"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "period_from": {
+            "type": "string",
+            "format": "date"
+          },
+          "period_to": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "reads": [
+        "journal_entries",
+        "journal_lines",
+        "accounts"
+      ],
+      "writes": [
+        "tax_reports"
+      ]
+    }
+  ],
+  "integrity": {
+    "engineSha256": "ef974165c7832abc551ce98182207fa2d7a71339001a03132fd8a49f8d4373a5",
+    "sourceSha256": "f4fa75ee5939e561705d4825bec94e8cf69aece86be68fd836af8ff9092452cd",
+    "schemaSha256": "965319584bcc31cbebb8177ff5e04a67cb818fb0cb9510114c988cc190190029"
+  }
 }
