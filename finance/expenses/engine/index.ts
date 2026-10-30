@@ -1,25 +1,19 @@
 import type { ZveltioExtension } from '@zveltio/sdk/extension';
-import { join } from 'path';
-import { expensesRoutes } from './routes.js';
+import { expensesActions } from './actions.js';
 
+// Reports, their expenses, mileage and per diem entries and reimbursements are
+// collections this extension declares in `schema/collections/` (manifest
+// `collections`); the engine creates them, owns their rules and serves them
+// through the data API. What is left in code is the report's life: the
+// actions in `actions.ts`.
 const extension: ZveltioExtension = {
   name: 'finance/expenses',
   category: 'finance',
-  // S3-01: sub-app mounted at /ext/finance/expenses by the engine.
   mountStrategy: 'subapp',
 
-  getMigrations() {
-    return [
-      join(import.meta.dir, 'migrations/001_initial.sql'),
-      join(import.meta.dir, 'migrations/002_tenant_rls.sql'),
-      join(import.meta.dir, 'migrations/003_user_ref_text.sql'),
-      join(import.meta.dir, 'migrations/004_reimbursed_status.sql'),
-    ];
-  },
+  actions: expensesActions,
 
-  async register(app, ctx) {
-    app.route('/', expensesRoutes(ctx));
-  },
+  async register() {},
 };
 
 export default extension;

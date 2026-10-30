@@ -1,0 +1,100 @@
+{
+  "name": "expense_reports",
+  "fields": [
+    {
+      "name": "title",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "required": true,
+      "indexed": true,
+      "defaultValue": "draft",
+      "options": {
+        "values": [
+          "draft",
+          "submitted",
+          "approved",
+          "rejected",
+          "reimbursed"
+        ]
+      }
+    },
+    {
+      "name": "currency",
+      "type": "text",
+      "required": true,
+      "defaultValue": "RON"
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    },
+    {
+      "name": "submitted_at",
+      "type": "datetime"
+    },
+    {
+      "name": "approved_at",
+      "type": "datetime"
+    },
+    {
+      "name": "rejection_reason",
+      "type": "textarea"
+    },
+    {
+      "name": "total_amount",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "mileage_total",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "per_diem_total",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "grand_total",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "reimbursed_amount",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "reimbursed_at",
+      "type": "datetime"
+    }
+  ],
+  "validation": [
+    {
+      "field": "status",
+      "rule": "transition",
+      "config": {
+        "expression": "previous == null ? value == null || value == 'draft' : previous == 'draft' ? value in ['draft', 'submitted'] : previous == 'submitted' ? value in ['submitted', 'approved', 'rejected'] : previous == 'approved' ? value in ['approved', 'reimbursed'] : value == previous"
+      },
+      "message": "A report goes draft, submitted, then approved or rejected; an approved report is reimbursed; rejected and reimbursed are final."
+    },
+    {
+      "field": "reimbursed_amount",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "A reimbursed amount is not negative."
+    }
+  ]
+}

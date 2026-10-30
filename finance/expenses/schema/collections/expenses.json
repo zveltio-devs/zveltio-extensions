@@ -1,0 +1,106 @@
+{
+  "name": "expenses",
+  "fields": [
+    {
+      "name": "report_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "expense_reports"
+      }
+    },
+    {
+      "name": "date",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "category",
+      "type": "enum",
+      "required": true,
+      "indexed": true,
+      "defaultValue": "other",
+      "options": {
+        "values": [
+          "travel",
+          "meals",
+          "accommodation",
+          "supplies",
+          "software",
+          "fuel",
+          "entertainment",
+          "other"
+        ]
+      }
+    },
+    {
+      "name": "description",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "amount",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "currency",
+      "type": "text",
+      "required": true,
+      "defaultValue": "RON"
+    },
+    {
+      "name": "exchange_rate",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 1
+    },
+    {
+      "name": "tax_amount",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "receipt_url",
+      "type": "url"
+    },
+    {
+      "name": "is_reimbursable",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "expenses_report_id",
+      "type": "m2o",
+      "field": "report_id",
+      "target": "expense_reports",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "amount",
+      "rule": "min",
+      "config": {
+        "value": 0.01
+      },
+      "message": "An expense is a positive amount."
+    },
+    {
+      "field": "exchange_rate",
+      "rule": "min",
+      "config": {
+        "value": 1e-06
+      },
+      "message": "An exchange rate is positive."
+    }
+  ]
+}

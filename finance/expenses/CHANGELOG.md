@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.0.0 (2026-10-30)
+
+- feat!: expense reports, their expenses, mileage and per diem entries and reimbursements are collections declared in `schema/collections/`, created and owned by the engine; no SQL migrations
+- feat!: the hand-written `/ext/finance/expenses/*` routes are gone — plain reads and edits go through `/api/data/<collection>`; the rest is the actions `recalculate`, `submit`, `approve`, `reject` and `reimburse` (`POST /ext/finance/expenses/actions/<name>`)
+- feat!: who may file, see, approve or reimburse whose report is the engine's rules on these collections; `expenses:approve`, `expenses:reimburse`, the self-approval refusal and `/reports/my` are gone
+- feat!: the report's owner is its `created_by`; `employee_id`, `approved_by`, the stored `amount_local` and mileage `amount`, and `/stats` are gone
+- fix: totals are computed when a report is submitted and frozen with it; per diem counts net of the meals deducted; an empty report is not submitted
+- fix: a reimbursement is at most the outstanding balance and moves it only if nobody moved it since it was read; a report's status goes draft, submitted, approved or rejected, reimbursed
+- requires engine 3.0.0-beta.92
+
 ## 1.0.9 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)
