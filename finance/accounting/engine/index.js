@@ -79,6 +79,9 @@ function balanced(lines) {
 }
 async function openYear(host, date) {
   const years = (await all(host, "fiscal_years", { start_date: { lte: date } })).filter((y) => day(y.end_date) >= date);
+  if (years.length > 1) {
+    throw new ActionRefusal(409, "overlapping_years", `Fiscal years ${years.map((y) => y.year).join(" and ")} both cover ${date}; correct their dates first.`);
+  }
   const closed = years.find((y) => y.status === "closed");
   if (closed)
     throw new ActionRefusal(409, "year_closed", `Fiscal year ${closed.year} is closed; date the entry outside it.`);
@@ -126,7 +129,6 @@ var voidEntry = async (input, host) => {
   const e = await load(host, E, id, "entry");
   if (e.status !== "posted")
     throw new ActionRefusal(409, "entry_not_posted", "Only a posted entry is voided.");
-  await openYear(host, day(e.date));
   const today = todayIn(host.timezone);
   const fy = await openYear(host, today);
   const original = await host.collections.update(E, id, { status: "voided" }, { expect: { status: ["posted"] } });

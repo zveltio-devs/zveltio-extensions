@@ -3,7 +3,7 @@
   "displayName": "Accounting",
   "category": "finance",
   "description": "Double-entry bookkeeping: chart of accounts, journal entries, fiscal years, budgets, trial balance, P&L and balance sheet",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "zveltioMinVersion": "3.0.0-beta.92",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-accounting",
@@ -493,8 +493,8 @@
     }
   ],
   "integrity": {
-    "engineSha256": "ef974165c7832abc551ce98182207fa2d7a71339001a03132fd8a49f8d4373a5",
-    "sourceSha256": "f4fa75ee5939e561705d4825bec94e8cf69aece86be68fd836af8ff9092452cd",
+    "engineSha256": "eb8b31b24173a18dd53e21cca5561e360378877c90ea472b360dad41ea11c5b8",
+    "sourceSha256": "55155a156f24322878eb8d4451cdd1cb5ee91c4e2951b8896131f417e5c8947f",
     "schemaSha256": "965319584bcc31cbebb8177ff5e04a67cb818fb0cb9510114c988cc190190029"
   }
 }

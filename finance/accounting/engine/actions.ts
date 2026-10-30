@@ -64,10 +64,16 @@ function balanced(lines: Line[]) {
   if (d === 0) throw new ActionRefusal(409, 'empty_entry', 'An entry moves an amount.');
 }
 
-/** The fiscal year a date falls in, refusing it if any year covering the date is closed. */
+/**
+ * The fiscal year a date falls in. Refused when two years cover the date (which
+ * one the entry belongs to would be a guess) or when the year is closed.
+ */
 async function openYear(host: Host, date: string): Promise<string | null> {
   // One operator per field reaches the data API, so the end bound is applied here.
   const years = (await all(host, 'fiscal_years', { start_date: { lte: date } })).filter((y) => day(y.end_date) >= date);
+  if (years.length > 1) {
+    throw new ActionRefusal(409, 'overlapping_years', `Fiscal years ${years.map((y) => y.year).join(' and ')} both cover ${date}; correct their dates first.`);
+  }
   const closed = years.find((y) => y.status === 'closed');
   if (closed) throw new ActionRefusal(409, 'year_closed', `Fiscal year ${closed.year} is closed; date the entry outside it.`);
   return (years[0]?.id as string) ?? null;
@@ -124,7 +130,8 @@ const voidEntry: ExtensionAction = async (input, host) => {
   const { id } = input as { id: string };
   const e = await load(host, E, id, 'entry');
   if (e.status !== 'posted') throw new ActionRefusal(409, 'entry_not_posted', 'Only a posted entry is voided.');
-  await openYear(host, day(e.date));
+  // The original's year may be closed: the reversal is booked today, in the open
+  // year, and the closed year is never reopened (a storno in the current period).
   const today = todayIn(host.timezone);
   const fy = await openYear(host, today);
   const original = await host.collections.update(E, id, { status: 'voided' }, { expect: { status: ['posted'] } });
