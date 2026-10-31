@@ -134,6 +134,14 @@
       "type": "uuid"
     },
     {
+      "name": "asset_account_id",
+      "type": "uuid"
+    },
+    {
+      "name": "disposal_loss_account_id",
+      "type": "uuid"
+    },
+    {
       "name": "disposed_at",
       "type": "date",
       "writtenBy": "actions"
@@ -146,6 +154,11 @@
     {
       "name": "disposal_reason",
       "type": "text",
+      "writtenBy": "actions"
+    },
+    {
+      "name": "disposal_entry_id",
+      "type": "uuid",
       "writtenBy": "actions"
     }
   ]

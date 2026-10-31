@@ -228,6 +228,16 @@
             "name": "accumulated_dep_account_id",
             "label": "operations.assets.form.accumulatedAccount",
             "colSpan": 1
+          },
+          {
+            "name": "asset_account_id",
+            "label": "operations.assets.form.assetAccount",
+            "colSpan": 1
+          },
+          {
+            "name": "disposal_loss_account_id",
+            "label": "operations.assets.form.disposalLossAccount",
+            "colSpan": 1
           }
         ]
       }

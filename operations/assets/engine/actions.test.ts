@@ -119,4 +119,20 @@ describe('assets', () => {
     await refusal(a.transferAsset({ id: asset.id, to_location: 'X', transfer_date: '2025-03-01' }, host), 'asset_disposed');
     await refusal(a.disposeAsset({ id: 'nope', disposal_date: '2025-03-01' }, host), 'asset_not_found');
   });
+
+  it('closes a disposed asset in the ledger at cost when it has an asset account', async () => {
+    const { host, rows, runs } = fakeHost();
+    const asset = (await a.createAsset({ ...base, depreciation_account_id: 'e', accumulated_dep_account_id: 'c', asset_account_id: 'f' }, host)) as Row;
+    await refusal(a.disposeAsset({ id: asset.id, disposal_date: '2025-04-01' }, host), 'accounts_missing');
+    rows('assets')[0].disposal_loss_account_id = 'l';
+    await a.postDepreciation({ asset_id: asset.id, period_date: '2025-03-01' }, host);
+    await a.disposeAsset({ id: asset.id, disposal_date: '2025-04-01' }, host);
+    expect(runs.map((r) => r.action)).toEqual(['createEntry', 'postEntry', 'createEntry', 'postEntry']);
+    expect(runs[2].input.lines).toEqual([
+      { account_id: 'c', debit: 333.33, credit: 0, description: 'Accumulated depreciation' },
+      { account_id: 'l', debit: 666.67, credit: 0, description: 'Net book value written off' },
+      { account_id: 'f', debit: 0, credit: 1000, description: 'Asset at cost' },
+    ]);
+    expect(rows('assets')[0]).toMatchObject({ status: 'disposed', disposal_entry_id: 'je-3' });
+  });
 });

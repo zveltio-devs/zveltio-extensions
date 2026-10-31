@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.1.0 (2026-10-31)
+
+- feat: disposing of an asset that has an asset account closes it in the ledger through accounting's `createEntry` and `postEntry`, in the same transaction: accumulated depreciation and the disposal loss account (the part not yet depreciated) debited, the asset account credited at cost. The entry is linked on `disposal_entry_id`. Proceeds of a sale are invoiced, not posted here. An asset without an asset account is disposed in the register only, as before
+- feat: new optional fields `asset_account_id` and `disposal_loss_account_id`, plain edits, also accepted by `createAsset` and the Studio form
+
 ## 2.0.0 (2026-10-31)
 
 - feat!: the asset register, its depreciation schedule, maintenance, insurance, revaluations and transfers are collections declared in `schema/collections/` (`assets`, `asset_*`), created and owned by the engine; no SQL migrations

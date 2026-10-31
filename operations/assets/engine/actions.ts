@@ -61,6 +61,14 @@ async function change(host: Host, id: string, patch: (a: Row) => Row) {
   throw new ActionRefusal(409, 'asset_busy', 'The asset is being changed by other requests; try again.');
 }
 
+/** A posted journal entry in accounting, run by the engine in this transaction. */
+async function post(host: Host, entry: { date: string; description: string; reference: string; lines: Row[] }) {
+  if (!host.actions) throw new ActionRefusal(409, 'engine_too_old', "This engine cannot run another extension's action.");
+  const created = (await host.actions.run('finance/accounting', 'createEntry', entry)) as Row;
+  await host.actions.run('finance/accounting', 'postEntry', { id: created.id });
+  return created;
+}
+
 /**
  * One row per year of useful life; the last year lands exactly on the residual
  * value. Declining balance is double the straight-line rate, switching to
@@ -117,13 +125,12 @@ const postDepreciation: ExtensionAction = async (input, host) => {
   if (!a.depreciation_account_id || !a.accumulated_dep_account_id) {
     throw new ActionRefusal(409, 'accounts_missing', 'The asset needs a depreciation and an accumulated depreciation account.');
   }
-  if (!host.actions) throw new ActionRefusal(409, 'engine_too_old', "This engine cannot run another extension's action.");
   const amount = n(dep.amount);
   // Claimed under the precondition first, so the same period is never posted twice.
   await host.collections.update(SCHEDULE, String(dep.id), { is_posted: true }, { expect: { is_posted: [false] } }).catch((err) => {
     throw busy(err) ? new ActionRefusal(409, 'period_posted', 'That period is already posted.') : err;
   });
-  const entry = (await host.actions.run('finance/accounting', 'createEntry', {
+  const entry = await post(host, {
     date: d.journal_date ?? d.period_date,
     description: `Depreciation: ${a.name}`,
     reference: `DEP-${dep.id}`,
@@ -131,8 +138,7 @@ const postDepreciation: ExtensionAction = async (input, host) => {
       { account_id: a.depreciation_account_id, debit: amount, credit: 0, description: 'Depreciation expense' },
       { account_id: a.accumulated_dep_account_id, debit: 0, credit: amount, description: 'Accumulated depreciation' },
     ],
-  })) as Row;
-  await host.actions.run('finance/accounting', 'postEntry', { id: entry.id });
+  });
   await host.collections.update(SCHEDULE, String(dep.id), { journal_entry_id: entry.id });
   await change(host, d.asset_id, (x) => ({
     accumulated_depreciation: round2(n(x.accumulated_depreciation) + amount),
@@ -142,15 +148,45 @@ const postDepreciation: ExtensionAction = async (input, host) => {
   return entry;
 };
 
+/**
+ * Disposal takes the asset off the books. With an asset account set, the
+ * ledger closes it at cost: the accumulated depreciation and, for what was not
+ * yet depreciated, the loss account are debited, the asset account credited.
+ * What a sale brings in is invoiced, not posted here. Without an asset account
+ * the asset is disposed in the register only.
+ */
 const disposeAsset: ExtensionAction = async (input, host) => {
   const d = input as { id: string; disposal_date: string; disposal_value?: number; reason?: string };
-  return change(host, d.id, () => ({
-    status: 'disposed',
-    disposed_at: d.disposal_date,
-    disposal_value: round2(d.disposal_value ?? 0),
-    disposal_reason: d.reason ?? null,
-    current_value: 0,
-  }));
+  const a = await active(host, d.id);
+  if (a.asset_account_id && (!a.accumulated_dep_account_id || !a.disposal_loss_account_id)) {
+    throw new ActionRefusal(409, 'accounts_missing', 'Closing the asset needs its accumulated depreciation and disposal loss accounts.');
+  }
+  let closed: Row = a;
+  const disposed = await change(host, d.id, (x) => {
+    closed = x;
+    return {
+      status: 'disposed',
+      disposed_at: d.disposal_date,
+      disposal_value: round2(d.disposal_value ?? 0),
+      disposal_reason: d.reason ?? null,
+      current_value: 0,
+    };
+  });
+  if (!closed.asset_account_id) return disposed;
+  const cost = n(closed.purchase_cost);
+  const depreciated = n(closed.accumulated_depreciation);
+  const lines = [
+    { account_id: closed.accumulated_dep_account_id, debit: depreciated, credit: 0, description: 'Accumulated depreciation' },
+    { account_id: closed.disposal_loss_account_id, debit: round2(cost - depreciated), credit: 0, description: 'Net book value written off' },
+    { account_id: closed.asset_account_id, debit: 0, credit: cost, description: 'Asset at cost' },
+  ].filter((l) => l.debit > 0 || l.credit > 0);
+  const entry = await post(host, {
+    date: d.disposal_date,
+    description: `Disposal: ${closed.name}`,
+    reference: `DISP-${d.id}`,
+    lines,
+  });
+  return host.collections.update(ASSETS, d.id, { disposal_entry_id: entry.id });
 };
 
 const transferAsset: ExtensionAction = async (input, host) => {

@@ -3,7 +3,7 @@
   "displayName": "Point of Sale",
   "category": "operations",
   "description": "Till sessions, sales, receipts numbering, loyalty, cash movements and Z-reports, with stock moved through inventory",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "zveltioMinVersion": "3.0.0-beta.94",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-pos",
@@ -230,7 +230,7 @@
     {
       "name": "refundOrder",
       "permission": {
-        "resource": "pos_orders",
+        "resource": "pos_z_reports",
         "action": "execute"
       },
       "input": {
@@ -295,8 +295,8 @@
     }
   ],
   "integrity": {
-    "engineSha256": "c25b6c2689c59a472ef414298cabab005b1dd5957c7e1eb6ed1b822e9618e417",
-    "sourceSha256": "d2770760dab6be7073a7ab438d0151016baf8aeda1b7451f31e0cee0161a0a75",
+    "engineSha256": "897490101703506ab170ede3bd47266cd61f7daf51b33061c869c6a4f6ab42d0",
+    "sourceSha256": "a0a25ae4e41744e14e79ea5e378289b3f1df1cffa64f06751218c8e26d544940",
     "schemaSha256": "8fce46fb2aad7924c3792c2654f280936ca27e26f349a31f7ef888ea4f6c9244"
   }
 }
