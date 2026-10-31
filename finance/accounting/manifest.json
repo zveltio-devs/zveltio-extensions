@@ -3,8 +3,8 @@
   "displayName": "Accounting",
   "category": "finance",
   "description": "Double-entry bookkeeping: chart of accounts, journal entries, fiscal years, budgets, trial balance, P&L and balance sheet",
-  "version": "2.0.1",
-  "zveltioMinVersion": "3.0.0-beta.92",
+  "version": "2.1.0",
+  "zveltioMinVersion": "3.0.0-beta.93",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-accounting",
   "permissions": [
@@ -208,6 +208,90 @@
       },
       "reads": [
         "journal_entries"
+      ],
+      "writes": [
+        "journal_entries",
+        "journal_lines"
+      ]
+    },
+    {
+      "name": "updateDraft",
+      "permission": {
+        "resource": "journal_entries",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reference": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "object",
+              "required": [
+                "account_id"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "account_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "debit": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "credit": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "description": {
+                  "type": "string"
+                },
+                "currency": {
+                  "type": "string",
+                  "minLength": 3,
+                  "maxLength": 3
+                },
+                "exchange_rate": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "amount_foreign": {
+                  "type": "number"
+                },
+                "cost_center_id": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          }
+        }
+      },
+      "reads": [
+        "journal_entries",
+        "journal_lines",
+        "fiscal_years"
       ],
       "writes": [
         "journal_entries",
@@ -493,8 +577,8 @@
     }
   ],
   "integrity": {
-    "engineSha256": "eb8b31b24173a18dd53e21cca5561e360378877c90ea472b360dad41ea11c5b8",
-    "sourceSha256": "55155a156f24322878eb8d4451cdd1cb5ee91c4e2951b8896131f417e5c8947f",
-    "schemaSha256": "965319584bcc31cbebb8177ff5e04a67cb818fb0cb9510114c988cc190190029"
+    "engineSha256": "7e0559b0313ec6e5dbd205bc16eb21d0c98610864354aa415e7cb018bd493e1a",
+    "sourceSha256": "2292f60e195521ae860246aec1d6956be1d406d5db5205de77f9034c8eceb0ea",
+    "schemaSha256": "fb2bb30a667bcf3cb0be50a51c2a38e533cb8a7bf257a8a37efc8100cf4e41f5"
   }
 }

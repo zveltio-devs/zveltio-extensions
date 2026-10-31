@@ -155,6 +155,36 @@ const deleteEntry: ExtensionAction = async (input, host) => {
   return { id };
 };
 
+/**
+ * A draft changed: its date, wording, or its lines replaced whole, balanced. A
+ * posted entry is voided instead. The status moves only from draft (`expect`),
+ * so a concurrent post cannot slip in between the check and the change.
+ */
+const updateDraft: ExtensionAction = async (input, host) => {
+  const d = input as { id: string; date?: string; description?: string; reference?: string; lines?: Line[] };
+  const e = await load(host, E, d.id, 'entry');
+  if (e.status !== 'draft') throw new ActionRefusal(409, 'entry_not_draft', 'Only a draft is edited; void a posted entry.');
+  if (d.lines) balanced(d.lines);
+  const date = d.date ?? day(e.date);
+  const entry = await host.collections.update(
+    E,
+    d.id,
+    {
+      status: 'draft',
+      date,
+      fiscal_year_id: await openYear(host, date),
+      ...(d.description !== undefined && { description: d.description }),
+      ...(d.reference !== undefined && { reference: d.reference }),
+    },
+    { expect: { status: ['draft'] } },
+  );
+  if (d.lines) {
+    for (const l of await all(host, L, { entry_id: d.id })) await host.collections.delete(L, String(l.id));
+    await writeLines(host, d.id, d.lines);
+  }
+  return entry;
+};
+
 /** A year closed for good, once nothing in it is still a draft. */
 const closeFiscalYear: ExtensionAction = async (input, host) => {
   const { id } = input as { id: string };
@@ -406,6 +436,7 @@ export const accountingActions: Record<string, ExtensionAction> = {
   postEntry,
   voidEntry,
   deleteEntry,
+  updateDraft,
   closeFiscalYear,
   createRecurring,
   runRecurring,

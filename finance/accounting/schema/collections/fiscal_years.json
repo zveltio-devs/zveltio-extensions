@@ -27,11 +27,13 @@
           "open",
           "closed"
         ]
-      }
+      },
+      "writtenBy": "actions"
     },
     {
       "name": "closed_at",
-      "type": "datetime"
+      "type": "datetime",
+      "writtenBy": "actions"
     }
   ],
   "validation": [

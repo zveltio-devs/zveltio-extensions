@@ -1,5 +1,6 @@
 {
   "name": "journal_entries",
+  "writtenBy": "actions",
   "fields": [
     {
       "name": "date",
