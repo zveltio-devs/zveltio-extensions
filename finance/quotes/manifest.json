@@ -3,8 +3,8 @@
   "displayName": "Quotes & Proposals",
   "category": "finance",
   "description": "Quotes and proposals linked to CRM contacts, converted into invoices",
-  "version": "2.0.2",
-  "zveltioMinVersion": "3.0.0-beta.92",
+  "version": "2.1.0",
+  "zveltioMinVersion": "3.0.0-beta.94",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-quotes",
   "permissions": [
@@ -17,7 +17,7 @@
   "dependencies": [
     {
       "name": "finance/invoicing",
-      "minVersion": "2.0.0"
+      "minVersion": "2.3.0"
     }
   ],
   "studio": {
@@ -162,19 +162,20 @@
       },
       "reads": [
         "quotes",
-        "quote_lines",
-        "document_series"
+        "quote_lines"
       ],
       "writes": [
-        "document_series",
         "quotes",
         "quote_lines"
+      ],
+      "calls": [
+        "finance/invoicing.claimQuoteNumber"
       ]
     },
     {
       "name": "convertToInvoice",
       "permission": {
-        "resource": "invoices",
+        "resource": "quotes",
         "action": "execute"
       },
       "input": {
@@ -206,23 +207,19 @@
       },
       "reads": [
         "quotes",
-        "quote_lines",
-        "document_series",
-        "company_profile",
-        "invoices",
-        "invoice_lines"
+        "quote_lines"
       ],
       "writes": [
-        "quotes",
-        "document_series",
-        "invoices",
-        "invoice_lines"
+        "quotes"
+      ],
+      "calls": [
+        "finance/invoicing.createInvoice"
       ]
     }
   ],
   "integrity": {
-    "engineSha256": "a6fa0372a55b9947d56157cf3f9e405bc7e5aab93e830bdfe2506d32b8628c4e",
-    "sourceSha256": "72b458f4d0515be5aa00bb976dd9b54150ec4e36af97095d88fe2a672184c4c2",
+    "engineSha256": "2852517fb6f49dffefd85dee70fdf862525b4e0db3680e1ae35dff8b75aef4ab",
+    "sourceSha256": "f22aaa9d4e9c3fc73b362a42ab1619bbcd09d581d35c121b84b612ca435d0b7e",
     "schemaSha256": "e05ed125316c2f2fb0e081ca1d54aa26608f67423a32c6c3785f6444675b026a"
   }
 }

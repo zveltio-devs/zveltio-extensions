@@ -3,8 +3,8 @@
   "displayName": "Invoicing",
   "category": "finance",
   "description": "Recurring invoices, payment tracking and overdue management",
-  "version": "2.2.0",
-  "zveltioMinVersion": "3.0.0-beta.92",
+  "version": "2.3.0",
+  "zveltioMinVersion": "3.0.0-beta.93",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-invoicing",
   "permissions": [
@@ -54,9 +54,9 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "7462343dbadc4e9a9c3620830390e9fbf49008f55ca3d216e442123d202da788",
-    "sourceSha256": "2216656840b0bf0f086f46b5e165c9b48c759d82fec516b7f5290f2342a89a7d",
-    "schemaSha256": "e34c445f5481825eafc3159f99798fdd8df14f58e306a1d4aa45e2b35cbb0655"
+    "engineSha256": "f0dad2a329526f7be949cf2fb9a0b19eb644d6b465d565f19508a05420922664",
+    "sourceSha256": "d2258dacdd0dfb267d82ec2d2be43dde7dbf6b3d7cc24c34a9fccdbc26d564bc",
+    "schemaSha256": "2bfb355c3a74edab545b07a46a18c5a73a65485c940e09234d652be462d66ceb"
   },
   "collections": [
     "company_profile",
@@ -550,6 +550,104 @@
       ],
       "writes": [
         "invoices"
+      ]
+    },
+    {
+      "name": "cancelInvoice",
+      "permission": {
+        "resource": "invoices",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "invoices"
+      ],
+      "writes": [
+        "invoices"
+      ]
+    },
+    {
+      "name": "createSeries",
+      "permission": {
+        "resource": "document_series",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "doc_type",
+          "series"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "doc_type": {
+            "type": "string",
+            "enum": [
+              "invoice",
+              "proforma",
+              "credit_note",
+              "receipt",
+              "delivery_note",
+              "quote"
+            ]
+          },
+          "series": {
+            "type": "string",
+            "minLength": 1
+          },
+          "next_number": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "padding": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "is_default": {
+            "type": "boolean"
+          }
+        }
+      },
+      "reads": [
+        "document_series"
+      ],
+      "writes": [
+        "document_series"
+      ]
+    },
+    {
+      "name": "claimQuoteNumber",
+      "permission": {
+        "resource": "document_series",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "series": {
+            "type": "string"
+          }
+        }
+      },
+      "reads": [
+        "document_series"
+      ],
+      "writes": [
+        "document_series"
       ]
     },
     {

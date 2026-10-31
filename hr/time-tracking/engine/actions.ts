@@ -1,9 +1,4 @@
 import { ActionRefusal, type ExtensionAction } from "@zveltio/sdk/extension";
-// ponytail: invoicing's own code, inlined into this bundle when it is packed —
-// billed hours become an invoice exactly as invoicing issues one. A change to
-// invoicing's actions needs a repack of time-tracking too; check-bundle-sources
-// hashes only this extension's engine/, so it will not say so.
-import { invoicingActions } from "../../../finance/invoicing/engine/actions.js";
 
 // What time tracking does beyond plain edits, as actions
 // (`POST /ext/hr/time-tracking/actions/<name>`). The engine runs each as the
@@ -11,7 +6,9 @@ import { invoicingActions } from "../../../finance/invoicing/engine/actions.js";
 // (`host.collections`): the collections' permissions, column rules, revisions,
 // flows and audit are a PATCH's own, and a throw rolls back everything the
 // action wrote. Projects are plain edits, and a timesheet moves draft →
-// submitted → approved/rejected by a PATCH its transition rule checks.
+// submitted → approved/rejected by a PATCH its transition rule checks. Billed
+// hours become an invoice through invoicing's own `createInvoice`, which the
+// engine runs here (`host.actions.run`, manifest `calls`) in the same transaction.
 
 type Host = Parameters<ExtensionAction>[1];
 type Row = Record<string, unknown>;
@@ -150,7 +147,7 @@ const computeTimesheet: ExtensionAction = async (input, host) => {
 /**
  * Billable, unbilled entries of one project become one invoice, through
  * invoicing's own `createInvoice` (`finance/invoicing`, an optional
- * dependency: without it the action is refused). Each entry is marked billed
+ * dependency: without it the engine answers 404). Each entry is marked billed
  * only if it still is not (`expect`), so two invoices running together for the
  * same hours fail one of them, rolling back its invoice and its number.
  */
@@ -186,8 +183,13 @@ const invoiceEntries: ExtensionAction = async (input, host) => {
 			"client_required",
 			"The project names no client; give client_name.",
 		);
-	const inv = (await invoicingActions.createInvoice(
-		{
+	if (!host.actions)
+		throw new ActionRefusal(
+			409,
+			"engine_too_old",
+			"This engine cannot run another extension's action.",
+		);
+	const inv = (await host.actions.run("finance/invoicing", "createInvoice", {
 			client_name,
 			...(d.client_tax_id && { client_tax_id: d.client_tax_id }),
 			currency: project.currency ?? "RON",
@@ -205,9 +207,7 @@ const invoiceEntries: ExtensionAction = async (input, host) => {
 				sort_order: i,
 				metadata: { time_entry_id: e.id },
 			})),
-		},
-		host,
-	)) as Row;
+	})) as Row;
 	for (const e of entries) {
 		await host.collections.update(
 			E,

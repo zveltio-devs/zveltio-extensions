@@ -3,8 +3,8 @@
   "displayName": "Time Tracking",
   "category": "hr",
   "description": "Timesheets, project-based time logging and billable hours",
-  "version": "2.1.2",
-  "zveltioMinVersion": "3.0.0-beta.92",
+  "version": "2.2.0",
+  "zveltioMinVersion": "3.0.0-beta.94",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-time-tracking",
   "permissions": [
@@ -44,8 +44,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "5d571239e02ed63b6b69279f4665ff7ea0ddfe87d766e906f66fafe0e62c6291",
-    "sourceSha256": "6f8170603434dab983fd2b4b503dce987ca3f94ffa63bc417c57cd96b846c761",
+    "engineSha256": "b7c396ebe91811e97758d44036d1493137728f6802810c631746db7562cca356",
+    "sourceSha256": "10b9308c5b43848599d56dd39a2efbeea06e6f0b0c1ad0faf70bebdc9ce73558",
     "schemaSha256": "9939f71ca744e78fb13d7f3c9faac95dad41a9d1164d57a9c8fbbafc0b59d2e3"
   },
   "collections": [
@@ -276,24 +276,20 @@
       },
       "reads": [
         "time_projects",
-        "time_entries",
-        "invoices",
-        "invoice_lines",
-        "document_series",
-        "company_profile"
+        "time_entries"
       ],
       "writes": [
-        "time_entries",
-        "invoices",
-        "invoice_lines",
-        "document_series"
+        "time_entries"
+      ],
+      "calls": [
+        "finance/invoicing.createInvoice"
       ]
     }
   ],
   "optionalDependencies": [
     {
       "name": "finance/invoicing",
-      "minVersion": "2.0.0"
+      "minVersion": "2.3.0"
     }
   ]
 }

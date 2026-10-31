@@ -193,8 +193,8 @@
           "icon": "Ban",
           "label": "invoicing.action.cancel",
           "variant": "text-warning",
-          "method": "PATCH",
-          "endpoint": "/api/data/invoices/{id}",
+          "method": "POST",
+          "endpoint": "/ext/finance/invoicing/actions/cancelInvoice",
           "confirm": "invoicing.cancelConfirm",
           "visibleWhen": {
             "field": "status",
@@ -206,7 +206,7 @@
             ]
           },
           "body": {
-            "status": "cancelled"
+            "id": "{id}"
           }
         },
         {

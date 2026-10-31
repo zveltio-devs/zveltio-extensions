@@ -3,8 +3,8 @@
   "displayName": "Banking Sync",
   "category": "finance",
   "description": "Import bank statements, auto-reconcile transactions with invoices and track cash flow",
-  "version": "2.0.2",
-  "zveltioMinVersion": "3.0.0-beta.92",
+  "version": "2.1.0",
+  "zveltioMinVersion": "3.0.0-beta.94",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-banking",
   "permissions": [
@@ -16,7 +16,7 @@
   "dependencies": [
     {
       "name": "finance/invoicing",
-      "minVersion": "2.0.0"
+      "minVersion": "2.3.0"
     }
   ],
   "studio": {
@@ -293,14 +293,14 @@
       },
       "reads": [
         "bank_transactions",
-        "bank_reconciliations",
-        "invoices"
+        "bank_reconciliations"
       ],
       "writes": [
         "bank_transactions",
-        "bank_reconciliations",
-        "invoices",
-        "invoice_payments"
+        "bank_reconciliations"
+      ],
+      "calls": [
+        "finance/invoicing.recordPayment"
       ]
     },
     {
@@ -361,8 +361,8 @@
     }
   ],
   "integrity": {
-    "engineSha256": "ae2e063c4df404dd5433d8e715f2f45ff2030fde9e4538ac958d3f6257a2ce8e",
-    "sourceSha256": "ceb3b75b6bd3d9f0675b7840e6f3d3f93fde426fdd7cf4258d15ca04bebe6c96",
+    "engineSha256": "f473dafd1a4e87133ea212ea8e75b26fbca2f86cd842efe60dc92fff8c879650",
+    "sourceSha256": "f163571f46981a629c8ef1c0140b6170f88e3fff0996976218d8953b023c4498",
     "schemaSha256": "a3be61ca206b28bfc471fc83c4b41e672689e08c088908c1e969adc1ef2019c2"
   }
 }

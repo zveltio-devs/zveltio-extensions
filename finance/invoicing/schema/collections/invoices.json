@@ -4,11 +4,13 @@
     {
       "name": "number",
       "type": "text",
-      "unique": true
+      "unique": true,
+      "writtenBy": "actions"
     },
     {
       "name": "series",
-      "type": "text"
+      "type": "text",
+      "writtenBy": "actions"
     },
     {
       "name": "doc_type",
@@ -39,7 +41,8 @@
           "overdue",
           "cancelled"
         ]
-      }
+      },
+      "writtenBy": "actions"
     },
     {
       "name": "client_id",
@@ -198,7 +201,8 @@
       "name": "amount_paid",
       "type": "decimal",
       "required": true,
-      "defaultValue": 0
+      "defaultValue": 0,
+      "writtenBy": "actions"
     },
     {
       "name": "vat_breakdown",
@@ -262,14 +266,16 @@
     },
     {
       "name": "paid_at",
-      "type": "datetime"
+      "type": "datetime",
+      "writtenBy": "actions"
     },
     {
       "name": "converted_from_id",
       "type": "m2o",
       "options": {
         "related_collection": "invoices"
-      }
+      },
+      "writtenBy": "actions"
     }
   ],
   "relations": [

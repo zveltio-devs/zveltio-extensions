@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.3.0 (2026-10-31)
+
+- feat: an invoice's status, number, series, paid amount, paid date and conversion source, a credit note's status, number and applied amount, every payment and a series' counter are written only by invoicing's actions (`writtenBy: "actions"`); a PATCH through `/api/data` is refused
+- feat: `cancelInvoice` cancels an unpaid invoice and `createSeries` adds a series counting from its start number; the Studio's Cancel and new-series form use them
+- feat: `claimQuoteNumber` gives `finance/quotes` the next quote number, run through the engine (`host.actions.run`)
+
 ## 2.2.0 (2026-10-30)
 
 - feat: a draft credit note holds no number; `issueCreditNote` issues it and claims the next number of the credit note series, so deleting a draft leaves no gap (a draft numbered before keeps its number)

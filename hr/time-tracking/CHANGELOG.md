@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.0 (2026-10-31)
+
+- feat: billed hours become an invoice through finance/invoicing's own `createInvoice`, run by the engine (`host.actions.run`, manifest `calls`), instead of invoicing's code copied into this bundle; needs engine 3.0.0-beta.94 and invoicing 2.3.0
+
 ## 2.1.2 (2026-10-30)
 
 - fix: bundles finance/invoicing 2.2.0 (credit notes numbered when issued)

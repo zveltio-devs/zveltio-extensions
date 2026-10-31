@@ -7,11 +7,14 @@ import { ActionRefusal, type ExtensionAction, todayIn } from '@zveltio/sdk/exten
 // everything the action wrote — a number claimed from a series included, so a
 // refused invoice leaves no hole in the numbering. A draft has no number: it
 // takes one when it is sent (`sendInvoice`), and only a draft is deleted
-// (`deleteDraft`), so the series stays continuous. The company profile, series,
-// catalogue, reminders and cancelling (`status: cancelled`) are plain edits
-// through `/api/data`; the status rule on `invoices` keeps a paid or cancelled
-// invoice that way. Who may do what is the
-// engine's rules on these collections, not this file's.
+// (`deleteDraft`), so the series stays continuous. A status, number, series,
+// paid amount, payment and series counter are written only here
+// (`writtenBy: "actions"`): quotes, banking and time-tracking reach them by
+// running these actions (`host.actions.run`), never by importing this file.
+// The company profile, catalogue, reminders and a series' name, padding and
+// default are plain edits through `/api/data`; the status rule on `invoices`
+// keeps a paid or cancelled invoice that way. Who may do what is the engine's
+// rules on these collections, not this file's.
 
 type Host = Parameters<ExtensionAction>[1];
 type Row = Record<string, unknown>;
@@ -83,14 +86,6 @@ export function isValidCui(value: string): boolean {
   return ((sum * 10) % 11) % 10 === Number(digits.slice(-1));
 }
 
-/**
- * Claim the next number of a series: the named one, else the type's default,
- * else its oldest. Cod fiscal art. 319 alin. (20) lit. a) wants the numbering
- * continuous per issuer. The counter moves only if nobody moved it since it
- * was read (`expect`); a concurrent claim waits on the row, fails the
- * precondition, and this reads again — so two invoices never share a number,
- * and a refusal later in the action rolls the claim back with everything else.
- */
 /** The named series of a document type, else its default, else its oldest. */
 async function findSeries(host: Host, docType: string, series?: string) {
   const found = records(
@@ -113,7 +108,15 @@ async function findSeries(host: Host, docType: string, series?: string) {
   return s;
 }
 
-export async function claimNumber(host: Host, docType: string, series?: string) {
+/**
+ * Claim the next number of a series: the named one, else the type's default,
+ * else its oldest. Cod fiscal art. 319 alin. (20) lit. a) wants the numbering
+ * continuous per issuer. The counter moves only if nobody moved it since it
+ * was read (`expect`); a concurrent claim waits on the row, fails the
+ * precondition, and this reads again — so two invoices never share a number,
+ * and a refusal later in the action rolls the claim back with everything else.
+ */
+async function claimNumber(host: Host, docType: string, series?: string) {
   for (let attempt = 0; attempt < 5; attempt++) {
     const s = await findSeries(host, docType, series);
     const next = n(s.next_number);
@@ -436,6 +439,26 @@ const deleteDraft: ExtensionAction = async (input, host) => {
   return { deleted: id };
 };
 
+/** Cancel an invoice not yet paid; the status rule refuses a paid or cancelled one. */
+const cancelInvoice: ExtensionAction = async (input, host) => {
+  const { id } = input as { id: string };
+  await load(host, I, id, 'invoice');
+  return host.collections.update(I, id, { status: 'cancelled' }, { expect: { status: ['draft', ...PAYABLE] } });
+};
+
+/** A new series, counting from `next_number` (a series carried over from another system starts past 1). */
+const createSeries: ExtensionAction = async (input, host) => host.collections.insert('document_series', blankless(input as Row));
+
+/**
+ * The next quote number, for `finance/quotes` (`host.actions.run`): a quote
+ * series lives here with the others. Only quotes: an invoice or credit note
+ * takes its number when it is issued, so its series keeps no gap.
+ */
+const claimQuoteNumber: ExtensionAction = async (input, host) => {
+  const { series } = input as { series?: string };
+  return claimNumber(host, 'quote', series || undefined);
+};
+
 const createCreditNote: ExtensionAction = async (input, host) => {
   const d = blankless(input as Row) as {
     original_invoice_id?: string;
@@ -650,6 +673,9 @@ export const invoicingActions: Record<string, ExtensionAction> = {
   generateNext,
   sendInvoice,
   deleteDraft,
+  cancelInvoice,
+  createSeries,
+  claimQuoteNumber,
   createCreditNote,
   issueCreditNote,
   applyCreditNote,

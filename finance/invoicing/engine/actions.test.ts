@@ -174,6 +174,32 @@ describe('sendInvoice and deleteDraft', () => {
     expect(await a.sendInvoice({ id: old.id }, host as never)).toMatchObject({ number: 'INV-0003', status: 'sent' });
     expect(rows('document_series')[0].next_number).toBe(7);
   });
+
+  it('cancels an unpaid invoice, never a paid or cancelled one', async () => {
+    const { host, rows } = await setup();
+    const inv = await issue(host, BASE);
+    expect(await a.cancelInvoice({ id: inv.id }, host as never)).toMatchObject({ status: 'cancelled' });
+    await refusal(a.cancelInvoice({ id: inv.id }, host as never), 'precondition_failed');
+    rows('invoices')[0].status = 'paid';
+    await refusal(a.cancelInvoice({ id: inv.id }, host as never), 'precondition_failed');
+    await refusal(a.cancelInvoice({ id: '00000000-0000-0000-0000-999999999999' }, host as never), 'invoice_not_found');
+  });
+});
+
+describe('series', () => {
+  it('a new series counts from its start number', async () => {
+    const { host } = await setup();
+    await a.createSeries({ doc_type: 'invoice', series: 'NEW', next_number: 41, padding: '', is_default: false }, host as never);
+    expect(await issue(host, { ...BASE, series: 'NEW' })).toMatchObject({ number: 'NEW-41', series: 'NEW' });
+  });
+
+  it('claims quote numbers, from the quote series only', async () => {
+    const { host } = await setup();
+    await refusal(a.claimQuoteNumber({}, host as never), 'no_series');
+    await host.collections.insert('document_series', { doc_type: 'quote', series: 'Q', next_number: 5, padding: 3, is_default: true });
+    expect(await a.claimQuoteNumber({ series: '' }, host as never)).toEqual({ number: 'Q-005', series: 'Q' });
+    expect(await a.claimQuoteNumber({}, host as never)).toEqual({ number: 'Q-006', series: 'Q' });
+  });
 });
 
 describe('payments and credit notes', () => {
