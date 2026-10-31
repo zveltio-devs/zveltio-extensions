@@ -28,7 +28,8 @@
       "name": "quantity_received",
       "type": "decimal",
       "required": true,
-      "defaultValue": 0
+      "defaultValue": 0,
+      "writtenBy": "actions"
     },
     {
       "name": "unit_cost",

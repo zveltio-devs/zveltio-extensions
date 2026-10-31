@@ -6,7 +6,8 @@ import { ActionRefusal, type ExtensionAction, todayIn } from '@zveltio/sdk/exten
 // rules, revisions, flows and audit are a PATCH's own, and a throw rolls back
 // everything the action wrote — a transfer leaves both warehouses or neither.
 // Warehouses, suppliers, products, variants and batches are plain edits
-// through `/api/data`. Who may move stock or receive an order is the engine's
+// through `/api/data`; stock, movements, average cost, batch quantities and an
+// order's number, status and receipts are written only here (`writtenBy`). Who may move stock or receive an order is the engine's
 // rules on these collections, not this file's.
 
 type Host = Parameters<ExtensionAction>[1];
@@ -14,6 +15,7 @@ type Row = Record<string, unknown>;
 
 const LEVELS = 'stock_levels';
 const MOVES = 'stock_movements';
+const SERIES = 'purchase_order_series';
 const PAGE = 500;
 const TRIES = 5;
 
@@ -130,15 +132,40 @@ const moveStock: ExtensionAction = async (input, host) => {
 };
 
 /**
- * The next `PO-00001` number: one past the highest. Two orders created at the
- * same instant take the same number and the unique key refuses the second.
+ * The tenant's one series row. The first order since 2.1.0 creates it, counting
+ * on from the highest number 2.0.0 gave out; two such orders at once meet on
+ * its unique key and the loser reads the winner's row.
  */
-// ponytail: a refused duplicate is a retry for the caller; a numbering series collection when that happens in practice.
-async function nextNumber(host: Host): Promise<string> {
+async function series(host: Host): Promise<Row> {
+  const s = await first(host, SERIES, {});
+  if (s) return s;
   const res = await host.collections.list('purchase_orders', { sort: 'number', order: 'desc', limit: 1, count: 'none' });
-  const last = ((res.records as Row[]) ?? [])[0];
-  const n = Number(/(\d+)$/.exec(String(last?.number ?? ''))?.[1] ?? 0);
-  return `PO-${String(n + 1).padStart(5, '0')}`;
+  const last = Number(/(\d+)$/.exec(String(((res.records as Row[]) ?? [])[0]?.number ?? ''))?.[1] ?? 0);
+  return host.collections.insert(SERIES, { next_number: last + 1 }).catch(async (err) => {
+    const won = await first(host, SERIES, {});
+    if (!won) throw err;
+    return won;
+  });
+}
+
+/**
+ * The next `PO-00001` number, claimed from the series only if nobody claimed it
+ * since it was read (`expect`): no two orders share a number, and a refused
+ * order rolls its claim back.
+ */
+async function nextNumber(host: Host): Promise<string> {
+  for (let attempt = 0; attempt < TRIES; attempt++) {
+    const s = await series(host);
+    const n = Number(s.next_number);
+    try {
+      await host.collections.update(SERIES, String(s.id), { next_number: n + 1 }, { expect: { next_number: [String(s.next_number)] } });
+    } catch (err) {
+      if ((err as { code?: unknown }).code === 'precondition_failed') continue;
+      throw err;
+    }
+    return `PO-${String(n).padStart(5, '0')}`;
+  }
+  throw new ActionRefusal(409, 'series_busy', 'The series is being used by other requests; try again.');
 }
 
 const createPurchaseOrder: ExtensionAction = async (input, host) => {
@@ -181,6 +208,24 @@ const createPurchaseOrder: ExtensionAction = async (input, host) => {
     });
   }
   return po;
+};
+
+/** A draft order sent to its supplier; its status moves only from draft (`expect`). */
+const sendPurchaseOrder: ExtensionAction = async (input, host) => {
+  const { id } = input as { id: string };
+  const po = await load(host, 'purchase_orders', id, 'purchase_order');
+  if (po.status !== 'draft') throw new ActionRefusal(409, 'not_draft', `A ${po.status} order is not sent again.`);
+  return host.collections.update('purchase_orders', id, { status: 'sent' }, { expect: { status: ['draft'] } });
+};
+
+/** An order called off before it is fully received; what came in stays in stock. */
+const cancelPurchaseOrder: ExtensionAction = async (input, host) => {
+  const { id } = input as { id: string };
+  const po = await load(host, 'purchase_orders', id, 'purchase_order');
+  if (!['draft', 'sent', 'partial'].includes(String(po.status))) {
+    throw new ActionRefusal(409, 'not_cancellable', `A ${po.status} order is not cancelled.`);
+  }
+  return host.collections.update('purchase_orders', id, { status: 'cancelled' }, { expect: { status: [String(po.status)] } });
 };
 
 /**
@@ -294,6 +339,8 @@ const expiringBatches: ExtensionAction = async (input, host) => {
 export const inventoryActions: Record<string, ExtensionAction> = {
   moveStock,
   createPurchaseOrder,
+  sendPurchaseOrder,
+  cancelPurchaseOrder,
   receivePurchaseOrder,
   lowStock,
   valuation,

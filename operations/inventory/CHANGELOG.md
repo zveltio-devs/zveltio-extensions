@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.0 (2026-10-31)
+
+- feat: stock levels and movements are written only by this extension's actions (`writtenBy: "actions"`), and so are a product's `avg_cost`, a batch's `quantity`, an order's `number`, `status` and `received_date` and a line's `quantity_received`: the data API, sync and every other path answer 409 `written_by_actions`, so stock moves only through `moveStock` and `receivePurchaseOrder`
+- feat: purchase orders are numbered from a series (`purchase_order_series`), claimed only if nobody claimed it since it was read, instead of one past the highest number: two orders created together no longer collide on the unique key. The series counts on from the highest number already given out
+- feat: `sendPurchaseOrder` (draft to sent) and `cancelPurchaseOrder` (draft, sent or partly received to cancelled) replace a PATCH of the order's status
+- note: deleting a product or a warehouse through the data API answers 409 `written_by_actions`, since its stock levels would go with it
+- requires engine 3.0.0-beta.93
+
 ## 2.0.0 (2026-10-30)
 
 - feat!: warehouses, suppliers, products and variants, stock levels and movements, batches, purchase orders and their lines are collections declared in `schema/collections/`, created and owned by the engine; no SQL migrations

@@ -81,7 +81,8 @@
     },
     {
       "name": "avg_cost",
-      "type": "decimal"
+      "type": "decimal",
+      "writtenBy": "actions"
     },
     {
       "name": "image_url",

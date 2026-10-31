@@ -3,8 +3,8 @@
   "displayName": "Inventory",
   "category": "operations",
   "description": "Warehouses, SKUs, stock movements, reorder alerts and barcode support",
-  "version": "2.0.0",
-  "zveltioMinVersion": "3.0.0-beta.92",
+  "version": "2.1.0",
+  "zveltioMinVersion": "3.0.0-beta.93",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-inventory",
   "permissions": [
@@ -44,6 +44,7 @@
     "product_variants",
     "stock_levels",
     "purchase_orders",
+    "purchase_order_series",
     "purchase_order_lines",
     "product_batches",
     "stock_movements"
@@ -181,11 +182,65 @@
         }
       },
       "reads": [
-        "purchase_orders"
+        "purchase_orders",
+        "purchase_order_series"
       ],
       "writes": [
         "purchase_orders",
-        "purchase_order_lines"
+        "purchase_order_lines",
+        "purchase_order_series"
+      ]
+    },
+    {
+      "name": "sendPurchaseOrder",
+      "permission": {
+        "resource": "purchase_orders",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "purchase_orders"
+      ],
+      "writes": [
+        "purchase_orders"
+      ]
+    },
+    {
+      "name": "cancelPurchaseOrder",
+      "permission": {
+        "resource": "purchase_orders",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "purchase_orders"
+      ],
+      "writes": [
+        "purchase_orders"
       ]
     },
     {
@@ -319,8 +374,8 @@
     }
   ],
   "integrity": {
-    "engineSha256": "2ed2dcf3e2b9aa975ce0b7d1c504b93cbb3d7e779593f3f661bc1f31bf23c429",
-    "sourceSha256": "aedb8e5f8cca8007ceda991194ea843588aa77801a0e535df74e3182bf2f97bc",
-    "schemaSha256": "28d489131ce8043a2421361111fad4b8f368b23d64b97a8a50857ae77cd4babb"
+    "engineSha256": "c9e29a99ea8e32a593e4029547db4dc2239ceaf080c7b43e30a62ab76b34c3c5",
+    "sourceSha256": "36155e50ff7a1ff481734eab0652c41d3acec5fd61aa167697daa0c526a02330",
+    "schemaSha256": "515aad4edb6ae1234b2940bffbfd1a259f422d5947e2c8954282a34c3cc0d7d1"
   }
 }

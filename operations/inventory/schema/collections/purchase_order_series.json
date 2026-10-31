@@ -1,0 +1,19 @@
+{
+  "name": "purchase_order_series",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "singleton",
+      "type": "text",
+      "required": true,
+      "unique": true,
+      "defaultValue": "po"
+    },
+    {
+      "name": "next_number",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 1
+    }
+  ]
+}
