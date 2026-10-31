@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.18 (2026-10-31)
+
+- chore: the test of the inventory product link is gone with inventory 2.0.0 (#288), which changed the published archive without a version
+
 ## 1.0.17 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)
