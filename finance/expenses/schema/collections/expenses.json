@@ -1,5 +1,6 @@
 {
   "name": "expenses",
+  "writtenBy": "actions",
   "fields": [
     {
       "name": "report_id",
@@ -98,7 +99,7 @@
       "field": "exchange_rate",
       "rule": "min",
       "config": {
-        "value": 1e-06
+        "value": 0.000001
       },
       "message": "An exchange rate is positive."
     }

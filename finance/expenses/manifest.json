@@ -3,7 +3,7 @@
   "displayName": "Expenses",
   "category": "finance",
   "description": "Employee expense reports with receipt management, categorization and approval flow",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "zveltioMinVersion": "3.0.0-beta.93",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-expenses",
@@ -45,6 +45,186 @@
     "expense_reimbursements"
   ],
   "actions": [
+    {
+      "name": "createReport",
+      "permission": {
+        "resource": "expense_reports",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "currency": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      },
+      "reads": [],
+      "writes": [
+        "expense_reports"
+      ]
+    },
+    {
+      "name": "updateDraft",
+      "permission": {
+        "resource": "expense_reports",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "currency": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      },
+      "reads": [
+        "expense_reports"
+      ],
+      "writes": [
+        "expense_reports"
+      ]
+    },
+    {
+      "name": "deleteDraft",
+      "permission": {
+        "resource": "expense_reports",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "expense_reports"
+      ],
+      "writes": [
+        "expense_reports",
+        "expenses",
+        "mileage_entries",
+        "per_diem_entries"
+      ]
+    },
+    {
+      "name": "addEntry",
+      "permission": {
+        "resource": "expense_reports",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "report_id",
+          "collection",
+          "entry"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "report_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "collection": {
+            "enum": [
+              "expenses",
+              "mileage_entries",
+              "per_diem_entries"
+            ]
+          },
+          "entry": {
+            "type": "object"
+          }
+        }
+      },
+      "reads": [
+        "expense_reports"
+      ],
+      "writes": [
+        "expense_reports",
+        "expenses",
+        "mileage_entries",
+        "per_diem_entries"
+      ]
+    },
+    {
+      "name": "removeEntry",
+      "permission": {
+        "resource": "expense_reports",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "collection"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "collection": {
+            "enum": [
+              "expenses",
+              "mileage_entries",
+              "per_diem_entries"
+            ]
+          }
+        }
+      },
+      "reads": [
+        "expense_reports",
+        "expenses",
+        "mileage_entries",
+        "per_diem_entries"
+      ],
+      "writes": [
+        "expense_reports",
+        "expenses",
+        "mileage_entries",
+        "per_diem_entries"
+      ]
+    },
     {
       "name": "recalculate",
       "permission": {
@@ -212,8 +392,8 @@
     }
   ],
   "integrity": {
-    "engineSha256": "9069702d95fce7a5aa59981badc244fcefa9d9a2d6d5ecbcf6886277c3b5cf2b",
-    "sourceSha256": "b1c78ad6ae78bb0bbd28a3b5a598198707b5ece74b6fabec87d6c29104592575",
-    "schemaSha256": "b3c9f2e9df9451b6f17f0f5a28a28cac9f4d5380166cbfeab29edbf7080d9236"
+    "engineSha256": "ff13d19fa7939cddfd315239cfc78ddeecab388b4d1267e1c1c0f3d4043c02b0",
+    "sourceSha256": "f34653c21b9bf1a743980c1c7ee9ecc3c8c86f63c97c3cbe28dce8cd19b4d1ef",
+    "schemaSha256": "713e30025eeae405c95884d513c1c50660abcf8dbd012676157d8bffd6f7893a"
   }
 }

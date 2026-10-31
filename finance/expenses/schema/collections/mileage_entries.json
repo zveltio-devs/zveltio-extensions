@@ -1,5 +1,6 @@
 {
   "name": "mileage_entries",
+  "writtenBy": "actions",
   "fields": [
     {
       "name": "report_id",

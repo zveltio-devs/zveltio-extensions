@@ -192,7 +192,7 @@
         }
       ],
       "form": {
-        "endpoint": "/api/data/expense_reports",
+        "endpoint": "/ext/finance/expenses/actions/createReport",
         "fields": [
           {
             "name": "title",
