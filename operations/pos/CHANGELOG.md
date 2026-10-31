@@ -10,7 +10,9 @@
 - feat!: a customer is no longer linked to a CRM contact automatically; `contact_id` is a plain field, copied onto the order. The "one open session per cashier" check, `/stats` and the live Z-report of an open session are gone
 - fix: a refund can be written (the old status check had no `refunded`), and it takes back the loyalty and spend of every sale to a customer, not only of sales that earned points
 - fix: the expected float counts the cash movements (float in and out, drops, payouts), and net sales no longer subtract a refund twice
-- fix: two sales to one customer cannot spend the same points; a redemption is refused beyond the customer's balance
+- fix: two sales to one customer cannot spend the same points; a redemption is refused beyond the customer's balance before the sale, not netted against the points the sale earns, and refused without a customer
+- fix: closing a till waits for a sale or cash movement in flight and counts it, or refuses it; a refund is accepted only while the sale's session is open, so a Z-report is final
+- fix: each line rounds to cents and the order is the sum of its lines
 - requires engine 3.0.0-beta.94 and operations/inventory 2.1.0
 
 ## 1.0.14 (2026-10-26)

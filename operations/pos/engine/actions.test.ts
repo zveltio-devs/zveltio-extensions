@@ -100,9 +100,15 @@ describe('checkout', () => {
     const cust = (await host.collections.insert('pos_customers', { name: 'Ana' })) as Row;
     // Redeeming more than held is capped at what the sale is worth, then refused against the balance.
     await refusal(a.checkout({ session_id: s.id, customer_id: cust.id, redeem_points: 500, lines: [line] }, host), 'insufficient_points');
+    // Points the sale itself earns do not pay for it.
+    await refusal(a.checkout({ session_id: s.id, customer_id: cust.id, redeem_points: 20, lines: [line] }, host), 'insufficient_points');
+    await refusal(a.checkout({ session_id: s.id, redeem_points: 1, lines: [line] }, host), 'no_customer');
+    const sold = (await a.checkout({ session_id: s.id, lines: [line] }, host)) as Row;
     await a.closeSession({ id: s.id, closing_float: 0 }, host);
     await refusal(a.checkout({ session_id: s.id, lines: [line] }, host), 'session_closed');
     await refusal(a.recordCashMovement({ session_id: s.id, type: 'drop', amount: 1 }, host), 'session_closed');
+    // A closed session's Z-report is final.
+    await refusal(a.refundOrder({ id: sold.id }, host), 'session_closed');
   });
 
   it('sells without moving stock when the till has no warehouse', async () => {

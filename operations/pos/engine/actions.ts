@@ -48,10 +48,19 @@ async function first(host: Host, collection: string, filter: Row): Promise<Row |
   return ((res.records as Row[]) ?? [])[0] ?? null;
 }
 
-async function openSessionOf(host: Host, id: string) {
+const closedSession = () => new ActionRefusal(409, 'session_closed', 'The till session is closed.');
+
+/**
+ * The session, held open for the rest of the request: writing its row with the
+ * `open` precondition takes the row lock, so `closeSession` waits for this sale
+ * or movement to commit and counts it, or this one waits and is refused.
+ */
+async function holdOpen(host: Host, id: string) {
   const s = await load(host, SESSIONS, id, 'session');
-  if (s.status !== 'open') throw new ActionRefusal(409, 'session_closed', 'The till session is closed.');
-  return s;
+  if (s.status !== 'open') throw closedSession();
+  return host.collections.update(SESSIONS, id, { status: 'open' }, { expect: { status: ['open'] } }).catch((err) => {
+    throw busy(err) ? closedSession() : err;
+  });
 }
 
 /** Inventory's `moveStock`, run by the engine; without inventory the engine answers 404. */
@@ -98,7 +107,7 @@ async function credit(host: Host, id: string, d: { points: number; spent: number
         CUSTOMERS,
         id,
         { loyalty_points: points, total_spent: round2(n(c.total_spent) + d.spent), visit_count: n(c.visit_count) + d.visits },
-        { expect: { loyalty_points: [String(c.loyalty_points)], total_spent: [String(c.total_spent)] } },
+        { expect: { loyalty_points: [String(c.loyalty_points)], total_spent: [String(c.total_spent)], visit_count: [String(c.visit_count)] } },
       );
     } catch (err) {
       if (!busy(err)) throw err;
@@ -118,7 +127,7 @@ const openSession: ExtensionAction = async (input, host) => {
 
 const recordCashMovement: ExtensionAction = async (input, host) => {
   const d = input as { session_id: string; type: string; amount: number; reason?: string };
-  await openSessionOf(host, d.session_id);
+  await holdOpen(host, d.session_id);
   return host.collections.insert('pos_cash_movements', {
     session_id: d.session_id,
     type: d.type,
@@ -131,10 +140,12 @@ type Line = { product_id?: string; product_name: string; sku?: string; quantity:
 
 const checkout: ExtensionAction = async (input, host) => {
   const d = input as { session_id: string; payment_method?: string; customer_id?: string; redeem_points?: number; notes?: string; lines: Line[] };
-  const session = await openSessionOf(host, d.session_id);
+  if (d.redeem_points && !d.customer_id) throw new ActionRefusal(400, 'no_customer', 'Points are redeemed by a customer.');
+  const session = await holdOpen(host, d.session_id);
+  // Each line rounds to cents, and the order is the sum of its lines, so the receipt adds up.
   const lines = d.lines.map((l) => {
-    const net = l.quantity * l.unit_price * (1 - (l.discount ?? 0) / 100);
-    const tax = (net * (l.tax_rate ?? 19)) / 100;
+    const net = round2(l.quantity * l.unit_price * (1 - (l.discount ?? 0) / 100));
+    const tax = round2((net * (l.tax_rate ?? 19)) / 100);
     return { ...l, net, tax, total: round2(net + tax) };
   });
   const subtotal = round2(lines.reduce((s, l) => s + l.net, 0));
@@ -142,6 +153,9 @@ const checkout: ExtensionAction = async (input, host) => {
   const customer = d.customer_id ? await load(host, CUSTOMERS, d.customer_id, 'customer') : null;
   // Never more points than the sale is worth, so a redemption cannot push the total below zero.
   const redeemed = customer ? Math.min(d.redeem_points ?? 0, Math.floor((subtotal + tax_amount) / POINT_VALUE)) : 0;
+  if (customer && redeemed > n(customer.loyalty_points)) {
+    throw new ActionRefusal(409, 'insufficient_points', `The customer holds ${n(customer.loyalty_points)} points.`);
+  }
   const loyalty_discount = round2(redeemed * POINT_VALUE);
   const total = round2(subtotal + tax_amount - loyalty_discount);
   const earned = customer ? Math.floor(total) : 0;
@@ -192,11 +206,16 @@ const checkout: ExtensionAction = async (input, host) => {
   return order;
 };
 
-/** A refund gives the money back and takes back the loyalty the sale moved; the goods are not restocked. */
+/**
+ * A refund gives the money back and takes back the loyalty the sale moved; the
+ * goods are not restocked. Only while the sale's session is open: a closed
+ * session's Z-report is final.
+ */
 const refundOrder: ExtensionAction = async (input, host) => {
   const { id } = input as { id: string };
   const o = await load(host, ORDERS, id, 'order');
   if (o.status !== 'paid') throw new ActionRefusal(409, 'not_paid', 'Only a paid order is refunded.');
+  await holdOpen(host, String(o.session_id));
   const refunded = await host.collections
     .update(ORDERS, id, { status: 'refunded', refunded_at: new Date().toISOString() }, { expect: { status: ['paid'] } })
     .catch((err) => {
@@ -221,7 +240,12 @@ const SIGN: Record<string, number> = { float_in: 1, float_out: -1, drop: -1, pay
  */
 const closeSession: ExtensionAction = async (input, host) => {
   const d = input as { id: string; closing_float: number; notes?: string };
-  const s = await openSessionOf(host, d.id);
+  const s = await load(host, SESSIONS, d.id, 'session');
+  if (s.status !== 'open') throw closedSession();
+  // Closed first, so a sale or movement still in flight is either counted below or refused.
+  await host.collections.update(SESSIONS, d.id, { status: 'closed', closed_at: new Date().toISOString() }, { expect: { status: ['open'] } }).catch((err) => {
+    throw busy(err) ? closedSession() : err;
+  });
   const orders = await all(host, ORDERS, { session_id: d.id });
   const paid = orders.filter((o) => o.status === 'paid');
   const sum = (rows: Row[], k = 'total') => round2(rows.reduce((acc, r) => acc + n(r[k]), 0));
@@ -230,23 +254,11 @@ const closeSession: ExtensionAction = async (input, host) => {
   const total_refunds = sum(orders.filter((o) => o.status === 'refunded'));
   const cash_sales = sum(paid.filter((o) => o.payment_method === 'cash'));
   const cash_movements = round2((await all(host, 'pos_cash_movements', { session_id: d.id })).reduce((acc, m) => acc + SIGN[String(m.type)] * n(m.amount), 0));
-  const closed = await host.collections
-    .update(
-      SESSIONS,
-      d.id,
-      {
-        status: 'closed',
-        closed_at: new Date().toISOString(),
-        closing_float: round2(d.closing_float),
-        expected_float: round2(n(s.opening_float) + cash_sales + cash_movements),
-        ...(d.notes ? { notes: d.notes } : {}),
-      },
-      { expect: { status: ['open'] } },
-    )
-    .catch((err) => {
-      if (busy(err)) throw new ActionRefusal(409, 'session_closed', 'The till session is closed.');
-      throw err;
-    });
+  const closed = await host.collections.update(SESSIONS, d.id, {
+    closing_float: round2(d.closing_float),
+    expected_float: round2(n(s.opening_float) + cash_sales + cash_movements),
+    ...(d.notes ? { notes: d.notes } : {}),
+  });
   const report = await host.collections.insert('pos_z_reports', {
     session_id: d.id,
     total_sales,

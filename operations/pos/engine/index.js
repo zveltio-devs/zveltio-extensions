@@ -57,11 +57,14 @@ async function first(host, collection, filter) {
   const res = await host.collections.list(collection, { filter, limit: 1, count: "none" });
   return (res.records ?? [])[0] ?? null;
 }
-async function openSessionOf(host, id) {
+var closedSession = () => new ActionRefusal(409, "session_closed", "The till session is closed.");
+async function holdOpen(host, id) {
   const s = await load(host, SESSIONS, id, "session");
   if (s.status !== "open")
-    throw new ActionRefusal(409, "session_closed", "The till session is closed.");
-  return s;
+    throw closedSession();
+  return host.collections.update(SESSIONS, id, { status: "open" }, { expect: { status: ["open"] } }).catch((err) => {
+    throw busy(err) ? closedSession() : err;
+  });
 }
 function moveStock(host, input) {
   if (!host.actions)
@@ -95,7 +98,7 @@ async function credit(host, id, d) {
     if (points < 0)
       throw new ActionRefusal(409, "insufficient_points", `The customer holds ${n(c.loyalty_points)} points.`);
     try {
-      return await host.collections.update(CUSTOMERS, id, { loyalty_points: points, total_spent: round2(n(c.total_spent) + d.spent), visit_count: n(c.visit_count) + d.visits }, { expect: { loyalty_points: [String(c.loyalty_points)], total_spent: [String(c.total_spent)] } });
+      return await host.collections.update(CUSTOMERS, id, { loyalty_points: points, total_spent: round2(n(c.total_spent) + d.spent), visit_count: n(c.visit_count) + d.visits }, { expect: { loyalty_points: [String(c.loyalty_points)], total_spent: [String(c.total_spent)], visit_count: [String(c.visit_count)] } });
     } catch (err) {
       if (!busy(err))
         throw err;
@@ -113,7 +116,7 @@ var openSession = async (input, host) => {
 };
 var recordCashMovement = async (input, host) => {
   const d = input;
-  await openSessionOf(host, d.session_id);
+  await holdOpen(host, d.session_id);
   return host.collections.insert("pos_cash_movements", {
     session_id: d.session_id,
     type: d.type,
@@ -123,16 +126,21 @@ var recordCashMovement = async (input, host) => {
 };
 var checkout = async (input, host) => {
   const d = input;
-  const session = await openSessionOf(host, d.session_id);
+  if (d.redeem_points && !d.customer_id)
+    throw new ActionRefusal(400, "no_customer", "Points are redeemed by a customer.");
+  const session = await holdOpen(host, d.session_id);
   const lines = d.lines.map((l) => {
-    const net = l.quantity * l.unit_price * (1 - (l.discount ?? 0) / 100);
-    const tax = net * (l.tax_rate ?? 19) / 100;
+    const net = round2(l.quantity * l.unit_price * (1 - (l.discount ?? 0) / 100));
+    const tax = round2(net * (l.tax_rate ?? 19) / 100);
     return { ...l, net, tax, total: round2(net + tax) };
   });
   const subtotal = round2(lines.reduce((s, l) => s + l.net, 0));
   const tax_amount = round2(lines.reduce((s, l) => s + l.tax, 0));
   const customer = d.customer_id ? await load(host, CUSTOMERS, d.customer_id, "customer") : null;
   const redeemed = customer ? Math.min(d.redeem_points ?? 0, Math.floor((subtotal + tax_amount) / POINT_VALUE)) : 0;
+  if (customer && redeemed > n(customer.loyalty_points)) {
+    throw new ActionRefusal(409, "insufficient_points", `The customer holds ${n(customer.loyalty_points)} points.`);
+  }
   const loyalty_discount = round2(redeemed * POINT_VALUE);
   const total = round2(subtotal + tax_amount - loyalty_discount);
   const earned = customer ? Math.floor(total) : 0;
@@ -184,6 +192,7 @@ var refundOrder = async (input, host) => {
   const o = await load(host, ORDERS, id, "order");
   if (o.status !== "paid")
     throw new ActionRefusal(409, "not_paid", "Only a paid order is refunded.");
+  await holdOpen(host, String(o.session_id));
   const refunded = await host.collections.update(ORDERS, id, { status: "refunded", refunded_at: new Date().toISOString() }, { expect: { status: ["paid"] } }).catch((err) => {
     if (busy(err))
       throw new ActionRefusal(409, "not_paid", "Only a paid order is refunded.");
@@ -199,7 +208,12 @@ var refundOrder = async (input, host) => {
 var SIGN = { float_in: 1, float_out: -1, drop: -1, payout: -1 };
 var closeSession = async (input, host) => {
   const d = input;
-  const s = await openSessionOf(host, d.id);
+  const s = await load(host, SESSIONS, d.id, "session");
+  if (s.status !== "open")
+    throw closedSession();
+  await host.collections.update(SESSIONS, d.id, { status: "closed", closed_at: new Date().toISOString() }, { expect: { status: ["open"] } }).catch((err) => {
+    throw busy(err) ? closedSession() : err;
+  });
   const orders = await all(host, ORDERS, { session_id: d.id });
   const paid = orders.filter((o) => o.status === "paid");
   const sum = (rows, k = "total") => round2(rows.reduce((acc, r) => acc + n(r[k]), 0));
@@ -208,15 +222,9 @@ var closeSession = async (input, host) => {
   const cash_sales = sum(paid.filter((o) => o.payment_method === "cash"));
   const cash_movements = round2((await all(host, "pos_cash_movements", { session_id: d.id })).reduce((acc, m) => acc + SIGN[String(m.type)] * n(m.amount), 0));
   const closed = await host.collections.update(SESSIONS, d.id, {
-    status: "closed",
-    closed_at: new Date().toISOString(),
     closing_float: round2(d.closing_float),
     expected_float: round2(n(s.opening_float) + cash_sales + cash_movements),
     ...d.notes ? { notes: d.notes } : {}
-  }, { expect: { status: ["open"] } }).catch((err) => {
-    if (busy(err))
-      throw new ActionRefusal(409, "session_closed", "The till session is closed.");
-    throw err;
   });
   const report = await host.collections.insert("pos_z_reports", {
     session_id: d.id,
