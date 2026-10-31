@@ -49,7 +49,7 @@
       "field": "product_id",
       "target": "products",
       "targetField": "id",
-      "onDelete": "CASCADE",
+      "onDelete": "RESTRICT",
       "onUpdate": "CASCADE",
       "metadata": {}
     },
@@ -59,7 +59,7 @@
       "field": "warehouse_id",
       "target": "warehouses",
       "targetField": "id",
-      "onDelete": "CASCADE",
+      "onDelete": "RESTRICT",
       "onUpdate": "CASCADE",
       "metadata": {}
     }
