@@ -63,6 +63,40 @@ async function totals(host, reportId) {
   const per_diem_total = sum(await entries(host, "per_diem_entries", reportId), (p) => n(p.rate) - n(p.meals_deducted));
   return { total_amount, mileage_total, per_diem_total, grand_total: round2(total_amount + mileage_total + per_diem_total) };
 }
+async function holdDraft(host, id, change = {}) {
+  const r = await load(host, id);
+  if (r.status !== "draft")
+    throw new ActionRefusal(409, "report_not_draft", "Only a draft is edited; a submitted report is frozen with its entries.");
+  return host.collections.update(R, id, { ...change, status: "draft" }, { expect: { status: ["draft"] } });
+}
+var createReport = async (input, host) => {
+  const d = input;
+  return host.collections.insert(R, { title: d.title, ...d.currency !== undefined && { currency: d.currency }, notes: d.notes || null });
+};
+var updateDraft = async (input, host) => {
+  const { id, ...change } = input;
+  return holdDraft(host, id, change);
+};
+var deleteDraft = async (input, host) => {
+  const { id } = input;
+  await holdDraft(host, id);
+  await host.collections.delete(R, id);
+  return { id };
+};
+var addEntry = async (input, host) => {
+  const { report_id, collection, entry } = input;
+  await holdDraft(host, report_id);
+  return host.collections.insert(collection, { ...entry, report_id });
+};
+var removeEntry = async (input, host) => {
+  const { id, collection } = input;
+  const e = await host.collections.read(collection, id);
+  if (!e)
+    throw new ActionRefusal(404, "entry_not_found", "No such entry.");
+  await holdDraft(host, String(e.report_id));
+  await host.collections.delete(collection, id);
+  return { id };
+};
 var recalculate = async (input, host) => {
   const { id } = input;
   const r = await load(host, id);
@@ -118,7 +152,18 @@ var reimburse = async (input, host) => {
   });
   return { reimbursement, report };
 };
-var expensesActions = { recalculate, submit, approve, reject, reimburse };
+var expensesActions = {
+  createReport,
+  updateDraft,
+  deleteDraft,
+  addEntry,
+  removeEntry,
+  recalculate,
+  submit,
+  approve,
+  reject,
+  reimburse
+};
 
 // engine/index.ts
 var extension = {

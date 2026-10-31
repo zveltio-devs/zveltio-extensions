@@ -5,8 +5,8 @@ import { ActionRefusal, type ExtensionAction, todayIn } from '@zveltio/sdk/exten
 // the data API (`host.collections`): the collections' permissions, column
 // rules, revisions, flows and audit are a PATCH's own, and a throw rolls back
 // everything the action wrote. Reports and their expenses, mileage and per
-// diem entries are plain edits through `/api/data`; the status rule on
-// `expense_reports` holds the report's order for a PATCH too. Who may file,
+// diem entries are written only here (`writtenBy: "actions"`): a draft is
+// edited, a submitted report is frozen with its entries. Who may file,
 // approve or reimburse whose report is the engine's rules on these
 // collections, not this file's.
 
@@ -47,6 +47,53 @@ export async function totals(host: Host, reportId: string) {
   const per_diem_total = sum(await entries(host, 'per_diem_entries', reportId), (p) => n(p.rate) - n(p.meals_deducted));
   return { total_amount, mileage_total, per_diem_total, grand_total: round2(total_amount + mileage_total + per_diem_total) };
 }
+
+/**
+ * A draft held for the rest of the request: its status is rewritten only while
+ * it is still a draft (`expect`), which locks the row, so a concurrent submit
+ * waits for this change or this change waits for it and is refused.
+ */
+async function holdDraft(host: Host, id: string, change: Row = {}) {
+  const r = await load(host, id);
+  if (r.status !== 'draft') throw new ActionRefusal(409, 'report_not_draft', 'Only a draft is edited; a submitted report is frozen with its entries.');
+  return host.collections.update(R, id, { ...change, status: 'draft' }, { expect: { status: ['draft'] } });
+}
+
+const createReport: ExtensionAction = async (input, host) => {
+  const d = input as { title: string; currency?: string; notes?: string };
+  return host.collections.insert(R, { title: d.title, ...(d.currency !== undefined && { currency: d.currency }), notes: d.notes || null });
+};
+
+/** A draft's title, currency or notes changed. */
+const updateDraft: ExtensionAction = async (input, host) => {
+  const { id, ...change } = input as { id: string; title?: string; currency?: string; notes?: string };
+  return holdDraft(host, id, change);
+};
+
+/** A draft removed, its entries with it. */
+const deleteDraft: ExtensionAction = async (input, host) => {
+  const { id } = input as { id: string };
+  await holdDraft(host, id);
+  await host.collections.delete(R, id);
+  return { id };
+};
+
+/** An expense, mileage or per diem entry added to a draft. */
+const addEntry: ExtensionAction = async (input, host) => {
+  const { report_id, collection, entry } = input as { report_id: string; collection: string; entry: Row };
+  await holdDraft(host, report_id);
+  return host.collections.insert(collection, { ...entry, report_id });
+};
+
+/** An entry taken out of a draft. */
+const removeEntry: ExtensionAction = async (input, host) => {
+  const { id, collection } = input as { id: string; collection: string };
+  const e = await host.collections.read(collection, id);
+  if (!e) throw new ActionRefusal(404, 'entry_not_found', 'No such entry.');
+  await holdDraft(host, String(e.report_id));
+  await host.collections.delete(collection, id);
+  return { id };
+};
 
 /** A draft's totals, read again from its entries. */
 const recalculate: ExtensionAction = async (input, host) => {
@@ -120,4 +167,15 @@ const reimburse: ExtensionAction = async (input, host) => {
   return { reimbursement, report };
 };
 
-export const expensesActions: Record<string, ExtensionAction> = { recalculate, submit, approve, reject, reimburse };
+export const expensesActions: Record<string, ExtensionAction> = {
+  createReport,
+  updateDraft,
+  deleteDraft,
+  addEntry,
+  removeEntry,
+  recalculate,
+  submit,
+  approve,
+  reject,
+  reimburse,
+};

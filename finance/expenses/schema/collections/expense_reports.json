@@ -1,5 +1,6 @@
 {
   "name": "expense_reports",
+  "writtenBy": "actions",
   "fields": [
     {
       "name": "title",
@@ -20,8 +21,7 @@
           "rejected",
           "reimbursed"
         ]
-      },
-      "writtenBy": "actions"
+      }
     },
     {
       "name": "currency",
@@ -35,58 +35,49 @@
     },
     {
       "name": "submitted_at",
-      "type": "datetime",
-      "writtenBy": "actions"
+      "type": "datetime"
     },
     {
       "name": "approved_at",
-      "type": "datetime",
-      "writtenBy": "actions"
+      "type": "datetime"
     },
     {
       "name": "rejection_reason",
-      "type": "textarea",
-      "writtenBy": "actions"
+      "type": "textarea"
     },
     {
       "name": "total_amount",
       "type": "decimal",
       "required": true,
-      "defaultValue": 0,
-      "writtenBy": "actions"
+      "defaultValue": 0
     },
     {
       "name": "mileage_total",
       "type": "decimal",
       "required": true,
-      "defaultValue": 0,
-      "writtenBy": "actions"
+      "defaultValue": 0
     },
     {
       "name": "per_diem_total",
       "type": "decimal",
       "required": true,
-      "defaultValue": 0,
-      "writtenBy": "actions"
+      "defaultValue": 0
     },
     {
       "name": "grand_total",
       "type": "decimal",
       "required": true,
-      "defaultValue": 0,
-      "writtenBy": "actions"
+      "defaultValue": 0
     },
     {
       "name": "reimbursed_amount",
       "type": "decimal",
       "required": true,
-      "defaultValue": 0,
-      "writtenBy": "actions"
+      "defaultValue": 0
     },
     {
       "name": "reimbursed_at",
-      "type": "datetime",
-      "writtenBy": "actions"
+      "type": "datetime"
     }
   ],
   "validation": [

@@ -37,7 +37,9 @@ function fakeHost() {
         }
         return { ...Object.assign(row, data) };
       },
-      delete: async () => {},
+      delete: async (c: string, id: string) => {
+        tables[c] = rows(c).filter((r) => r.id !== id);
+      },
     },
   };
   return { host: host as never, rows, c: host.collections };
@@ -103,5 +105,33 @@ describe('expense report life', () => {
     expect(rest.report.status).toBe('reimbursed');
     expect(rows('expense_reimbursements')).toHaveLength(2);
     await refusal(a.reimburse({ id }, host), 'report_not_approved');
+  });
+});
+
+describe('a draft is edited only while it is a draft', () => {
+  it('creates, edits and deletes a draft report', async () => {
+    const { host, rows } = fakeHost();
+    const r = (await a.createReport({ title: 'Iasi', notes: '' }, host)) as Row;
+    expect(r).toMatchObject({ title: 'Iasi', status: 'draft', currency: 'RON', notes: null });
+    expect(await a.updateDraft({ id: r.id, currency: 'EUR' }, host)).toMatchObject({ currency: 'EUR', status: 'draft' });
+    expect(await a.deleteDraft({ id: r.id }, host)).toEqual({ id: r.id });
+    expect(rows('expense_reports')).toHaveLength(0);
+  });
+
+  it('adds and removes entries on a draft only', async () => {
+    const { host, id, rows } = await report();
+    const e = (await a.addEntry({ report_id: id, collection: 'expenses', entry: { amount: 5, exchange_rate: 1, report_id: 'other' } }, host)) as Row;
+    expect(e.report_id).toBe(id);
+    await a.removeEntry({ id: e.id, collection: 'expenses' }, host);
+    expect(rows('expenses')).toHaveLength(2);
+    await refusal(a.removeEntry({ id: 'nope', collection: 'expenses' }, host), 'entry_not_found');
+
+    await a.submit({ id }, host);
+    const kept = String(rows('mileage_entries')[0].id);
+    await refusal(a.addEntry({ report_id: id, collection: 'expenses', entry: { amount: 1 } }, host), 'report_not_draft');
+    await refusal(a.removeEntry({ id: kept, collection: 'mileage_entries' }, host), 'report_not_draft');
+    await refusal(a.updateDraft({ id, title: 'x' }, host), 'report_not_draft');
+    await refusal(a.deleteDraft({ id }, host), 'report_not_draft');
+    expect(rows('mileage_entries')).toHaveLength(1);
   });
 });

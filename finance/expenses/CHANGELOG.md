@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.2.0 (2026-10-31)
+
+- feat: a report and its expenses, mileage and per diem entries are written only by this extension's actions (`writtenBy: "actions"`): the data API, sync and every other path answer 409 `written_by_actions`, so a submitted report cannot be edited, nor its entries changed under its frozen totals
+- feat: `createReport`, `updateDraft` and `deleteDraft` create, edit and delete a draft report; `addEntry` and `removeEntry` add an expense, mileage or per diem entry to a draft and take one out; a report that is not a draft is refused (`report_not_draft`). Each holds the draft's row for the request, so a concurrent `submit` cannot slip in between the check and the change
+- feat(studio): the new-report form posts to `createReport`
+
 ## 2.1.0 (2026-10-31)
 
 - feat: a report's status, its dates, rejection reason, totals and reimbursed amount are written only by this extension's actions (`writtenBy: "actions"`), and reimbursements are written only by `reimburse`: the data API, sync and every other path answer 409 `written_by_actions`, so a report is submitted, approved, rejected and paid back only through `submit`, `approve`, `reject` and `reimburse`

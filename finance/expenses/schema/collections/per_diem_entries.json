@@ -1,5 +1,6 @@
 {
   "name": "per_diem_entries",
+  "writtenBy": "actions",
   "fields": [
     {
       "name": "report_id",
