@@ -1,0 +1,62 @@
+{
+  "name": "asset_depreciation",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "asset_id",
+      "type": "m2o",
+      "indexed": true,
+      "required": true,
+      "options": {
+        "related_collection": "assets"
+      }
+    },
+    {
+      "name": "period_date",
+      "type": "date",
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "amount",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "book_value_after",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "is_posted",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": false
+    },
+    {
+      "name": "journal_entry_id",
+      "type": "uuid"
+    }
+  ],
+  "indexes": [
+    {
+      "fields": [
+        "asset_id",
+        "period_date"
+      ],
+      "unique": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "asset_depreciation_asset_id",
+      "type": "m2o",
+      "field": "asset_id",
+      "target": "assets",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

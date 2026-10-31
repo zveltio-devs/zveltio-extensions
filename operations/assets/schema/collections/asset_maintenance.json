@@ -1,0 +1,86 @@
+{
+  "name": "asset_maintenance",
+  "fields": [
+    {
+      "name": "asset_id",
+      "type": "m2o",
+      "indexed": true,
+      "required": true,
+      "options": {
+        "related_collection": "assets"
+      }
+    },
+    {
+      "name": "type",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "scheduled",
+      "options": {
+        "values": [
+          "scheduled",
+          "repair",
+          "inspection"
+        ]
+      }
+    },
+    {
+      "name": "scheduled_date",
+      "type": "date",
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "completed_date",
+      "type": "date"
+    },
+    {
+      "name": "cost",
+      "type": "decimal"
+    },
+    {
+      "name": "description",
+      "type": "textarea",
+      "required": true
+    },
+    {
+      "name": "performed_by",
+      "type": "text"
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "required": true,
+      "indexed": true,
+      "defaultValue": "scheduled",
+      "options": {
+        "values": [
+          "scheduled",
+          "completed",
+          "overdue"
+        ]
+      }
+    }
+  ],
+  "relations": [
+    {
+      "name": "asset_maintenance_asset_id",
+      "type": "m2o",
+      "field": "asset_id",
+      "target": "assets",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "cost",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "Maintenance does not cost a negative amount."
+    }
+  ]
+}

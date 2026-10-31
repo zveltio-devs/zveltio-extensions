@@ -1,0 +1,45 @@
+{
+  "name": "asset_transfers",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "asset_id",
+      "type": "m2o",
+      "indexed": true,
+      "required": true,
+      "options": {
+        "related_collection": "assets"
+      }
+    },
+    {
+      "name": "from_location",
+      "type": "text"
+    },
+    {
+      "name": "to_location",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "transfer_date",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "reason",
+      "type": "text"
+    }
+  ],
+  "relations": [
+    {
+      "name": "asset_transfers_asset_id",
+      "type": "m2o",
+      "field": "asset_id",
+      "target": "assets",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

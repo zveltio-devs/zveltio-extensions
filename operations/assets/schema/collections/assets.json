@@ -1,0 +1,152 @@
+{
+  "name": "assets",
+  "fields": [
+    {
+      "name": "code",
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "description",
+      "type": "textarea"
+    },
+    {
+      "name": "category",
+      "type": "enum",
+      "required": true,
+      "indexed": true,
+      "defaultValue": "equipment",
+      "options": {
+        "values": [
+          "building",
+          "equipment",
+          "vehicle",
+          "furniture",
+          "software",
+          "land",
+          "other"
+        ]
+      }
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "required": true,
+      "indexed": true,
+      "defaultValue": "active",
+      "writtenBy": "actions",
+      "options": {
+        "values": [
+          "active",
+          "disposed"
+        ]
+      }
+    },
+    {
+      "name": "serial_number",
+      "type": "text"
+    },
+    {
+      "name": "supplier",
+      "type": "text"
+    },
+    {
+      "name": "image_url",
+      "type": "url"
+    },
+    {
+      "name": "warranty_expiry",
+      "type": "date"
+    },
+    {
+      "name": "next_maintenance_date",
+      "type": "date"
+    },
+    {
+      "name": "location",
+      "type": "text",
+      "writtenBy": "actions"
+    },
+    {
+      "name": "purchase_date",
+      "type": "date",
+      "required": true,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "purchase_cost",
+      "type": "decimal",
+      "required": true,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "residual_value",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "useful_life_years",
+      "type": "integer",
+      "required": true,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "depreciation_method",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "straight_line",
+      "writtenBy": "actions",
+      "options": {
+        "values": [
+          "straight_line",
+          "declining_balance"
+        ]
+      }
+    },
+    {
+      "name": "accumulated_depreciation",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "current_value",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "depreciation_account_id",
+      "type": "uuid"
+    },
+    {
+      "name": "accumulated_dep_account_id",
+      "type": "uuid"
+    },
+    {
+      "name": "disposed_at",
+      "type": "date",
+      "writtenBy": "actions"
+    },
+    {
+      "name": "disposal_value",
+      "type": "decimal",
+      "writtenBy": "actions"
+    },
+    {
+      "name": "disposal_reason",
+      "type": "text",
+      "writtenBy": "actions"
+    }
+  ]
+}

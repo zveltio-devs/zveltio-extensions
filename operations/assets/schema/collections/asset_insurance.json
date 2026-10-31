@@ -1,0 +1,83 @@
+{
+  "name": "asset_insurance",
+  "fields": [
+    {
+      "name": "asset_id",
+      "type": "m2o",
+      "indexed": true,
+      "required": true,
+      "options": {
+        "related_collection": "assets"
+      }
+    },
+    {
+      "name": "policy_number",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "insurer",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "type",
+      "type": "text",
+      "required": true,
+      "defaultValue": "property"
+    },
+    {
+      "name": "insured_value",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "premium",
+      "type": "decimal"
+    },
+    {
+      "name": "start_date",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "end_date",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    }
+  ],
+  "relations": [
+    {
+      "name": "asset_insurance_asset_id",
+      "type": "m2o",
+      "field": "asset_id",
+      "target": "assets",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "insured_value",
+      "rule": "min",
+      "config": {
+        "value": 0.01
+      },
+      "message": "An asset is insured for a positive value."
+    },
+    {
+      "field": "premium",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "A premium is not negative."
+    }
+  ]
+}

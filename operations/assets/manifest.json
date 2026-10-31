@@ -2,13 +2,13 @@
   "name": "operations/assets",
   "displayName": "Fixed Assets",
   "category": "operations",
-  "description": "Fixed asset register, straight-line and declining balance depreciation, maintenance schedules",
-  "version": "1.0.10",
-  "zveltioMinVersion": "1.0.0",
+  "description": "Fixed asset register, straight-line and declining balance depreciation posted to the ledger, maintenance, insurance, revaluations and transfers",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.94",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-assets",
   "permissions": [
-    "database"
+    "data:write"
   ],
   "i18nPrefixes": [
     "assets",
@@ -17,7 +17,7 @@
   "dependencies": [
     {
       "name": "finance/accounting",
-      "minVersion": "1.0.0"
+      "minVersion": "2.1.1"
     }
   ],
   "studio": {
@@ -43,11 +43,283 @@
     "bundled": true,
     "bundlePeers": false
   },
+  "collections": [
+    "assets",
+    "asset_depreciation",
+    "asset_maintenance",
+    "asset_insurance",
+    "asset_revaluations",
+    "asset_transfers"
+  ],
+  "actions": [
+    {
+      "name": "createAsset",
+      "permission": {
+        "resource": "assets",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "code",
+          "name",
+          "purchase_date",
+          "purchase_cost",
+          "useful_life_years"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "building",
+              "equipment",
+              "vehicle",
+              "furniture",
+              "software",
+              "land",
+              "other"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "serial_number": {
+            "type": "string"
+          },
+          "supplier": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "purchase_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "purchase_cost": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "useful_life_years": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "residual_value": {
+            "type": "number",
+            "minimum": 0
+          },
+          "depreciation_method": {
+            "type": "string",
+            "enum": [
+              "straight_line",
+              "declining_balance"
+            ]
+          },
+          "warranty_expiry": {
+            "type": "string",
+            "format": "date"
+          },
+          "next_maintenance_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "depreciation_account_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accumulated_dep_account_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [],
+      "writes": [
+        "assets",
+        "asset_depreciation"
+      ]
+    },
+    {
+      "name": "postDepreciation",
+      "permission": {
+        "resource": "asset_depreciation",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "asset_id",
+          "period_date"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "asset_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "period_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "journal_date": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "reads": [
+        "assets",
+        "asset_depreciation"
+      ],
+      "writes": [
+        "assets",
+        "asset_depreciation"
+      ],
+      "calls": [
+        "finance/accounting.createEntry",
+        "finance/accounting.postEntry"
+      ]
+    },
+    {
+      "name": "disposeAsset",
+      "permission": {
+        "resource": "assets",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "disposal_date"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "disposal_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "disposal_value": {
+            "type": "number",
+            "minimum": 0
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "reads": [
+        "assets"
+      ],
+      "writes": [
+        "assets"
+      ]
+    },
+    {
+      "name": "transferAsset",
+      "permission": {
+        "resource": "asset_transfers",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "to_location",
+          "transfer_date"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "to_location": {
+            "type": "string",
+            "minLength": 1
+          },
+          "transfer_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "reads": [
+        "assets"
+      ],
+      "writes": [
+        "assets",
+        "asset_transfers"
+      ]
+    },
+    {
+      "name": "revalueAsset",
+      "permission": {
+        "resource": "asset_revaluations",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "revaluation_date",
+          "new_value"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revaluation_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "new_value": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "market",
+              "cost",
+              "expert_opinion"
+            ]
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      },
+      "reads": [
+        "assets"
+      ],
+      "writes": [
+        "assets",
+        "asset_revaluations"
+      ]
+    }
+  ],
   "integrity": {
-    "engineSha256": "4acc463b111a6555023ff6837f1860d58a8e1694416c92b95e42713694180cfd",
-    "sourceSha256": "ef0b0457240673c7750edbfa6b315cbece650b2d89ea95e1313baa171eb97c3a"
-  },
-  "resources": [
-    "assets"
-  ]
+    "engineSha256": "91f003c9b24fc9d8f4ff326c67c4558d53e2c00a65c42241364669db84886114",
+    "sourceSha256": "2f534894fd26f3d6201945228387b590e757dfe90095667fa51c02f5383801c9",
+    "schemaSha256": "f2f77e9982fa83e2f4336ac30f81091bea3be8955e510df65002137e98ea8748"
+  }
 }
