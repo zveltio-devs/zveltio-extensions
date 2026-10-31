@@ -1,0 +1,99 @@
+{
+  "name": "ec_product_reviews",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "product_id",
+      "type": "m2o",
+      "indexed": true,
+      "required": true,
+      "options": {
+        "related_collection": "ec_products"
+      }
+    },
+    {
+      "name": "customer_name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "customer_email",
+      "type": "email",
+      "required": true
+    },
+    {
+      "name": "order_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "ec_orders"
+      }
+    },
+    {
+      "name": "rating",
+      "type": "integer",
+      "required": true
+    },
+    {
+      "name": "title",
+      "type": "text"
+    },
+    {
+      "name": "body",
+      "type": "textarea"
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "indexed": true,
+      "required": true,
+      "defaultValue": "pending",
+      "options": {
+        "values": [
+          "pending",
+          "approved",
+          "rejected"
+        ]
+      }
+    },
+    {
+      "name": "is_verified_purchase",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": false
+    }
+  ],
+  "relations": [
+    {
+      "name": "ec_product_reviews_product_id",
+      "type": "m2o",
+      "field": "product_id",
+      "target": "ec_products",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "ec_product_reviews_order_id",
+      "type": "m2o",
+      "field": "order_id",
+      "target": "ec_orders",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "rating",
+      "rule": "range",
+      "config": {
+        "min": 1,
+        "max": 5
+      },
+      "message": "A rating is 1 to 5 stars."
+    }
+  ]
+}

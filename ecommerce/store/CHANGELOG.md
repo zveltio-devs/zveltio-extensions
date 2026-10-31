@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.0.0 (2026-10-31)
+
+- feat!: categories, products, variants, customers, shipping zones and rates, tax rules, coupons, orders and their items, carts, reviews and the order series are collections declared in `schema/collections/` (`ec_*`), created and owned by the engine; no SQL migrations
+- feat!: the hand-written `/ext/ecommerce/store/*` routes are gone — reads and plain edits go through `/api/data/<collection>`; a purchase and what follows it are the actions `checkout`, `saveCart`, `submitReview` and `moderateReview` (`POST /ext/ecommerce/store/actions/<name>`)
+- feat!: an order's number, customer and money, its items, the series, carts, reviews, a coupon's use count and a product's rating are written only by these actions (`writtenBy: "actions"`); an order's status, payment status, tracking number and notes stay plain edits
+- feat!: the `store` permission resource and the `/public/*` storefront routes are gone. A storefront is a client holding an API key the operator issues; what it may read and run is the engine's rules on these collections. The per-IP limit of the public writes goes with them (the engine limits keys)
+- feat!: a product is no longer created in inventory or linked to a CRM contact automatically; `product_id` is a plain field naming the inventory product. The inventory and CRM dependencies, `/admin/stats`, the shipping-rate listing by country and the seeded Romanian tax rules are gone
+- fix: a coupon that does not apply refuses the order (`coupon_invalid`) instead of being recorded on it unapplied, and one not yet valid (`valid_from`) is refused
+- fix: a free-above shipping rate is free above its threshold; an inactive zone's rate is refused
+- fix: an order takes its currency from its products, and refuses products priced in different ones (`mixed_currencies`); the caller no longer names it
+- fix: order numbers come from a series, not `COUNT(*) + 1`; each line rounds to cents
+- fix: two moderations of one product's reviews cannot write over each other's rating
+- requires engine 3.0.0-beta.93
+
 ## 1.0.18 (2026-10-31)
 
 - chore: the test of the inventory product link is gone with inventory 2.0.0 (#288), which changed the published archive without a version

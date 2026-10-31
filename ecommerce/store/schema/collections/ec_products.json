@@ -1,0 +1,161 @@
+{
+  "name": "ec_products",
+  "fields": [
+    {
+      "name": "sku",
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "slug",
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    {
+      "name": "description",
+      "type": "textarea"
+    },
+    {
+      "name": "short_description",
+      "type": "textarea"
+    },
+    {
+      "name": "category_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "ec_categories"
+      }
+    },
+    {
+      "name": "product_id",
+      "type": "uuid",
+      "indexed": true
+    },
+    {
+      "name": "price",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "compare_price",
+      "type": "decimal"
+    },
+    {
+      "name": "cost",
+      "type": "decimal"
+    },
+    {
+      "name": "currency",
+      "type": "text",
+      "required": true,
+      "defaultValue": "RON"
+    },
+    {
+      "name": "tax_rate",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 19
+    },
+    {
+      "name": "stock_qty",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "track_stock",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true
+    },
+    {
+      "name": "allow_backorder",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": false
+    },
+    {
+      "name": "weight",
+      "type": "decimal"
+    },
+    {
+      "name": "images",
+      "type": "json"
+    },
+    {
+      "name": "attributes",
+      "type": "json"
+    },
+    {
+      "name": "tags",
+      "type": "tags"
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "indexed": true,
+      "required": true,
+      "defaultValue": "draft",
+      "options": {
+        "values": [
+          "draft",
+          "active",
+          "archived"
+        ]
+      }
+    },
+    {
+      "name": "is_featured",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": false
+    },
+    {
+      "name": "avg_rating",
+      "type": "decimal",
+      "writtenBy": "actions"
+    },
+    {
+      "name": "review_count",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "digital_file_url",
+      "type": "url"
+    }
+  ],
+  "relations": [
+    {
+      "name": "ec_products_category_id",
+      "type": "m2o",
+      "field": "category_id",
+      "target": "ec_categories",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "price",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "A price is never negative."
+    }
+  ]
+}

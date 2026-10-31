@@ -1,0 +1,75 @@
+{
+  "name": "ec_coupons",
+  "fields": [
+    {
+      "name": "code",
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    {
+      "name": "type",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "percent",
+      "options": {
+        "values": [
+          "percent",
+          "fixed"
+        ]
+      }
+    },
+    {
+      "name": "value",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "min_order_amount",
+      "type": "decimal"
+    },
+    {
+      "name": "max_uses",
+      "type": "integer"
+    },
+    {
+      "name": "used_count",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "valid_from",
+      "type": "datetime"
+    },
+    {
+      "name": "valid_until",
+      "type": "datetime"
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true
+    }
+  ],
+  "validation": [
+    {
+      "field": "code",
+      "rule": "pattern",
+      "config": {
+        "pattern": "^[A-Z0-9_-]{3,30}$"
+      },
+      "message": "A coupon code is 3 to 30 capital letters, digits, '-' or '_'."
+    },
+    {
+      "field": "value",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "A coupon's value is never negative."
+    }
+  ]
+}

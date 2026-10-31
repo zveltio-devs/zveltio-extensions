@@ -1,0 +1,92 @@
+{
+  "name": "ec_order_items",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "order_id",
+      "type": "m2o",
+      "indexed": true,
+      "required": true,
+      "options": {
+        "related_collection": "ec_orders"
+      }
+    },
+    {
+      "name": "product_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "ec_products"
+      }
+    },
+    {
+      "name": "variant_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "ec_product_variants"
+      }
+    },
+    {
+      "name": "product_name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "sku",
+      "type": "text"
+    },
+    {
+      "name": "quantity",
+      "type": "integer",
+      "required": true
+    },
+    {
+      "name": "unit_price",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "tax_rate",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "total",
+      "type": "decimal",
+      "required": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "ec_order_items_order_id",
+      "type": "m2o",
+      "field": "order_id",
+      "target": "ec_orders",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "ec_order_items_product_id",
+      "type": "m2o",
+      "field": "product_id",
+      "target": "ec_products",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "ec_order_items_variant_id",
+      "type": "m2o",
+      "field": "variant_id",
+      "target": "ec_product_variants",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}
