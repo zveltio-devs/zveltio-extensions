@@ -1,5 +1,6 @@
 {
   "name": "stock_levels",
+  "writtenBy": "actions",
   "fields": [
     {
       "name": "product_id",

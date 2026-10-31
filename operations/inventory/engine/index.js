@@ -38,6 +38,7 @@ var RESERVED_PATH_SEGMENTS = Object.freeze([
 // engine/actions.ts
 var LEVELS = "stock_levels";
 var MOVES = "stock_movements";
+var SERIES = "purchase_order_series";
 var PAGE = 500;
 var TRIES = 5;
 var qty = (v) => Math.round(Number(v ?? 0) * 1e4) / 1e4;
@@ -129,11 +130,33 @@ var moveStock = async (input, host) => {
     note: d.note ?? null
   });
 };
-async function nextNumber(host) {
+async function series(host) {
+  const s = await first(host, SERIES, {});
+  if (s)
+    return s;
   const res = await host.collections.list("purchase_orders", { sort: "number", order: "desc", limit: 1, count: "none" });
-  const last = (res.records ?? [])[0];
-  const n = Number(/(\d+)$/.exec(String(last?.number ?? ""))?.[1] ?? 0);
-  return `PO-${String(n + 1).padStart(5, "0")}`;
+  const last = Number(/(\d+)$/.exec(String((res.records ?? [])[0]?.number ?? ""))?.[1] ?? 0);
+  return host.collections.insert(SERIES, { next_number: last + 1 }).catch(async (err) => {
+    const won = await first(host, SERIES, {});
+    if (!won)
+      throw err;
+    return won;
+  });
+}
+async function nextNumber(host) {
+  for (let attempt = 0;attempt < TRIES; attempt++) {
+    const s = await series(host);
+    const n = Number(s.next_number);
+    try {
+      await host.collections.update(SERIES, String(s.id), { next_number: n + 1 }, { expect: { next_number: [String(s.next_number)] } });
+    } catch (err) {
+      if (err.code === "precondition_failed")
+        continue;
+      throw err;
+    }
+    return `PO-${String(n).padStart(5, "0")}`;
+  }
+  throw new ActionRefusal(409, "series_busy", "The series is being used by other requests; try again.");
 }
 var createPurchaseOrder = async (input, host) => {
   const d = input;
@@ -168,6 +191,21 @@ var createPurchaseOrder = async (input, host) => {
     });
   }
   return po;
+};
+var sendPurchaseOrder = async (input, host) => {
+  const { id } = input;
+  const po = await load(host, "purchase_orders", id, "purchase_order");
+  if (po.status !== "draft")
+    throw new ActionRefusal(409, "not_draft", `A ${po.status} order is not sent again.`);
+  return host.collections.update("purchase_orders", id, { status: "sent" }, { expect: { status: ["draft"] } });
+};
+var cancelPurchaseOrder = async (input, host) => {
+  const { id } = input;
+  const po = await load(host, "purchase_orders", id, "purchase_order");
+  if (!["draft", "sent", "partial"].includes(String(po.status))) {
+    throw new ActionRefusal(409, "not_cancellable", `A ${po.status} order is not cancelled.`);
+  }
+  return host.collections.update("purchase_orders", id, { status: "cancelled" }, { expect: { status: [String(po.status)] } });
 };
 var receivePurchaseOrder = async (input, host) => {
   const d = input;
@@ -235,6 +273,8 @@ var expiringBatches = async (input, host) => {
 var inventoryActions = {
   moveStock,
   createPurchaseOrder,
+  sendPurchaseOrder,
+  cancelPurchaseOrder,
   receivePurchaseOrder,
   lowStock,
   valuation,

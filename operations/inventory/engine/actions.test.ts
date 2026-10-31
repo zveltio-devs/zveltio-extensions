@@ -156,6 +156,36 @@ describe('purchase orders', () => {
     await refusal(a.receivePurchaseOrder({ id: po.id, lines: [{ line_id: line, quantity_received: 1 }] }, host), 'not_receivable');
   });
 
+  it('numbers from a series that counts on from 2.0.0 orders; sends and cancels', async () => {
+    const { host, rows, c } = fakeHost();
+    await c.insert('purchase_orders', { number: 'PO-00007', status: 'received' });
+    const po = (await a.createPurchaseOrder({ supplier_id: 's', lines: [{ product_id: 'p', quantity_ordered: 1, unit_cost: 1 }] }, host)) as Row;
+    expect(po.number).toBe('PO-00008');
+    expect(rows('purchase_order_series').map((s) => s.next_number)).toEqual([9]);
+    expect(((await a.createPurchaseOrder({ supplier_id: 's', lines: [{ product_id: 'p', quantity_ordered: 1, unit_cost: 1 }] }, host)) as Row).number).toBe('PO-00009');
+
+    expect(await a.sendPurchaseOrder({ id: po.id }, host)).toMatchObject({ status: 'sent' });
+    await refusal(a.sendPurchaseOrder({ id: po.id }, host), 'not_draft');
+    expect(await a.cancelPurchaseOrder({ id: po.id }, host)).toMatchObject({ status: 'cancelled' });
+    await refusal(a.cancelPurchaseOrder({ id: po.id }, host), 'not_cancellable');
+  });
+
+  it('a first order that loses the series insert reads the series that won', async () => {
+    const { host, rows, c } = fakeHost();
+    const insert = c.insert;
+    let raced = false;
+    // Another request creates the series between this one's read and its insert, then claims 1.
+    c.insert = async (col: string, data: Row) => {
+      if (col !== 'purchase_order_series' || raced) return insert(col, data);
+      raced = true;
+      await insert(col, { singleton: 'po', next_number: 2 });
+      throw Object.assign(new Error('duplicate key'), { code: 'unique_violation' });
+    };
+    const po = (await a.createPurchaseOrder({ supplier_id: 's', lines: [{ product_id: 'p', quantity_ordered: 1, unit_cost: 1 }] }, host)) as Row;
+    expect(po.number).toBe('PO-00002');
+    expect(rows('purchase_order_series')).toHaveLength(1);
+  });
+
   it('refuses a line of another order and an order with no warehouse', async () => {
     const { host, rows } = fakeHost();
     const one = (await a.createPurchaseOrder({ supplier_id: 's', warehouse_id: 'w1', lines: [{ product_id: 'p', quantity_ordered: 1, unit_cost: 1 }] }, host)) as Row;

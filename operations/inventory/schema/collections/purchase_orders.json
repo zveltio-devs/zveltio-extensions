@@ -5,7 +5,8 @@
       "name": "number",
       "type": "text",
       "required": true,
-      "unique": true
+      "unique": true,
+      "writtenBy": "actions"
     },
     {
       "name": "supplier_id",
@@ -38,7 +39,8 @@
           "received",
           "cancelled"
         ]
-      }
+      },
+      "writtenBy": "actions"
     },
     {
       "name": "expected_date",
@@ -46,7 +48,8 @@
     },
     {
       "name": "received_date",
-      "type": "date"
+      "type": "date",
+      "writtenBy": "actions"
     },
     {
       "name": "currency",

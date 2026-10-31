@@ -32,7 +32,8 @@
       "name": "quantity",
       "type": "decimal",
       "required": true,
-      "defaultValue": 0
+      "defaultValue": 0,
+      "writtenBy": "actions"
     },
     {
       "name": "expiry_date",
