@@ -118,7 +118,7 @@
       "field": "batch_id",
       "target": "product_batches",
       "targetField": "id",
-      "onDelete": "SET NULL",
+      "onDelete": "RESTRICT",
       "onUpdate": "CASCADE",
       "metadata": {}
     },
@@ -128,7 +128,7 @@
       "field": "po_line_id",
       "target": "purchase_order_lines",
       "targetField": "id",
-      "onDelete": "SET NULL",
+      "onDelete": "RESTRICT",
       "onUpdate": "CASCADE",
       "metadata": {}
     }

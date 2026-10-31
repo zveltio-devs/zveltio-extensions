@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.1 (2026-10-31)
+
+- fix: a journal line's `cost_center_id` refuses (`RESTRICT`) instead of clearing: a cost center that no line names deletes again through the data API, and one still named answers the foreign key refusal instead of 409 `written_by_actions`
+
 ## 2.1.0 (2026-10-31)
 
 - feat: journal entries and their lines are written only by this extension's actions (`writtenBy: "actions"`): the data API, sync and every other path answer 409 `written_by_actions`, so a posted entry or its lines cannot be changed outside `voidEntry`; a fiscal year's `status` and `closed_at` move only through `closeFiscalYear`

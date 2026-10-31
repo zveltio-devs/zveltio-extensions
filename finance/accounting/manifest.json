@@ -3,7 +3,7 @@
   "displayName": "Accounting",
   "category": "finance",
   "description": "Double-entry bookkeeping: chart of accounts, journal entries, fiscal years, budgets, trial balance, P&L and balance sheet",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "zveltioMinVersion": "3.0.0-beta.93",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-accounting",

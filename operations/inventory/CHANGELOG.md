@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.1 (2026-10-31)
+
+- fix: the stock level, batch and purchase order line keys refuse (`RESTRICT`) instead of cascading or clearing: a product, warehouse, batch or purchase order line that nothing names deletes again through the data API, and one still named answers the foreign key refusal instead of 409 `written_by_actions`
+
 ## 2.1.0 (2026-10-31)
 
 - feat: stock levels and movements are written only by this extension's actions (`writtenBy: "actions"`), and so are a product's `avg_cost`, a batch's `quantity`, an order's `number`, `status` and `received_date` and a line's `quantity_received`: the data API, sync and every other path answer 409 `written_by_actions`, so stock moves only through `moveStock` and `receivePurchaseOrder`
