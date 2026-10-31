@@ -1,0 +1,59 @@
+{
+  "name": "pos_cash_movements",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "session_id",
+      "type": "m2o",
+      "indexed": true,
+      "required": true,
+      "options": {
+        "related_collection": "pos_sessions"
+      }
+    },
+    {
+      "name": "type",
+      "type": "enum",
+      "required": true,
+      "options": {
+        "values": [
+          "float_in",
+          "float_out",
+          "drop",
+          "payout"
+        ]
+      }
+    },
+    {
+      "name": "amount",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "reason",
+      "type": "text"
+    }
+  ],
+  "relations": [
+    {
+      "name": "pos_cash_movements_session_id",
+      "type": "m2o",
+      "field": "session_id",
+      "target": "pos_sessions",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "amount",
+      "rule": "min",
+      "config": {
+        "value": 0.01
+      },
+      "message": "A cash movement moves a positive amount."
+    }
+  ]
+}

@@ -2,18 +2,13 @@
   "name": "operations/pos",
   "displayName": "Point of Sale",
   "category": "operations",
-  "description": "Cash register, receipt generation, end-of-day reports and inventory integration",
-  "version": "1.0.14",
-  "zveltioMinVersion": "1.0.0",
+  "description": "Till sessions, sales, receipts numbering, loyalty, cash movements and Z-reports, with stock moved through inventory",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.94",
   "zveltioMaxVersion": "4.0.0",
-  "optionalDependencies": [
-    {
-      "name": "crm"
-    }
-  ],
   "package": "@zveltio/ext-pos",
   "permissions": [
-    "database"
+    "data:write"
   ],
   "i18nPrefixes": [
     "operations.pos"
@@ -21,9 +16,14 @@
   "dependencies": [
     {
       "name": "operations/inventory",
-      "minVersion": "1.0.0"
+      "minVersion": "2.1.0"
     }
   ],
+  "contributes": {
+    "engine": true,
+    "studio": true,
+    "fieldTypes": []
+  },
   "studio": {
     "pages": [
       {
@@ -35,11 +35,6 @@
     ],
     "navGroup": "operations"
   },
-  "contributes": {
-    "engine": true,
-    "studio": true,
-    "fieldTypes": []
-  },
   "engine": {
     "entry": "engine/index.js",
     "format": "esm",
@@ -47,11 +42,261 @@
     "bundled": true,
     "bundlePeers": false
   },
+  "collections": [
+    "pos_order_series",
+    "pos_sessions",
+    "pos_customers",
+    "pos_orders",
+    "pos_order_lines",
+    "pos_cash_movements",
+    "pos_held_orders",
+    "pos_loyalty_log",
+    "pos_z_reports"
+  ],
+  "actions": [
+    {
+      "name": "openSession",
+      "permission": {
+        "resource": "pos_sessions",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [],
+        "additionalProperties": false,
+        "properties": {
+          "warehouse_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "opening_float": {
+            "type": "number",
+            "minimum": 0
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      },
+      "reads": [],
+      "writes": [
+        "pos_sessions"
+      ]
+    },
+    {
+      "name": "recordCashMovement",
+      "permission": {
+        "resource": "pos_cash_movements",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "session_id",
+          "type",
+          "amount"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "float_in",
+              "float_out",
+              "drop",
+              "payout"
+            ]
+          },
+          "amount": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "reads": [
+        "pos_sessions"
+      ],
+      "writes": [
+        "pos_cash_movements"
+      ]
+    },
+    {
+      "name": "checkout",
+      "permission": {
+        "resource": "pos_orders",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "session_id",
+          "lines"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payment_method": {
+            "type": "string",
+            "enum": [
+              "cash",
+              "card",
+              "transfer",
+              "voucher"
+            ]
+          },
+          "customer_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "redeem_points": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "notes": {
+            "type": "string"
+          },
+          "lines": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": [
+                "product_name",
+                "quantity",
+                "unit_price"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "product_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "product_name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "sku": {
+                  "type": "string"
+                },
+                "quantity": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "unit_price": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "tax_rate": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "discount": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                }
+              }
+            }
+          }
+        }
+      },
+      "reads": [
+        "pos_sessions",
+        "pos_customers",
+        "pos_order_series"
+      ],
+      "writes": [
+        "pos_orders",
+        "pos_order_lines",
+        "pos_order_series",
+        "pos_customers",
+        "pos_loyalty_log"
+      ],
+      "calls": [
+        "operations/inventory.moveStock"
+      ]
+    },
+    {
+      "name": "refundOrder",
+      "permission": {
+        "resource": "pos_orders",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "pos_orders",
+        "pos_customers"
+      ],
+      "writes": [
+        "pos_orders",
+        "pos_customers",
+        "pos_loyalty_log"
+      ]
+    },
+    {
+      "name": "closeSession",
+      "permission": {
+        "resource": "pos_sessions",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "closing_float"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "closing_float": {
+            "type": "number",
+            "minimum": 0
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      },
+      "reads": [
+        "pos_sessions",
+        "pos_orders",
+        "pos_cash_movements"
+      ],
+      "writes": [
+        "pos_sessions",
+        "pos_z_reports"
+      ]
+    }
+  ],
   "integrity": {
-    "engineSha256": "79dbb234a6f8c707004301347e5b244e18b58e743fceb075d30315ebea38967a",
-    "sourceSha256": "9956bdcb5ba3ebaad54e05cd2ea9eb4287e8fa1fcab376fdf0b7c8c6ac0615cb"
-  },
-  "resources": [
-    "pos"
-  ]
+    "engineSha256": "c25b6c2689c59a472ef414298cabab005b1dd5957c7e1eb6ed1b822e9618e417",
+    "sourceSha256": "d2770760dab6be7073a7ab438d0151016baf8aeda1b7451f31e0cee0161a0a75",
+    "schemaSha256": "8fce46fb2aad7924c3792c2654f280936ca27e26f349a31f7ef888ea4f6c9244"
+  }
 }

@@ -1,0 +1,57 @@
+{
+  "name": "pos_held_orders",
+  "fields": [
+    {
+      "name": "session_id",
+      "type": "m2o",
+      "indexed": true,
+      "required": true,
+      "options": {
+        "related_collection": "pos_sessions"
+      }
+    },
+    {
+      "name": "label",
+      "type": "text"
+    },
+    {
+      "name": "lines",
+      "type": "json",
+      "required": true
+    },
+    {
+      "name": "customer_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "pos_customers"
+      }
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    }
+  ],
+  "relations": [
+    {
+      "name": "pos_held_orders_session_id",
+      "type": "m2o",
+      "field": "session_id",
+      "target": "pos_sessions",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "pos_held_orders_customer_id",
+      "type": "m2o",
+      "field": "customer_id",
+      "target": "pos_customers",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

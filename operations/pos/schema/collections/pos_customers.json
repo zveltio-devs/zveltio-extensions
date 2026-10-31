@@ -1,0 +1,59 @@
+{
+  "name": "pos_customers",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "email",
+      "type": "email",
+      "unique": true
+    },
+    {
+      "name": "phone",
+      "type": "phone"
+    },
+    {
+      "name": "contact_id",
+      "type": "uuid",
+      "indexed": true
+    },
+    {
+      "name": "loyalty_points",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "total_spent",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "visit_count",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    }
+  ],
+  "validation": [
+    {
+      "field": "loyalty_points",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "A customer holds no negative points."
+    }
+  ]
+}
