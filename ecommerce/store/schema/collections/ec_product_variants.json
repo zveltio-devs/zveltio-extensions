@@ -1,0 +1,79 @@
+{
+  "name": "ec_product_variants",
+  "fields": [
+    {
+      "name": "product_id",
+      "type": "m2o",
+      "indexed": true,
+      "required": true,
+      "options": {
+        "related_collection": "ec_products"
+      }
+    },
+    {
+      "name": "sku",
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "attributes",
+      "type": "json"
+    },
+    {
+      "name": "price",
+      "type": "decimal"
+    },
+    {
+      "name": "compare_price",
+      "type": "decimal"
+    },
+    {
+      "name": "cost",
+      "type": "decimal"
+    },
+    {
+      "name": "stock_qty",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "weight",
+      "type": "decimal"
+    },
+    {
+      "name": "image_url",
+      "type": "url"
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true
+    },
+    {
+      "name": "sort_order",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0
+    }
+  ],
+  "relations": [
+    {
+      "name": "ec_product_variants_product_id",
+      "type": "m2o",
+      "field": "product_id",
+      "target": "ec_products",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

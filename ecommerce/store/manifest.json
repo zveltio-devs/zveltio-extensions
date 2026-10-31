@@ -2,31 +2,17 @@
   "name": "ecommerce/store",
   "displayName": "eCommerce",
   "category": "ecommerce",
-  "description": "Product catalog, orders, customer management, coupons and public storefront API",
-  "version": "1.0.18",
-  "zveltioMinVersion": "1.0.0",
+  "description": "Product catalog, orders, coupons, shipping, carts and reviews, with checkout and moderation as actions",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.93",
   "zveltioMaxVersion": "4.0.0",
-  "optionalDependencies": [
-    {
-      "name": "crm"
-    }
-  ],
   "package": "@zveltio/ext-ecommerce",
   "permissions": [
-    "database"
+    "data:write"
   ],
   "i18nPrefixes": [
     "ecommerce",
     "store"
-  ],
-  "publicRoutes": [
-    "/public/*"
-  ],
-  "dependencies": [
-    {
-      "name": "operations/inventory",
-      "minVersion": "1.0.0"
-    }
   ],
   "studio": {
     "pages": [
@@ -51,11 +37,253 @@
     "bundled": true,
     "bundlePeers": false
   },
+  "collections": [
+    "ec_categories",
+    "ec_products",
+    "ec_product_variants",
+    "ec_customers",
+    "ec_shipping_zones",
+    "ec_shipping_rates",
+    "ec_tax_rules",
+    "ec_coupons",
+    "ec_order_series",
+    "ec_orders",
+    "ec_order_items",
+    "ec_abandoned_carts",
+    "ec_product_reviews"
+  ],
+  "actions": [
+    {
+      "name": "checkout",
+      "permission": {
+        "resource": "ec_orders",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "customer_email",
+          "customer_name",
+          "lines"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "customer_email": {
+            "type": "string",
+            "format": "email"
+          },
+          "customer_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "billing_address": {
+            "type": "object"
+          },
+          "shipping_address": {
+            "type": "object"
+          },
+          "payment_method": {
+            "type": "string"
+          },
+          "coupon_code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "shipping_rate_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "lines": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": [
+                "product_id",
+                "quantity"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "product_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "variant_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          }
+        }
+      },
+      "reads": [
+        "ec_products",
+        "ec_product_variants",
+        "ec_coupons",
+        "ec_shipping_rates",
+        "ec_shipping_zones",
+        "ec_order_series",
+        "ec_abandoned_carts"
+      ],
+      "writes": [
+        "ec_orders",
+        "ec_order_items",
+        "ec_order_series",
+        "ec_coupons",
+        "ec_products",
+        "ec_product_variants",
+        "ec_abandoned_carts"
+      ]
+    },
+    {
+      "name": "saveCart",
+      "permission": {
+        "resource": "ec_abandoned_carts",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "session_id",
+          "items",
+          "subtotal"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "customer_email": {
+            "type": "string",
+            "format": "email"
+          },
+          "customer_name": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "minItems": 1
+          },
+          "subtotal": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      },
+      "reads": [
+        "ec_abandoned_carts"
+      ],
+      "writes": [
+        "ec_abandoned_carts"
+      ]
+    },
+    {
+      "name": "submitReview",
+      "permission": {
+        "resource": "ec_product_reviews",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "product_id",
+          "customer_name",
+          "customer_email",
+          "rating"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "customer_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "customer_email": {
+            "type": "string",
+            "format": "email"
+          },
+          "rating": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "order_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "ec_products",
+        "ec_orders",
+        "ec_order_items"
+      ],
+      "writes": [
+        "ec_product_reviews"
+      ]
+    },
+    {
+      "name": "moderateReview",
+      "permission": {
+        "resource": "ec_products",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "status"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "rejected"
+            ]
+          }
+        }
+      },
+      "reads": [
+        "ec_product_reviews",
+        "ec_products"
+      ],
+      "writes": [
+        "ec_product_reviews",
+        "ec_products"
+      ]
+    }
+  ],
   "integrity": {
-    "engineSha256": "8f553f29f2bf75fbc987f1015c8e6b074cd7a990d97109f57e8917ef81ebc885",
-    "sourceSha256": "74df100e501004479f92d6bc4f3f014d85529ce8426b004bb64e46d461ef3719"
-  },
-  "resources": [
-    "store"
-  ]
+    "engineSha256": "ffec0bb954f622903f5dd93c9e57ccc76d92a2c0c22ea87367ffd420aeffa9dd",
+    "sourceSha256": "1124e54fb736592df266e1d95fecc3cbe5f62471d7ad6df08f8dc896a4856c86",
+    "schemaSha256": "232178366b4dcaa6687e4a078c6cfe07529cc5af2e267d9f08beea2d372cc3f7"
+  }
 }

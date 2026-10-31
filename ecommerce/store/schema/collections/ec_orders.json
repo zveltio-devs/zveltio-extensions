@@ -1,0 +1,148 @@
+{
+  "name": "ec_orders",
+  "fields": [
+    {
+      "name": "order_number",
+      "type": "text",
+      "required": true,
+      "unique": true,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "customer_email",
+      "type": "email",
+      "indexed": true,
+      "required": true,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "customer_name",
+      "type": "text",
+      "required": true,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "indexed": true,
+      "required": true,
+      "defaultValue": "pending",
+      "options": {
+        "values": [
+          "pending",
+          "processing",
+          "shipped",
+          "delivered",
+          "cancelled",
+          "refunded"
+        ]
+      }
+    },
+    {
+      "name": "payment_status",
+      "type": "enum",
+      "indexed": true,
+      "required": true,
+      "defaultValue": "unpaid",
+      "options": {
+        "values": [
+          "unpaid",
+          "paid",
+          "refunded",
+          "partial"
+        ]
+      }
+    },
+    {
+      "name": "payment_method",
+      "type": "text",
+      "writtenBy": "actions"
+    },
+    {
+      "name": "currency",
+      "type": "text",
+      "required": true,
+      "defaultValue": "RON",
+      "writtenBy": "actions"
+    },
+    {
+      "name": "subtotal",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "shipping_cost",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "tax_amount",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "discount",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "total",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "billing_address",
+      "type": "json",
+      "writtenBy": "actions"
+    },
+    {
+      "name": "shipping_address",
+      "type": "json",
+      "writtenBy": "actions"
+    },
+    {
+      "name": "coupon_code",
+      "type": "text",
+      "writtenBy": "actions"
+    },
+    {
+      "name": "shipping_zone_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "ec_shipping_zones"
+      },
+      "writtenBy": "actions"
+    },
+    {
+      "name": "tracking_number",
+      "type": "text"
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    }
+  ],
+  "relations": [
+    {
+      "name": "ec_orders_shipping_zone_id",
+      "type": "m2o",
+      "field": "shipping_zone_id",
+      "target": "ec_shipping_zones",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

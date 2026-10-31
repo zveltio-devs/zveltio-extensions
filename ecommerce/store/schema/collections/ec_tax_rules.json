@@ -1,0 +1,55 @@
+{
+  "name": "ec_tax_rules",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "country",
+      "type": "text",
+      "required": true,
+      "defaultValue": "RO"
+    },
+    {
+      "name": "region",
+      "type": "text"
+    },
+    {
+      "name": "rate",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 19
+    },
+    {
+      "name": "applies_to",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "all",
+      "options": {
+        "values": [
+          "all",
+          "physical",
+          "digital"
+        ]
+      }
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true
+    }
+  ],
+  "indexes": [
+    {
+      "fields": [
+        "country",
+        "region",
+        "applies_to"
+      ],
+      "unique": true
+    }
+  ]
+}

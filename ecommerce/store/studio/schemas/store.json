@@ -7,43 +7,12 @@
     {
       "id": "products",
       "label": "ecommerce.store.tab.products",
-      "dataSource": "/ext/ecommerce/store/admin/products",
-      "dataPath": "data",
-      "stats": {
-        "dataSource": "/ext/ecommerce/store/admin/stats",
-        "dataPath": "stats",
-        "cards": [
-          {
-            "label": "ecommerce.store.stat.orders",
-            "key": "total_orders",
-            "format": "number"
-          },
-          {
-            "label": "ecommerce.store.stat.revenue",
-            "key": "total_revenue",
-            "format": "number"
-          },
-          {
-            "label": "ecommerce.store.stat.products",
-            "key": "total_products",
-            "format": "number"
-          },
-          {
-            "label": "common.status.pending",
-            "key": "pending_orders",
-            "format": "number",
-            "color": "text-warning"
-          }
-        ]
-      },
+      "dataSource": "/api/data/ec_products?sort=created_at&order=desc&limit=500",
+      "dataPath": "records",
       "columns": [
         {
           "key": "name",
           "label": "common.col.name"
-        },
-        {
-          "key": "category_name",
-          "label": "common.col.category"
         },
         {
           "key": "price",
@@ -64,17 +33,19 @@
           ]
         },
         {
-          "key": "is_active",
+          "key": "status",
           "label": "common.col.status",
           "type": "badge",
           "badge": {
             "colors": {
-              "true": "badge-success",
-              "false": "badge-ghost"
+              "active": "badge-success",
+              "draft": "badge-ghost",
+              "archived": "badge-ghost"
             },
             "labels": {
-              "true": "common.col.active",
-              "false": "ecommerce.store.status.inactive"
+              "active": "store.status.active",
+              "draft": "store.status.draft",
+              "archived": "store.status.archived"
             }
           }
         }
@@ -85,13 +56,23 @@
           "icon": "Trash2",
           "variant": "text-error",
           "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/ext/ecommerce/store/admin/products/{id}",
-          "confirm": "ecommerce.store.confirmDeleteProduct"
+          "method": "PATCH",
+          "endpoint": "/api/data/ec_products/{id}",
+          "confirm": "ecommerce.store.confirmDeleteProduct",
+          "body": {
+            "status": "archived"
+          },
+          "visibleWhen": {
+            "field": "status",
+            "in": [
+              "draft",
+              "active"
+            ]
+          }
         }
       ],
       "form": {
-        "endpoint": "/ext/ecommerce/store/admin/products",
+        "endpoint": "/api/data/ec_products",
         "fields": [
           {
             "name": "name",
@@ -162,8 +143,8 @@
     {
       "id": "orders",
       "label": "ecommerce.store.tab.orders",
-      "dataSource": "/ext/ecommerce/store/admin/orders",
-      "dataPath": "data",
+      "dataSource": "/api/data/ec_orders?sort=created_at&order=desc&limit=500",
+      "dataPath": "records",
       "columns": [
         {
           "key": "order_number",
@@ -192,7 +173,7 @@
           "key": "status",
           "label": "common.col.status",
           "editable": {
-            "endpoint": "/ext/ecommerce/store/admin/orders/{id}",
+            "endpoint": "/api/data/ec_orders/{id}",
             "method": "PATCH",
             "field": "status",
             "options": [

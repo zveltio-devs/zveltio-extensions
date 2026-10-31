@@ -1,0 +1,86 @@
+{
+  "name": "ec_shipping_rates",
+  "fields": [
+    {
+      "name": "zone_id",
+      "type": "m2o",
+      "indexed": true,
+      "required": true,
+      "options": {
+        "related_collection": "ec_shipping_zones"
+      }
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "type",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "flat",
+      "options": {
+        "values": [
+          "flat",
+          "weight",
+          "free_above"
+        ]
+      }
+    },
+    {
+      "name": "price",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "min_weight",
+      "type": "decimal"
+    },
+    {
+      "name": "max_weight",
+      "type": "decimal"
+    },
+    {
+      "name": "free_above_amount",
+      "type": "decimal"
+    },
+    {
+      "name": "estimated_days_min",
+      "type": "integer"
+    },
+    {
+      "name": "estimated_days_max",
+      "type": "integer"
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "ec_shipping_rates_zone_id",
+      "type": "m2o",
+      "field": "zone_id",
+      "target": "ec_shipping_zones",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "price",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "A shipping price is never negative."
+    }
+  ]
+}

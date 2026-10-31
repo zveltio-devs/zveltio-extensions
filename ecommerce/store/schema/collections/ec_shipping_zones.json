@@ -1,0 +1,30 @@
+{
+  "name": "ec_shipping_zones",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "countries",
+      "type": "tags"
+    },
+    {
+      "name": "regions",
+      "type": "tags"
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true
+    },
+    {
+      "name": "sort_order",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0
+    }
+  ]
+}

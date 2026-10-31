@@ -1,0 +1,56 @@
+{
+  "name": "ec_categories",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "slug",
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    {
+      "name": "parent_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "ec_categories"
+      }
+    },
+    {
+      "name": "description",
+      "type": "textarea"
+    },
+    {
+      "name": "image_url",
+      "type": "url"
+    },
+    {
+      "name": "sort_order",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "ec_categories_parent_id",
+      "type": "m2o",
+      "field": "parent_id",
+      "target": "ec_categories",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}
