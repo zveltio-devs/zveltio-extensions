@@ -247,7 +247,7 @@
     {
       "name": "moderateReview",
       "permission": {
-        "resource": "ec_product_reviews",
+        "resource": "ec_products",
         "action": "execute"
       },
       "input": {

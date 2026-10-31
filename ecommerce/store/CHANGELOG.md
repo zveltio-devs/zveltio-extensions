@@ -11,6 +11,7 @@
 - fix: a free-above shipping rate is free above its threshold; an inactive zone's rate is refused
 - fix: an order takes its currency from its products, and refuses products priced in different ones (`mixed_currencies`); the caller no longer names it
 - fix: order numbers come from a series, not `COUNT(*) + 1`; each line rounds to cents
+- feat!: `moderateReview` is gated on `ec_products` (`execute`), not on reviews: a storefront key that may submit reviews never needs it, so it cannot approve its own
 - fix: two moderations of one product's reviews cannot write over each other's rating
 - requires engine 3.0.0-beta.93
 
