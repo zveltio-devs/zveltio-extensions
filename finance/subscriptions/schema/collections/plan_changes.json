@@ -1,0 +1,98 @@
+{
+  "name": "plan_changes",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "subscriber_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "subscribers"
+      },
+      "required": true
+    },
+    {
+      "name": "from_plan_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "subscription_plans"
+      },
+      "required": true
+    },
+    {
+      "name": "to_plan_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "subscription_plans"
+      },
+      "required": true
+    },
+    {
+      "name": "effective_date",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "proration_amount",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "reason",
+      "type": "textarea"
+    },
+    {
+      "name": "invoice_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "subscription_invoices"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "name": "plan_changes_subscriber_id",
+      "type": "m2o",
+      "field": "subscriber_id",
+      "target": "subscribers",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "plan_changes_from_plan_id",
+      "type": "m2o",
+      "field": "from_plan_id",
+      "target": "subscription_plans",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "plan_changes_to_plan_id",
+      "type": "m2o",
+      "field": "to_plan_id",
+      "target": "subscription_plans",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "plan_changes_invoice_id",
+      "type": "m2o",
+      "field": "invoice_id",
+      "target": "subscription_invoices",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

@@ -1,0 +1,105 @@
+{
+  "name": "subscription_plans",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "description",
+      "type": "textarea"
+    },
+    {
+      "name": "price",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "currency",
+      "type": "text",
+      "required": true,
+      "defaultValue": "RON"
+    },
+    {
+      "name": "interval",
+      "type": "enum",
+      "options": {
+        "values": [
+          "monthly",
+          "quarterly",
+          "yearly"
+        ]
+      },
+      "required": true,
+      "defaultValue": "monthly"
+    },
+    {
+      "name": "trial_days",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "features",
+      "type": "tags"
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true
+    },
+    {
+      "name": "usage_billing",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": false
+    },
+    {
+      "name": "usage_metric",
+      "type": "text"
+    },
+    {
+      "name": "usage_unit_price",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "max_usage",
+      "type": "decimal"
+    },
+    {
+      "name": "stripe_price_id",
+      "type": "text"
+    }
+  ],
+  "validation": [
+    {
+      "field": "price",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "A plan price is never negative."
+    },
+    {
+      "field": "trial_days",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "A trial is zero days or more."
+    },
+    {
+      "field": "usage_unit_price",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "A usage unit price is never negative."
+    }
+  ]
+}

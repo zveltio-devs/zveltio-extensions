@@ -1,0 +1,69 @@
+{
+  "name": "subscription_usage",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "subscriber_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "subscribers"
+      },
+      "required": true
+    },
+    {
+      "name": "metric_name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "quantity",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "unit_price",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "billing_period_start",
+      "type": "date"
+    },
+    {
+      "name": "billing_period_end",
+      "type": "date"
+    },
+    {
+      "name": "invoice_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "subscription_invoices"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "name": "subscription_usage_subscriber_id",
+      "type": "m2o",
+      "field": "subscriber_id",
+      "target": "subscribers",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "subscription_usage_invoice_id",
+      "type": "m2o",
+      "field": "invoice_id",
+      "target": "subscription_invoices",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

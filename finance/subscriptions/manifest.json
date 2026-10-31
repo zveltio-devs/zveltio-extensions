@@ -2,13 +2,13 @@
   "name": "finance/subscriptions",
   "displayName": "Subscriptions",
   "category": "finance",
-  "description": "Recurring billing plans, subscriber management, MRR/ARR tracking and Stripe integration",
-  "version": "1.0.11",
-  "zveltioMinVersion": "1.0.0",
+  "description": "Recurring billing plans, subscribers, metered usage, invoices and dunning",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.93",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-subscriptions",
   "permissions": [
-    "database"
+    "data:write"
   ],
   "i18nPrefixes": [
     "finance.subscriptions"
@@ -36,11 +36,297 @@
     "bundled": true,
     "bundlePeers": false
   },
+  "collections": [
+    "subscription_plans",
+    "subscribers",
+    "subscription_invoices",
+    "subscription_usage",
+    "dunning_attempts",
+    "plan_changes"
+  ],
+  "actions": [
+    {
+      "name": "subscribe",
+      "permission": {
+        "resource": "subscribers",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "plan_id",
+          "name",
+          "email"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "plan_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "contact_id": {
+            "type": "string"
+          },
+          "organization_id": {
+            "type": "string"
+          },
+          "start_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "metadata": {
+            "type": "object"
+          }
+        }
+      },
+      "reads": [
+        "subscription_plans"
+      ],
+      "writes": [
+        "subscribers"
+      ]
+    },
+    {
+      "name": "changePlan",
+      "permission": {
+        "resource": "subscribers",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "plan_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "plan_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "reads": [
+        "subscribers",
+        "subscription_plans",
+        "subscription_invoices"
+      ],
+      "writes": [
+        "subscribers",
+        "plan_changes"
+      ]
+    },
+    {
+      "name": "cancel",
+      "permission": {
+        "resource": "subscribers",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "at_period_end": {
+            "type": "boolean"
+          }
+        }
+      },
+      "reads": [
+        "subscribers"
+      ],
+      "writes": [
+        "subscribers"
+      ]
+    },
+    {
+      "name": "reactivate",
+      "permission": {
+        "resource": "subscribers",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "subscribers"
+      ],
+      "writes": [
+        "subscribers"
+      ]
+    },
+    {
+      "name": "recordUsage",
+      "permission": {
+        "resource": "subscription_usage",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "metric_name",
+          "quantity"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "metric_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "quantity": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "billing_period_start": {
+            "type": "string",
+            "format": "date"
+          },
+          "billing_period_end": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "reads": [
+        "subscribers",
+        "subscription_plans"
+      ],
+      "writes": [
+        "subscription_usage"
+      ]
+    },
+    {
+      "name": "issueInvoice",
+      "permission": {
+        "resource": "subscription_invoices",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "subscribers",
+        "subscription_plans",
+        "subscription_usage",
+        "plan_changes"
+      ],
+      "writes": [
+        "subscribers",
+        "subscription_invoices",
+        "subscription_usage",
+        "plan_changes"
+      ]
+    },
+    {
+      "name": "markInvoicePaid",
+      "permission": {
+        "resource": "subscription_invoices",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "subscription_invoices",
+        "subscribers"
+      ],
+      "writes": [
+        "subscription_invoices",
+        "subscribers"
+      ]
+    },
+    {
+      "name": "recordPaymentFailure",
+      "permission": {
+        "resource": "subscription_invoices",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      },
+      "reads": [
+        "subscription_invoices",
+        "subscribers",
+        "dunning_attempts"
+      ],
+      "writes": [
+        "subscribers",
+        "dunning_attempts"
+      ]
+    }
+  ],
   "integrity": {
-    "engineSha256": "77ab55a6c4ab8b7db2af518d1ecf9ff88327beec249bd0ba118a93dab14017c3",
-    "sourceSha256": "167488cf283cf8237fec7b32b23d97605d8bbbe5ab6c3664f76bb5866e67f0e7"
-  },
-  "resources": [
-    "subscriptions"
-  ]
+    "engineSha256": "47ce798a42e08424c1d6ead1f7e8003787d2e42888a5936464868f7831587b05",
+    "sourceSha256": "ec8510b3e92e48a0783c432503ed9e231ac7fc3fa14a96060de0c7e1492a46c8",
+    "schemaSha256": "510a622088bd9c9a7ee28c3a5645bb4d2d3d0a55a9e5e12fde535b5634ec8d09"
+  }
 }

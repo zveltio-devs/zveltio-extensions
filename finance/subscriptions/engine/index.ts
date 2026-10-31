@@ -1,26 +1,19 @@
-import type { ZveltioExtension } from '@zveltio/sdk/extension';
-import { join } from 'path';
-import { subscriptionsRoutes } from './routes.js';
+import type { ZveltioExtension } from "@zveltio/sdk/extension";
+import { subscriptionsActions } from "./actions.js";
 
+// Plans, subscribers, invoices, usage, dunning attempts and plan changes are
+// collections this extension declares in `schema/collections/` (manifest
+// `collections`); the engine creates them, owns their rules and serves them
+// through the data API. What is left in code is the billing lifecycle: the
+// actions in `actions.ts`.
 const extension: ZveltioExtension = {
-  name: 'finance/subscriptions',
-  category: 'finance',
-  // S3-01: sub-app mounted at /ext/finance/subscriptions by the engine.
-  mountStrategy: 'subapp',
+	name: "finance/subscriptions",
+	category: "finance",
+	mountStrategy: "subapp",
 
-  getMigrations() {
-    return [
-      join(import.meta.dir, 'migrations/001_initial.sql'),
-      join(import.meta.dir, 'migrations/002_tenant_rls.sql'),
-      join(import.meta.dir, 'migrations/003_user_ref_text.sql'),
-      join(import.meta.dir, 'migrations/004_cancellation_reason_and_invoice_updated_at.sql'),
-      join(import.meta.dir, 'migrations/004_invoice_due_date.sql'),
-    ];
-  },
+	actions: subscriptionsActions,
 
-  async register(app, ctx) {
-    app.route('/', subscriptionsRoutes(ctx));
-  },
+	async register() {},
 };
 
 export default extension;
