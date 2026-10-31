@@ -1,0 +1,56 @@
+{
+  "name": "pos_sessions",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "warehouse_id",
+      "type": "uuid",
+      "indexed": true
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "required": true,
+      "indexed": true,
+      "defaultValue": "open",
+      "options": {
+        "values": [
+          "open",
+          "closed"
+        ]
+      }
+    },
+    {
+      "name": "opening_float",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "closing_float",
+      "type": "decimal"
+    },
+    {
+      "name": "expected_float",
+      "type": "decimal"
+    },
+    {
+      "name": "closed_at",
+      "type": "datetime"
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    }
+  ],
+  "validation": [
+    {
+      "field": "opening_float",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "An opening float is not negative."
+    }
+  ]
+}

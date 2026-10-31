@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.0.0 (2026-10-31)
+
+- feat!: till sessions, orders and their lines, customers, held orders, cash movements, the loyalty log, Z-reports and the receipt series are collections declared in `schema/collections/` (`pos_*`), created and owned by the engine; no SQL migrations
+- feat!: the hand-written `/ext/operations/pos/*` routes are gone — plain reads and edits (customers, held orders, every read) go through `/api/data/<collection>`; a till's life is the actions `openSession`, `recordCashMovement`, `checkout`, `refundOrder` and `closeSession` (`POST /ext/operations/pos/actions/<name>`)
+- feat!: sessions, orders, lines, cash movements, the loyalty log, Z-reports and a customer's points, spend and visits are written only by these actions (`writtenBy: "actions"`)
+- feat!: the `pos` permission resource and the `pos:refund` check are gone; who may sell, refund or close a till is the engine's rules on these collections
+- feat!: a sale moves stock through inventory's `moveStock` in the same transaction (manifest `calls`), out of the session's warehouse; a line the warehouse cannot cover refuses the sale (`insufficient_stock`) instead of selling stock that is not there. A session without a warehouse sells without moving stock
+- feat!: a customer is no longer linked to a CRM contact automatically; `contact_id` is a plain field, copied onto the order. The "one open session per cashier" check, `/stats` and the live Z-report of an open session are gone
+- fix: a refund can be written (the old status check had no `refunded`), and it takes back the loyalty and spend of every sale to a customer, not only of sales that earned points
+- fix: the expected float counts the cash movements (float in and out, drops, payouts), and net sales no longer subtract a refund twice
+- fix: two sales to one customer cannot spend the same points; a redemption is refused beyond the customer's balance
+- requires engine 3.0.0-beta.94 and operations/inventory 2.1.0
+
 ## 1.0.14 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)

@@ -1,0 +1,61 @@
+{
+  "name": "pos_loyalty_log",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "customer_id",
+      "type": "m2o",
+      "indexed": true,
+      "required": true,
+      "options": {
+        "related_collection": "pos_customers"
+      }
+    },
+    {
+      "name": "order_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "pos_orders"
+      }
+    },
+    {
+      "name": "delta",
+      "type": "integer",
+      "required": true
+    },
+    {
+      "name": "reason",
+      "type": "enum",
+      "required": true,
+      "options": {
+        "values": [
+          "order",
+          "refund"
+        ]
+      }
+    }
+  ],
+  "relations": [
+    {
+      "name": "pos_loyalty_log_customer_id",
+      "type": "m2o",
+      "field": "customer_id",
+      "target": "pos_customers",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "pos_loyalty_log_order_id",
+      "type": "m2o",
+      "field": "order_id",
+      "target": "pos_orders",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

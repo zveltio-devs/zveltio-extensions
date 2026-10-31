@@ -1,0 +1,128 @@
+{
+  "name": "pos_orders",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "session_id",
+      "type": "m2o",
+      "indexed": true,
+      "required": true,
+      "options": {
+        "related_collection": "pos_sessions"
+      }
+    },
+    {
+      "name": "number",
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    {
+      "name": "payment_method",
+      "type": "enum",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "values": [
+          "cash",
+          "card",
+          "transfer",
+          "voucher"
+        ]
+      }
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "required": true,
+      "indexed": true,
+      "defaultValue": "paid",
+      "options": {
+        "values": [
+          "paid",
+          "refunded"
+        ]
+      }
+    },
+    {
+      "name": "customer_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "pos_customers"
+      }
+    },
+    {
+      "name": "customer_name",
+      "type": "text"
+    },
+    {
+      "name": "contact_id",
+      "type": "uuid",
+      "indexed": true
+    },
+    {
+      "name": "subtotal",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "tax_amount",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "loyalty_discount",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "total",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "loyalty_points_earned",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "loyalty_points_redeemed",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "refunded_at",
+      "type": "datetime"
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    }
+  ],
+  "relations": [
+    {
+      "name": "pos_orders_session_id",
+      "type": "m2o",
+      "field": "session_id",
+      "target": "pos_sessions",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "pos_orders_customer_id",
+      "type": "m2o",
+      "field": "customer_id",
+      "target": "pos_customers",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

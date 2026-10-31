@@ -6,14 +6,19 @@
   "resources": [
     {
       "id": "sessions",
-      "dataSource": "/ext/operations/pos/sessions/{masterId}/orders?limit=20",
-      "dataPath": "data",
+      "dataSource": "/api/data/pos_orders?session_id[eq]={masterId}&sort=created_at&order=desc&limit=500",
+      "dataPath": "records",
       "master": {
-        "dataSource": "/ext/operations/pos/sessions?limit=20",
-        "dataPath": "data",
+        "dataSource": "/api/data/pos_sessions?sort=created_at&order=desc&limit=500",
+        "dataPath": "records",
         "idKey": "id",
         "titleKey": "status",
-        "subtitle": { "keys": ["opened_at"], "sep": " " },
+        "subtitle": {
+          "keys": [
+            "created_at"
+          ],
+          "sep": " "
+        },
         "badgeKey": "status"
       },
       "detailActions": [
@@ -22,8 +27,11 @@
           "icon": "Square",
           "label": "operations.pos.closeSession",
           "method": "POST",
-          "endpoint": "/ext/operations/pos/sessions/{id}/close",
-          "visibleWhen": { "field": "status", "equals": "open" },
+          "endpoint": "/ext/operations/pos/actions/closeSession",
+          "visibleWhen": {
+            "field": "status",
+            "equals": "open"
+          },
           "prompt": {
             "title": "operations.pos.closeSession",
             "submitLabel": "operations.pos.closeSession",
@@ -36,27 +44,42 @@
                 "default": 0
               }
             ]
+          },
+          "body": {
+            "id": "{id}"
           }
         }
       ],
       "columns": [
-        { "key": "order_number", "label": "common.col.number", "type": "mono" },
-        { "key": "created_at", "label": "operations.pos.col.time", "type": "date" },
+        {
+          "key": "number",
+          "label": "common.col.number",
+          "type": "mono"
+        },
+        {
+          "key": "created_at",
+          "label": "operations.pos.col.time",
+          "type": "date"
+        },
         {
           "key": "total",
           "label": "common.col.total",
           "type": "currency",
-          "currency": { "code": "RON" }
+          "currency": {
+            "code": "RON"
+          }
         },
         {
           "key": "status",
           "label": "common.col.status",
           "type": "badge",
-          "badge": { "colors": {} }
+          "badge": {
+            "colors": {}
+          }
         }
       ],
       "form": {
-        "endpoint": "/ext/operations/pos/sessions/open",
+        "endpoint": "/ext/operations/pos/actions/openSession",
         "fields": [
           {
             "name": "opening_float",

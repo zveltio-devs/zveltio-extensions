@@ -1,0 +1,67 @@
+{
+  "name": "pos_order_lines",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "order_id",
+      "type": "m2o",
+      "indexed": true,
+      "required": true,
+      "options": {
+        "related_collection": "pos_orders"
+      }
+    },
+    {
+      "name": "product_id",
+      "type": "uuid",
+      "indexed": true
+    },
+    {
+      "name": "product_name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "sku",
+      "type": "text"
+    },
+    {
+      "name": "quantity",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "unit_price",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "tax_rate",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "discount",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "total",
+      "type": "decimal",
+      "required": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "pos_order_lines_order_id",
+      "type": "m2o",
+      "field": "order_id",
+      "target": "pos_orders",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

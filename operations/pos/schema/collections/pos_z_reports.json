@@ -1,0 +1,68 @@
+{
+  "name": "pos_z_reports",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "session_id",
+      "type": "m2o",
+      "indexed": true,
+      "required": true,
+      "unique": true,
+      "options": {
+        "related_collection": "pos_sessions"
+      }
+    },
+    {
+      "name": "total_sales",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "total_refunds",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "net_sales",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "cash_sales",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "card_sales",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "cash_movements",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "order_count",
+      "type": "integer",
+      "required": true
+    },
+    {
+      "name": "tax_amount",
+      "type": "decimal",
+      "required": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "pos_z_reports_session_id",
+      "type": "m2o",
+      "field": "session_id",
+      "target": "pos_sessions",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

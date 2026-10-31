@@ -1,29 +1,19 @@
 import type { ZveltioExtension } from '@zveltio/sdk/extension';
-import { join } from 'path';
-import { posRoutes } from './routes.js';
+import { posActions } from './actions.js';
 
+// Till sessions, orders and their lines, customers, held orders, cash
+// movements, the loyalty log and Z-reports are collections this extension
+// declares in `schema/collections/` (manifest `collections`); the engine
+// creates them, owns their rules and serves them through the data API. What is
+// left in code is a till's life: the actions in `actions.ts`.
 const extension: ZveltioExtension = {
   name: 'operations/pos',
   category: 'operations',
-  // S3-01: sub-app mounted at /ext/operations/pos by the engine.
   mountStrategy: 'subapp',
 
-  getMigrations() {
-    return [
-      join(import.meta.dir, 'migrations/001_initial.sql'),
-      join(import.meta.dir, 'migrations/002_tenant_rls.sql'),
-      join(import.meta.dir, 'migrations/003_user_ref_text.sql'),
-      join(import.meta.dir, 'migrations/004_order_customer_name.sql'),
-      join(import.meta.dir, 'migrations/004_session_expected_float_and_order_updated_at.sql'),
-      join(import.meta.dir, 'migrations/005_tenant_scoped_unique_keys.sql'),
-      join(import.meta.dir, 'migrations/006_pos_customer_email_unique.sql'),
-      join(import.meta.dir, 'migrations/007_order_number_counter.sql'),
-    ];
-  },
+  actions: posActions,
 
-  async register(app, ctx) {
-    app.route('/', posRoutes(ctx));
-  },
+  async register() {},
 };
 
 export default extension;
