@@ -1,0 +1,120 @@
+{
+  "name": "subscription_invoices",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "subscriber_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "subscribers"
+      },
+      "required": true
+    },
+    {
+      "name": "plan_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "subscription_plans"
+      },
+      "required": true
+    },
+    {
+      "name": "amount",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "usage_amount",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "proration_amount",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "total_amount",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "currency",
+      "type": "text",
+      "required": true,
+      "defaultValue": "RON"
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "options": {
+        "values": [
+          "open",
+          "paid"
+        ]
+      },
+      "required": true,
+      "defaultValue": "open",
+      "indexed": true
+    },
+    {
+      "name": "period_start",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "period_end",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "due_date",
+      "type": "date"
+    },
+    {
+      "name": "paid_at",
+      "type": "datetime"
+    },
+    {
+      "name": "stripe_invoice_id",
+      "type": "text"
+    }
+  ],
+  "indexes": [
+    {
+      "fields": [
+        "subscriber_id",
+        "period_start"
+      ],
+      "unique": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "subscription_invoices_subscriber_id",
+      "type": "m2o",
+      "field": "subscriber_id",
+      "target": "subscribers",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "subscription_invoices_plan_id",
+      "type": "m2o",
+      "field": "plan_id",
+      "target": "subscription_plans",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

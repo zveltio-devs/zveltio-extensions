@@ -1,0 +1,129 @@
+{
+  "name": "subscribers",
+  "fields": [
+    {
+      "name": "plan_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "subscription_plans"
+      },
+      "required": true,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "email",
+      "type": "email",
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "contact_id",
+      "type": "text"
+    },
+    {
+      "name": "organization_id",
+      "type": "text"
+    },
+    {
+      "name": "interval",
+      "type": "enum",
+      "options": {
+        "values": [
+          "monthly",
+          "quarterly",
+          "yearly"
+        ]
+      },
+      "required": true,
+      "defaultValue": "monthly",
+      "writtenBy": "actions"
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "options": {
+        "values": [
+          "trialing",
+          "active",
+          "past_due",
+          "cancelled"
+        ]
+      },
+      "required": true,
+      "defaultValue": "trialing",
+      "indexed": true,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "current_period_start",
+      "type": "date",
+      "required": true,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "current_period_end",
+      "type": "date",
+      "required": true,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "trial_end",
+      "type": "date",
+      "writtenBy": "actions"
+    },
+    {
+      "name": "cancel_at_period_end",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": false,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "cancelled_at",
+      "type": "datetime",
+      "writtenBy": "actions"
+    },
+    {
+      "name": "dunning_count",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "payment_failure_at",
+      "type": "datetime",
+      "writtenBy": "actions"
+    },
+    {
+      "name": "stripe_customer_id",
+      "type": "text"
+    },
+    {
+      "name": "stripe_subscription_id",
+      "type": "text"
+    },
+    {
+      "name": "metadata",
+      "type": "json"
+    }
+  ],
+  "relations": [
+    {
+      "name": "subscribers_plan_id",
+      "type": "m2o",
+      "field": "plan_id",
+      "target": "subscription_plans",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

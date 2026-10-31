@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.0.0 (2026-10-31)
+
+- feat!: plans, subscribers, invoices, usage, dunning attempts and plan changes are collections declared in `schema/collections/`, created and owned by the engine; no SQL migrations
+- feat!: the hand-written `/ext/finance/subscriptions/*` routes are gone — plans and a subscriber's name, email, contact and Stripe ids are plain edits through `/api/data`; the rest is the actions `subscribe`, `changePlan`, `cancel`, `reactivate`, `recordUsage`, `issueInvoice`, `markInvoicePaid` and `recordPaymentFailure` (`POST /ext/finance/subscriptions/actions/<name>`)
+- feat!: a subscriber's plan, status and billing period, and every invoice, usage line, dunning attempt and plan change, are written only by these actions (`writtenBy: actions`, engine 3.0.0-beta.93)
+- feat!: who may subscribe, bill or settle is the engine's rules on these collections; the `subscriptions` resource and `subscriptions:settle` are gone
+- feat!: gone with them: pause/resume, `/stats` (MRR), the cancellation reason and the `paused`, `expired`, `draft`, `void` and `uncollectible` states nothing could reach
+- fix: cancelling works; 1.x wrote `cancel_scheduled` and `cancellation_reason`, which migration 004 had removed, so every cancel failed (pause and resume failed the same way on `paused`)
+- fix: marking an invoice paid works; 1.x wrote the `updated_at` column migration 004 had dropped
+- fix: a plan change prorates the unused share of the period already billed and the next invoice bills it (`proration_amount`); 1.x read a `start_date` column that does not exist, recorded a proration of `NaN` and never billed it. A change keeps the currency and the billing interval; the subscriber keeps the interval it subscribed on, so editing a plan's interval does not move existing periods
+- fix: a cancel at period end takes effect: billing the next period cancels the subscriber instead
+- fix: an invoice bills the subscriber's current period and moves the subscriber to the next one, once (unique per subscriber and period start); 1.x billed a period starting on the day it was called, so two calls billed the customer twice and the subscriber's period never moved
+- fix: a trial ends: the first billed period starts at the trial's end, and billing it makes the subscriber active (1.x left a trialing subscriber unbillable forever)
+- fix: a usage line names the invoice that billed it instead of a flag, and paying the subscriber's last open invoice ends its dunning and lifts past due
+- fix: a month-end period ends on the last day of a shorter month instead of spilling into the next one
+
 ## 1.0.11 (2026-10-26)
 
 - fix(migrations): declared migration order must equal directory order (#210)

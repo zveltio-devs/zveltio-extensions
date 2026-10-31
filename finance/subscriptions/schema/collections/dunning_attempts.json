@@ -1,0 +1,68 @@
+{
+  "name": "dunning_attempts",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "subscriber_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "subscribers"
+      },
+      "required": true
+    },
+    {
+      "name": "invoice_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "subscription_invoices"
+      },
+      "required": true
+    },
+    {
+      "name": "attempt_number",
+      "type": "integer",
+      "required": true
+    },
+    {
+      "name": "next_attempt_at",
+      "type": "datetime"
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    }
+  ],
+  "indexes": [
+    {
+      "fields": [
+        "invoice_id",
+        "attempt_number"
+      ],
+      "unique": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "dunning_attempts_subscriber_id",
+      "type": "m2o",
+      "field": "subscriber_id",
+      "target": "subscribers",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "dunning_attempts_invoice_id",
+      "type": "m2o",
+      "field": "invoice_id",
+      "target": "subscription_invoices",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}
