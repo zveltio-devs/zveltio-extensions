@@ -4,7 +4,8 @@
     {
       "name": "number",
       "type": "text",
-      "unique": true
+      "unique": true,
+      "writtenBy": "actions"
     },
     {
       "name": "original_invoice_id",
@@ -74,13 +75,15 @@
           "partially_applied",
           "applied"
         ]
-      }
+      },
+      "writtenBy": "actions"
     },
     {
       "name": "applied_amount",
       "type": "decimal",
       "required": true,
-      "defaultValue": 0
+      "defaultValue": 0,
+      "writtenBy": "actions"
     }
   ],
   "relations": [

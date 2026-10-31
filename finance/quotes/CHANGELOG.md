@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.1.0 (2026-10-31)
+
+- feat: quote numbers and invoices come from finance/invoicing's own actions, run by the engine (`host.actions.run`, manifest `calls`), instead of invoicing's code copied into this bundle; needs engine 3.0.0-beta.94 and invoicing 2.3.0
+- feat: `convertToInvoice` is gated on `quotes`; the invoice it creates still needs `execute` on `invoices`, which the engine checks for invoicing's `createInvoice`
+
 ## 2.0.2 (2026-10-30)
 
 - fix: bundles finance/invoicing 2.2.0 (credit notes numbered when issued)

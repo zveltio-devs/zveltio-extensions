@@ -4,18 +4,16 @@ import {
 	type ExtensionAction,
 	todayIn,
 } from "@zveltio/sdk/extension";
-// ponytail: invoicing's own code, inlined into this bundle when it is packed —
-// a reconciled bank credit pays the invoice exactly as invoicing records a
-// payment. A change to invoicing's actions needs a repack of banking too;
-// check-bundle-sources hashes only this extension's engine/, so it will not say so.
-import { invoicingActions } from "../../invoicing/engine/actions.js";
 import { parseMT940 } from "./mt940.js";
 
 // What banking does beyond plain edits, as actions (`POST /ext/finance/banking/actions/<name>`).
 // Accounts, rules and cash-flow entries are plain edits through `/api/data`.
 // The engine runs each action as the caller, inside the request transaction,
-// through the data API: a refusal rolls back everything it wrote. Who may do
-// what is the engine's rules on these collections, not this file's.
+// through the data API: a refusal rolls back everything it wrote. A reconciled
+// credit pays its invoice through invoicing's own `recordPayment`, which the
+// engine runs here (`host.actions.run`, manifest `calls`) in the same
+// transaction. Who may do what is the engine's rules on these collections, not
+// this file's.
 
 type Host = Parameters<ExtensionAction>[1];
 type Row = Record<string, unknown>;
@@ -362,17 +360,20 @@ const reconcile: ExtensionAction = async (input, host) => {
 	await host.collections.update(T, d.transaction_id, { is_reconciled: true });
 	let invoice: unknown = null;
 	if (linked === "invoice") {
-		invoice = await invoicingActions.recordPayment(
-			{
-				id: d.linked_id,
-				amount: n(tx.amount),
-				payment_date: String(tx.date).slice(0, 10),
-				payment_method: "transfer",
-				...(tx.reference ? { reference: String(tx.reference) } : {}),
-				...(d.notes ? { notes: d.notes } : {}),
-			},
-			host,
-		);
+		if (!host.actions)
+			throw new ActionRefusal(
+				409,
+				"engine_too_old",
+				"This engine cannot run another extension's action.",
+			);
+		invoice = await host.actions.run("finance/invoicing", "recordPayment", {
+			id: d.linked_id,
+			amount: n(tx.amount),
+			payment_date: String(tx.date).slice(0, 10),
+			payment_method: "transfer",
+			...(tx.reference ? { reference: String(tx.reference) } : {}),
+			...(d.notes ? { notes: d.notes } : {}),
+		});
 	}
 	return { reconciliation: rec, invoice };
 };

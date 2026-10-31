@@ -68,7 +68,7 @@
         }
       ],
       "form": {
-        "endpoint": "/api/data/document_series",
+        "endpoint": "/ext/finance/invoicing/actions/createSeries",
         "fields": [
           {
             "name": "doc_type",

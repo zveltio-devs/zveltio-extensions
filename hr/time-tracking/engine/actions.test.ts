@@ -1,8 +1,10 @@
 // The time-tracking actions over an in-memory data API: the filter operators
-// they use (eq, gte), `expect` on update, and paging. The engine's own data API
+// they use (eq, gte), `expect` on update, and paging; invoicing's actions run on
+// the same data, as the engine runs them for `host.actions.run`. The engine's own data API
 // and its checks are tested in the engine; this proves what the actions ask of it.
 import { describe, expect, it } from "bun:test";
 import { ActionRefusal } from "@zveltio/sdk/extension";
+import { invoicingActions } from "../../../finance/invoicing/engine/actions";
 import { timeTrackingActions as a } from "./actions";
 
 type Row = Record<string, unknown>;
@@ -69,6 +71,13 @@ function fakeHost() {
 			},
 			delete: async (c: string, id: string) => {
 				tables[c] = rows(c).filter((r) => r.id !== id);
+			},
+		},
+		// What the engine does for `host.actions.run`: invoicing's own action, on this data.
+		actions: {
+			run: async (extension: string, action: string, input: unknown) => {
+				expect(extension).toBe("finance/invoicing");
+				return invoicingActions[action](input, host as never);
 			},
 		},
 	};

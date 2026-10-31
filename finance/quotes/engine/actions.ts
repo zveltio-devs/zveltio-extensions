@@ -3,24 +3,32 @@ import {
 	type ExtensionAction,
 	todayIn,
 } from "@zveltio/sdk/extension";
-// ponytail: invoicing's own code, inlined into this bundle when it is packed —
-// one place decides how a number is claimed and an invoice is totalled. A
-// change to invoicing's actions needs a repack of quotes too; check-bundle-sources
-// hashes only this extension's engine/, so it will not say so.
-import {
-	claimNumber,
-	invoicingActions,
-} from "../../invoicing/engine/actions.js";
 
 // What quotes does beyond plain edits, as actions (`POST /ext/finance/quotes/actions/<name>`).
 // The engine runs each as the caller, inside the request transaction, through
 // the data API: a refusal rolls back everything the action wrote, the claimed
-// number included. Sending, accepting, rejecting and the internal approval are
+// number included. Numbers and invoices are invoicing's: its actions run here
+// through the engine (`host.actions.run`, manifest `calls`), in the same
+// transaction, so one place decides how a number is claimed and an invoice is
+// totalled. Sending, accepting, rejecting and the internal approval are
 // plain edits of `status` and `approval_status`; the status rule on `quotes`
 // keeps the order. Who may do what is the engine's rules, not this file's.
 
 type Host = Parameters<ExtensionAction>[1];
 type Row = Record<string, unknown>;
+
+const INVOICING = "finance/invoicing";
+
+/** An action of invoicing, run by the engine; without invoicing the engine answers 404. */
+function invoicing(host: Host, action: string, input: Row): Promise<unknown> {
+	if (!host.actions)
+		throw new ActionRefusal(
+			409,
+			"engine_too_old",
+			"This engine cannot run another extension's action.",
+		);
+	return host.actions.run(INVOICING, action, input);
+}
 
 const Q = "quotes";
 const QL = "quote_lines";
@@ -92,7 +100,9 @@ const createQuote: ExtensionAction = async (input, host) => {
 	const tax = lines.reduce((s, x) => s + x.vat, 0);
 	const issue = todayIn(host.timezone);
 
-	const claimed = await claimNumber(host, "quote", d.series);
+	const claimed = (await invoicing(host, "claimQuoteNumber", {
+		...(d.series && { series: d.series }),
+	})) as { number: string };
 	const quote = await host.collections.insert(Q, {
 		...Object.fromEntries(
 			HEADER.filter((k) => d[k] !== undefined && d[k] !== "").map((k) => [
@@ -169,8 +179,7 @@ const convertToInvoice: ExtensionAction = async (input, host) => {
 		lines.push(...rows);
 		if (rows.length < 500) break;
 	}
-	const inv = (await invoicingActions.createInvoice(
-		{
+	const inv = (await invoicing(host, "createInvoice", {
 			client_id: q.organization_id ?? q.contact_id ?? undefined,
 			client_type: q.organization_id
 				? "organization"
@@ -202,9 +211,7 @@ const convertToInvoice: ExtensionAction = async (input, host) => {
 				sort_order: Number(l.sort_order),
 				metadata: { quote_id: d.id },
 			})),
-		},
-		host,
-	)) as Row;
+	})) as Row;
 	await host.collections.update(
 		Q,
 		d.id,

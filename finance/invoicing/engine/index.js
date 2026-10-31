@@ -382,6 +382,16 @@ var deleteDraft = async (input, host) => {
   await host.collections.delete(I, id);
   return { deleted: id };
 };
+var cancelInvoice = async (input, host) => {
+  const { id } = input;
+  await load(host, I, id, "invoice");
+  return host.collections.update(I, id, { status: "cancelled" }, { expect: { status: ["draft", ...PAYABLE] } });
+};
+var createSeries = async (input, host) => host.collections.insert("document_series", blankless(input));
+var claimQuoteNumber = async (input, host) => {
+  const { series } = input;
+  return claimNumber(host, "quote", series || undefined);
+};
 var createCreditNote = async (input, host) => {
   const d = blankless(input);
   const original = d.original_invoice_id ? await load(host, I, d.original_invoice_id, "invoice") : null;
@@ -549,6 +559,9 @@ var invoicingActions = {
   generateNext,
   sendInvoice,
   deleteDraft,
+  cancelInvoice,
+  createSeries,
+  claimQuoteNumber,
   createCreditNote,
   issueCreditNote,
   applyCreditNote,
