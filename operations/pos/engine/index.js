@@ -1,5 +1,5 @@
 // @bun
-// packages/sdk/src/extension/action-refusal.ts
+// /zveltio-extension/packages/sdk/src/extension/action-refusal.ts
 var ACTION_REFUSAL = Symbol.for("zveltio.extension.action-refusal");
 
 class ActionRefusal extends Error {
@@ -13,7 +13,7 @@ class ActionRefusal extends Error {
     this.name = "ActionRefusal";
   }
 }
-// packages/sdk/src/extension/reserved-paths.ts
+// /zveltio-extension/packages/sdk/src/extension/reserved-paths.ts
 var RESERVED_PATH_SEGMENTS = Object.freeze([
   "api",
   "ext",
@@ -26,7 +26,7 @@ var RESERVED_PATH_SEGMENTS = Object.freeze([
   "robots.txt",
   "sitemap.xml"
 ]);
-// ../zveltio-extensions/operations/pos/engine/actions.ts
+// engine/actions.ts
 var SESSIONS = "pos_sessions";
 var ORDERS = "pos_orders";
 var CUSTOMERS = "pos_customers";
@@ -73,12 +73,7 @@ function moveStock(host, input) {
 }
 async function nextNumber(host) {
   for (let attempt = 0;attempt < TRIES; attempt++) {
-    const s = await first(host, SERIES, {}) ?? await host.collections.insert(SERIES, {}).catch(async (err) => {
-      const won = await first(host, SERIES, {});
-      if (!won)
-        throw err;
-      return won;
-    });
+    const s = await first(host, SERIES, {}) ?? await host.collections.insert(SERIES, {});
     const next = n(s.next_number);
     try {
       await host.collections.update(SERIES, String(s.id), { next_number: next + 1 }, { expect: { next_number: [String(s.next_number)] } });
@@ -247,7 +242,7 @@ var posActions = {
   closeSession
 };
 
-// ../zveltio-extensions/operations/pos/engine/index.ts
+// engine/index.ts
 var extension = {
   name: "operations/pos",
   category: "operations",

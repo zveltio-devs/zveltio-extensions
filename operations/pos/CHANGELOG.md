@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.1.0 (2026-10-31)
+
+- feat: `refundOrder` is gated on `pos_z_reports:execute` instead of `pos_orders:execute`, so an operator can let a cashier sell without letting them refund. Who already ran `checkout` needs `pos_z_reports:execute` to keep refunding
+- fix: drop a dead catch in the receipt numbering; two first sales of a firm at once still fail the loser's request, and a retry succeeds
+
 ## 2.0.0 (2026-10-31)
 
 - feat!: till sessions, orders and their lines, customers, held orders, cash movements, the loyalty log, Z-reports and the receipt series are collections declared in `schema/collections/` (`pos_*`), created and owned by the engine; no SQL migrations

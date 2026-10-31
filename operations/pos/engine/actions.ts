@@ -8,7 +8,9 @@ import { ActionRefusal, type ExtensionAction } from '@zveltio/sdk/extension';
 // orders, cash movements, the loyalty log, Z-reports and a customer's points and
 // totals are written only here (`writtenBy`). Stock is inventory's: its
 // `moveStock` runs here through the engine (`host.actions.run`, manifest
-// `calls`), in the same transaction. Who may sell, refund or close a till is the
+// `calls`), in the same transaction. A refund is gated on `pos_z_reports`, not on
+// the orders a cashier sells on, so the operator can give refunds to someone
+// other than the cashier. Who may sell, refund or close a till is the
 // engine's rules on these collections, not this file's.
 
 type Host = Parameters<ExtensionAction>[1];
@@ -72,14 +74,10 @@ function moveStock(host: Host, input: Row): Promise<unknown> {
 /** The next `POS-000001`, claimed only if nobody claimed it since it was read. */
 async function nextNumber(host: Host): Promise<string> {
   for (let attempt = 0; attempt < TRIES; attempt++) {
-    const s =
-      (await first(host, SERIES, {})) ??
-      (await host.collections.insert(SERIES, {}).catch(async (err) => {
-        // Two first sales at once meet on the singleton key; the loser reads the winner's row.
-        const won = await first(host, SERIES, {});
-        if (!won) throw err;
-        return won;
-      }));
+    // Two first sales of a firm at once meet on the singleton key, and the
+    // loser's request fails: a refused insert aborts the request transaction,
+    // so there is nothing left to read the winner's row with. Retrying succeeds.
+    const s = (await first(host, SERIES, {})) ?? (await host.collections.insert(SERIES, {}));
     const next = n(s.next_number);
     try {
       await host.collections.update(SERIES, String(s.id), { next_number: next + 1 }, { expect: { next_number: [String(s.next_number)] } });

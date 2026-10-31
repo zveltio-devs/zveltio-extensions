@@ -3,7 +3,7 @@
   "displayName": "Fixed Assets",
   "category": "operations",
   "description": "Fixed asset register, straight-line and declining balance depreciation posted to the ledger, maintenance, insurance, revaluations and transfers",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "zveltioMinVersion": "3.0.0-beta.94",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-assets",
@@ -140,6 +140,14 @@
           "accumulated_dep_account_id": {
             "type": "string",
             "format": "uuid"
+          },
+          "asset_account_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "disposal_loss_account_id": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },
@@ -226,6 +234,10 @@
       ],
       "writes": [
         "assets"
+      ],
+      "calls": [
+        "finance/accounting.createEntry",
+        "finance/accounting.postEntry"
       ]
     },
     {
@@ -318,8 +330,8 @@
     }
   ],
   "integrity": {
-    "engineSha256": "91f003c9b24fc9d8f4ff326c67c4558d53e2c00a65c42241364669db84886114",
-    "sourceSha256": "2f534894fd26f3d6201945228387b590e757dfe90095667fa51c02f5383801c9",
-    "schemaSha256": "f2f77e9982fa83e2f4336ac30f81091bea3be8955e510df65002137e98ea8748"
+    "engineSha256": "ca2fb97a013db3c9c1739302139a8a3de6d3c62f6c879e70ec713c452a414f52",
+    "sourceSha256": "e482e1195c843c01330f5aae45e84ee6ab3b028881ff585bacb57cf659fa22dd",
+    "schemaSha256": "bdd5c7cfc99ff1f1a41e26a692219ac0cc9532b1aff1fcdfe6f5d40aeaf7b92b"
   }
 }
