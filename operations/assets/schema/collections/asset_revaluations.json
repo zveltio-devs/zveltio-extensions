@@ -1,0 +1,59 @@
+{
+  "name": "asset_revaluations",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "asset_id",
+      "type": "m2o",
+      "indexed": true,
+      "required": true,
+      "options": {
+        "related_collection": "assets"
+      }
+    },
+    {
+      "name": "revaluation_date",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "previous_value",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "new_value",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "method",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "market",
+      "options": {
+        "values": [
+          "market",
+          "cost",
+          "expert_opinion"
+        ]
+      }
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    }
+  ],
+  "relations": [
+    {
+      "name": "asset_revaluations_asset_id",
+      "type": "m2o",
+      "field": "asset_id",
+      "target": "assets",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

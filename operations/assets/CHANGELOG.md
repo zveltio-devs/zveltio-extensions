@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.0.0 (2026-10-31)
+
+- feat!: the asset register, its depreciation schedule, maintenance, insurance, revaluations and transfers are collections declared in `schema/collections/` (`assets`, `asset_*`), created and owned by the engine; no SQL migrations
+- feat!: the hand-written `/ext/operations/assets/*` routes are gone — every read, and plain edits (name, code, serial, accounts, warranty, next maintenance date, maintenance and insurance records), go through `/api/data/<collection>`; an asset's life is the actions `createAsset`, `postDepreciation`, `transferAsset`, `revalueAsset` and `disposeAsset` (`POST /ext/operations/assets/actions/<name>`)
+- feat!: an asset's cost, life, method, value, accumulated depreciation, location, status and disposal, its schedule, revaluations and transfers are written only by these actions (`writtenBy: "actions"`)
+- feat!: the `assets` permission resource is gone; who may do what is the engine's rules on these collections
+- feat!: a depreciation is posted to the ledger through accounting's `createEntry` and `postEntry` in the same transaction (manifest `calls`), not by writing accounting's tables
+- feat!: `/stats`, the aggregated `GET /:id`, the `in_maintenance` status and the recorded-maintenance-moves-the-next-date coupling are gone; the next maintenance date is a plain edit. An asset with a schedule cannot be deleted (its rows restrict it); dispose of it instead
+- fix: posting a depreciation works (the schedule was written to `period` and read from `period_date`, so every posting answered "not found"); a period is posted once, under a precondition
+- fix: the schedule rounds to cents and its last year lands exactly on the residual value; a residual value at or above the cost is refused
+- fix: a posting, a revaluation, a transfer and a disposal at once cannot start from the same value or location; a disposed asset is not posted, moved or revalued
+- requires engine 3.0.0-beta.94 and finance/accounting 2.1.1
+
 ## 1.0.10 (2026-10-26)
 
 - fix(migrations): declared migration order must equal directory order (#210)
