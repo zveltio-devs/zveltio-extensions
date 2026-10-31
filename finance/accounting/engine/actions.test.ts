@@ -116,7 +116,7 @@ describe('journal entries', () => {
   it('posting reads the stored lines again', async () => {
     const { host, ids, rows } = await books();
     const e = (await a.createEntry({ date: '2026-02-01', description: 'x', lines: [{ account_id: ids.bank, debit: 5 }, { account_id: ids.sales, credit: 5 }] }, host)) as Row;
-    rows('journal_lines')[0].debit = 6; // a PATCH on a draft's line
+    rows('journal_lines')[0].debit = 6; // a line changed under the draft
     await refusal(a.postEntry({ id: e.id }, host), 'unbalanced');
     rows('journal_lines')[0].debit = 5;
     expect(await a.postEntry({ id: e.id }, host)).toMatchObject({ status: 'posted' });
@@ -135,6 +135,26 @@ describe('journal entries', () => {
       [100, 0],
     ]);
     await refusal(a.voidEntry({ id }, host), 'entry_not_posted');
+  });
+
+  it('a draft is edited with its lines replaced whole and balanced; a posted entry is not', async () => {
+    const { host, ids, rows } = await books();
+    const e = (await a.createEntry({ date: '2026-02-01', description: 'x', lines: [{ account_id: ids.bank, debit: 1 }, { account_id: ids.sales, credit: 1 }] }, host)) as Row;
+    const three = [
+      { account_id: ids.bank, debit: 2 },
+      { account_id: ids.rent, debit: 1 },
+      { account_id: ids.sales, credit: 3 },
+    ];
+    await refusal(a.updateDraft({ id: e.id, lines: [{ account_id: ids.bank, debit: 2 }, { account_id: ids.sales, credit: 1 }] }, host), 'unbalanced');
+    expect(await a.updateDraft({ id: e.id, description: 'y', lines: three }, host)).toMatchObject({ status: 'draft', description: 'y' });
+    expect(rows('journal_lines').map((l) => [l.account_id, l.debit, l.credit])).toEqual([
+      [ids.bank, 2, 0],
+      [ids.rent, 1, 0],
+      [ids.sales, 0, 3],
+    ]);
+    await a.postEntry({ id: e.id }, host);
+    await refusal(a.updateDraft({ id: e.id, description: 'z' }, host), 'entry_not_draft');
+    expect(rows('journal_lines')).toHaveLength(3);
   });
 
   it('a draft is deleted with its lines', async () => {

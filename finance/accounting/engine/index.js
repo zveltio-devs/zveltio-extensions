@@ -150,6 +150,28 @@ var deleteEntry = async (input, host) => {
   await host.collections.delete(E, id);
   return { id };
 };
+var updateDraft = async (input, host) => {
+  const d = input;
+  const e = await load(host, E, d.id, "entry");
+  if (e.status !== "draft")
+    throw new ActionRefusal(409, "entry_not_draft", "Only a draft is edited; void a posted entry.");
+  if (d.lines)
+    balanced(d.lines);
+  const date = d.date ?? day(e.date);
+  const entry = await host.collections.update(E, d.id, {
+    status: "draft",
+    date,
+    fiscal_year_id: await openYear(host, date),
+    ...d.description !== undefined && { description: d.description },
+    ...d.reference !== undefined && { reference: d.reference }
+  }, { expect: { status: ["draft"] } });
+  if (d.lines) {
+    for (const l of await all(host, L, { entry_id: d.id }))
+      await host.collections.delete(L, String(l.id));
+    await writeLines(host, d.id, d.lines);
+  }
+  return entry;
+};
 var closeFiscalYear = async (input, host) => {
   const { id } = input;
   const fy = await load(host, "fiscal_years", id, "fiscal_year");
@@ -332,6 +354,7 @@ var accountingActions = {
   postEntry,
   voidEntry,
   deleteEntry,
+  updateDraft,
   closeFiscalYear,
   createRecurring,
   runRecurring,

@@ -1,5 +1,6 @@
 {
   "name": "journal_lines",
+  "writtenBy": "actions",
   "fields": [
     {
       "name": "entry_id",

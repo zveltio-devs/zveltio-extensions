@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.1.0 (2026-10-31)
+
+- feat: journal entries and their lines are written only by this extension's actions (`writtenBy: "actions"`): the data API, sync and every other path answer 409 `written_by_actions`, so a posted entry or its lines cannot be changed outside `voidEntry`; a fiscal year's `status` and `closed_at` move only through `closeFiscalYear`
+- feat: `updateDraft` changes a draft entry's date, description or reference, or replaces its lines whole (balanced, in an open year); a posted entry is refused (`entry_not_draft`)
+- note: deleting a cost centre through the data API answers 409 `written_by_actions`, since it would clear `cost_center_id` on journal lines
+- requires engine 3.0.0-beta.93
+
 ## 2.0.1 (2026-10-30)
 
 - fix: an entry dated where two fiscal years overlap is refused (`overlapping_years`) instead of landing in whichever year came first
