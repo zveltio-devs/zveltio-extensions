@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.1.0 (2026-10-31)
+
+- feat: a report's status, its dates, rejection reason, totals and reimbursed amount are written only by this extension's actions (`writtenBy: "actions"`), and reimbursements are written only by `reimburse`: the data API, sync and every other path answer 409 `written_by_actions`, so a report is submitted, approved, rejected and paid back only through `submit`, `approve`, `reject` and `reimburse`
+- requires engine 3.0.0-beta.93
+
 ## 2.0.0 (2026-10-30)
 
 - feat!: expense reports, their expenses, mileage and per diem entries and reimbursements are collections declared in `schema/collections/`, created and owned by the engine; no SQL migrations

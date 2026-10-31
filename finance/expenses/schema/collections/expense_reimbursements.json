@@ -1,5 +1,6 @@
 {
   "name": "expense_reimbursements",
+  "writtenBy": "actions",
   "fields": [
     {
       "name": "report_id",

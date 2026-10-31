@@ -20,7 +20,8 @@
           "rejected",
           "reimbursed"
         ]
-      }
+      },
+      "writtenBy": "actions"
     },
     {
       "name": "currency",
@@ -34,49 +35,58 @@
     },
     {
       "name": "submitted_at",
-      "type": "datetime"
+      "type": "datetime",
+      "writtenBy": "actions"
     },
     {
       "name": "approved_at",
-      "type": "datetime"
+      "type": "datetime",
+      "writtenBy": "actions"
     },
     {
       "name": "rejection_reason",
-      "type": "textarea"
+      "type": "textarea",
+      "writtenBy": "actions"
     },
     {
       "name": "total_amount",
       "type": "decimal",
       "required": true,
-      "defaultValue": 0
+      "defaultValue": 0,
+      "writtenBy": "actions"
     },
     {
       "name": "mileage_total",
       "type": "decimal",
       "required": true,
-      "defaultValue": 0
+      "defaultValue": 0,
+      "writtenBy": "actions"
     },
     {
       "name": "per_diem_total",
       "type": "decimal",
       "required": true,
-      "defaultValue": 0
+      "defaultValue": 0,
+      "writtenBy": "actions"
     },
     {
       "name": "grand_total",
       "type": "decimal",
       "required": true,
-      "defaultValue": 0
+      "defaultValue": 0,
+      "writtenBy": "actions"
     },
     {
       "name": "reimbursed_amount",
       "type": "decimal",
       "required": true,
-      "defaultValue": 0
+      "defaultValue": 0,
+      "writtenBy": "actions"
     },
     {
       "name": "reimbursed_at",
-      "type": "datetime"
+      "type": "datetime",
+      "writtenBy": "actions"
     }
   ],
   "validation": [
