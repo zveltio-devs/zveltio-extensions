@@ -1,0 +1,22 @@
+{
+  "name": "procurement_supplier_evaluations",
+  "writtenBy": "actions",
+  "fields": [
+    { "name": "supplier_id", "type": "m2o", "required": true, "options": { "related_collection": "procurement_suppliers" } },
+    { "name": "period", "type": "text", "required": true },
+    { "name": "quality_score", "type": "integer", "required": true },
+    { "name": "delivery_score", "type": "integer", "required": true },
+    { "name": "price_score", "type": "integer", "required": true },
+    { "name": "overall_score", "type": "decimal", "required": true },
+    { "name": "notes", "type": "textarea" }
+  ],
+  "indexes": [{ "fields": ["supplier_id", "period"], "unique": true }],
+  "relations": [
+    { "name": "procurement_supplier_evaluations_supplier_id", "type": "m2o", "field": "supplier_id", "target": "procurement_suppliers", "targetField": "id", "onDelete": "RESTRICT", "onUpdate": "CASCADE", "metadata": {} }
+  ],
+  "validation": [
+    { "field": "quality_score", "rule": "range", "config": { "min": 1, "max": 5 }, "message": "A score is 1 to 5." },
+    { "field": "delivery_score", "rule": "range", "config": { "min": 1, "max": 5 }, "message": "A score is 1 to 5." },
+    { "field": "price_score", "rule": "range", "config": { "min": 1, "max": 5 }, "message": "A score is 1 to 5." }
+  ]
+}

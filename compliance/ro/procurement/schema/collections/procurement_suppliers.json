@@ -1,0 +1,18 @@
+{
+  "name": "procurement_suppliers",
+  "fields": [
+    { "name": "name", "type": "text", "required": true },
+    { "name": "cui", "type": "text", "required": true, "unique": true },
+    { "name": "reg_com", "type": "text" },
+    { "name": "address", "type": "textarea" },
+    { "name": "county", "type": "text" },
+    { "name": "iban", "type": "text" },
+    { "name": "bank", "type": "text" },
+    { "name": "contact_name", "type": "text" },
+    { "name": "contact_email", "type": "email" },
+    { "name": "contact_phone", "type": "phone" },
+    { "name": "category", "type": "text" },
+    { "name": "is_active", "type": "boolean", "required": true, "defaultValue": true },
+    { "name": "notes", "type": "textarea" }
+  ]
+}

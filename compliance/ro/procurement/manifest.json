@@ -3,12 +3,12 @@
   "displayName": "Achizitii Publice RO",
   "category": "compliance/ro",
   "description": "Romanian public procurement management — purchase orders, supplier registry, budget tracking",
-  "version": "1.0.3",
-  "zveltioMinVersion": "1.0.0",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.96",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-ro-procurement",
   "permissions": [
-    "database"
+    "data:write"
   ],
   "i18nPrefixes": [
     "compliance.ro.procurement"
@@ -37,10 +37,456 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "8a4303c54db50ca49e368522d08a2709c970b75b1a41491428808f45d57349cf",
-    "sourceSha256": "a62238fb6b3262cf055323f6947c30184e2768ec85cb0dca93a42507120a5d23"
+    "engineSha256": "95258810ee3e7614555706f5b7b150939b0bf4e7fb8f071f36aba606d462102c",
+    "sourceSha256": "9f05db28c01f49e59be37e2be96a8b8f6807999058ffde870a1c9e4a0fc6d319",
+    "schemaSha256": "20e5ac06070d4d3f112de88aa522cff68d8965b5676169dcdebe44703873dff6"
   },
-  "resources": [
-    "procurement"
+  "collections": [
+    "procurement_suppliers",
+    "procurement_budget_lines",
+    "procurement_contracts",
+    "procurement_orders",
+    "procurement_reception_notes",
+    "procurement_supplier_evaluations"
+  ],
+  "actions": [
+    {
+      "name": "createOrder",
+      "permission": {
+        "resource": "procurement_orders",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "number",
+          "date",
+          "description",
+          "items"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "number": {
+            "type": "string",
+            "minLength": 1
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "supplier_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "supplier_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "supplier_cui": {
+            "type": "string",
+            "minLength": 1
+          },
+          "contract_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "budget_line_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "category": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "low",
+              "normal",
+              "high",
+              "urgent"
+            ]
+          },
+          "notes": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": [
+                "description",
+                "quantity",
+                "unit_price",
+                "vat_rate"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "description": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "quantity": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "unit": {
+                  "type": "string"
+                },
+                "unit_price": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "vat_rate": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                }
+              }
+            }
+          }
+        }
+      },
+      "reads": [
+        "procurement_suppliers"
+      ],
+      "writes": [
+        "procurement_orders"
+      ]
+    },
+    {
+      "name": "deleteDraft",
+      "permission": {
+        "resource": "procurement_orders",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "procurement_orders"
+      ],
+      "writes": [
+        "procurement_orders"
+      ]
+    },
+    {
+      "name": "approveOrder",
+      "permission": {
+        "resource": "procurement_orders",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "procurement_orders"
+      ],
+      "writes": [
+        "procurement_orders"
+      ]
+    },
+    {
+      "name": "receiveOrder",
+      "permission": {
+        "resource": "procurement_orders",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "procurement_orders"
+      ],
+      "writes": [
+        "procurement_orders"
+      ]
+    },
+    {
+      "name": "cancelOrder",
+      "permission": {
+        "resource": "procurement_orders",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "reads": [
+        "procurement_orders"
+      ],
+      "writes": [
+        "procurement_orders"
+      ]
+    },
+    {
+      "name": "createReceptionNote",
+      "permission": {
+        "resource": "procurement_reception_notes",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "number",
+          "date",
+          "items"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "number": {
+            "type": "string",
+            "minLength": 1
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "order_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "supplier_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "supplier_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "currency": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3
+          },
+          "discrepancies": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": [
+                "description",
+                "ordered_qty",
+                "received_qty",
+                "unit_price"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "description": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "ordered_qty": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "received_qty": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "unit": {
+                  "type": "string"
+                },
+                "unit_price": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        }
+      },
+      "reads": [
+        "procurement_orders",
+        "procurement_suppliers"
+      ],
+      "writes": [
+        "procurement_reception_notes"
+      ]
+    },
+    {
+      "name": "confirmReceptionNote",
+      "permission": {
+        "resource": "procurement_reception_notes",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "procurement_reception_notes"
+      ],
+      "writes": [
+        "procurement_reception_notes"
+      ]
+    },
+    {
+      "name": "evaluateSupplier",
+      "permission": {
+        "resource": "procurement_supplier_evaluations",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "supplier_id",
+          "period",
+          "quality_score",
+          "delivery_score",
+          "price_score"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "supplier_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "period": {
+            "type": "string",
+            "minLength": 1
+          },
+          "quality_score": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "delivery_score": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "price_score": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      },
+      "reads": [
+        "procurement_suppliers",
+        "procurement_supplier_evaluations"
+      ],
+      "writes": [
+        "procurement_supplier_evaluations"
+      ]
+    },
+    {
+      "name": "budgetReport",
+      "permission": {
+        "resource": "procurement_budget_lines",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "year": {
+            "type": "integer",
+            "minimum": 2000,
+            "maximum": 2100
+          }
+        }
+      },
+      "reads": [
+        "procurement_budget_lines",
+        "procurement_orders"
+      ],
+      "writes": []
+    },
+    {
+      "name": "spendingReport",
+      "permission": {
+        "resource": "procurement_orders",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "year": {
+            "type": "integer",
+            "minimum": 2000,
+            "maximum": 2100
+          },
+          "supplier_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "procurement_orders"
+      ],
+      "writes": []
+    }
   ]
 }
