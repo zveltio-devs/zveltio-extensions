@@ -180,7 +180,7 @@ const evaluateSupplier: ExtensionAction = async (input, host) => {
   const row = {
     ...d,
     notes: d.notes ?? null,
-    overall_score: Math.round(((d.quality_score + d.delivery_score + d.price_score) / 3) * 100) / 100,
+    overall_score: Math.round(((Number(d.quality_score) + Number(d.delivery_score) + Number(d.price_score)) / 3) * 100) / 100,
   };
   const [prev] = await all(host, E, { supplier_id: d.supplier_id, period: d.period });
   return prev ? host.collections.update(E, String(prev.id), row) : host.collections.insert(E, row);

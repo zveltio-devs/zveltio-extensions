@@ -3,7 +3,7 @@
   "displayName": "Achizitii Publice RO",
   "category": "compliance/ro",
   "description": "Romanian public procurement management — purchase orders, supplier registry, budget tracking",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "zveltioMinVersion": "3.0.0-beta.96",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-ro-procurement",
@@ -37,8 +37,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "95258810ee3e7614555706f5b7b150939b0bf4e7fb8f071f36aba606d462102c",
-    "sourceSha256": "9f05db28c01f49e59be37e2be96a8b8f6807999058ffde870a1c9e4a0fc6d319",
+    "engineSha256": "2291624510995385599906cdf33916d1370afce38cc7ab320fb03cc7866fbdf0",
+    "sourceSha256": "f36b15ccb89e537406b5095525330c140eedce9555101da7f969d92dff0231f4",
     "schemaSha256": "20e5ac06070d4d3f112de88aa522cff68d8965b5676169dcdebe44703873dff6"
   },
   "collections": [

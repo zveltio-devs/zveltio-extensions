@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.1 (2026-11-01)
+
+- fix: `evaluateSupplier` converts the three scores to numbers before adding them, so a score sent as a string no longer concatenates into the overall score
+
 ## 2.0.0 (2026-11-01)
 
 - feat!: suppliers, budget lines, contracts, purchase orders, reception notes (NIR) and supplier evaluations are collections declared in `schema/collections/`, created and owned by the engine; no SQL migrations
