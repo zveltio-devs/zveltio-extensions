@@ -1,27 +1,19 @@
-import type { ZveltioExtension } from '@zveltio/sdk/extension';
-import { join } from 'path';
-import { checklistsRoutes } from './routes.js';
+import type { ZveltioExtension } from "@zveltio/sdk/extension";
+import { checklistsActions } from "./actions.js";
 
+// Templates, template items, checklists, their items, recurrence schedules,
+// scoring schemes, weights and scores are collections this extension declares
+// in `schema/collections/` (manifest `collections`); the engine creates them,
+// owns their rules and serves them through the data API. What is left in code
+// is completion, scoring and recurrence: the actions in `actions.ts`.
 const extension: ZveltioExtension = {
-  name: 'workflow/checklists',
-  category: 'workflow',
-  // S3-01: sub-app mounted at /ext/workflow/checklists by the engine.
-  mountStrategy: 'subapp',
+	name: "workflow/checklists",
+	category: "workflow",
+	mountStrategy: "subapp",
 
-  getMigrations() {
-    return [
-      join(import.meta.dir, 'migrations/001_initial.sql'),
-      join(import.meta.dir, 'migrations/002_tenant_rls.sql'),
-      join(import.meta.dir, 'migrations/003_user_ref_text.sql'),
-      join(import.meta.dir, 'migrations/004_scoring_schemes.sql'),
-      join(import.meta.dir, 'migrations/005_user_ref_text.sql'),
-      join(import.meta.dir, 'migrations/006_scoring_rls.sql'),
-    ];
-  },
+	actions: checklistsActions,
 
-  async register(app, ctx) {
-    app.route('/', checklistsRoutes(ctx));
-  },
+	async register() {},
 };
 
 export default extension;

@@ -1,0 +1,107 @@
+{
+  "name": "approval_requests",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "workflow_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "approval_workflows"
+      },
+      "required": true
+    },
+    {
+      "name": "collection",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "record_id",
+      "type": "text",
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "current_step_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "approval_steps"
+      }
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "options": {
+        "values": [
+          "pending",
+          "approved",
+          "rejected",
+          "cancelled"
+        ]
+      },
+      "required": true,
+      "defaultValue": "pending",
+      "indexed": true
+    },
+    {
+      "name": "priority",
+      "type": "enum",
+      "options": {
+        "values": [
+          "low",
+          "normal",
+          "high",
+          "urgent"
+        ]
+      },
+      "required": true,
+      "defaultValue": "normal"
+    },
+    {
+      "name": "metadata",
+      "type": "json"
+    },
+    {
+      "name": "sla_due_at",
+      "type": "datetime"
+    },
+    {
+      "name": "sla_breached",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": false
+    },
+    {
+      "name": "completed_at",
+      "type": "datetime"
+    },
+    {
+      "name": "rejection_reason",
+      "type": "textarea"
+    }
+  ],
+  "relations": [
+    {
+      "name": "approval_requests_workflow_id",
+      "type": "m2o",
+      "field": "workflow_id",
+      "target": "approval_workflows",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "approval_requests_current_step_id",
+      "type": "m2o",
+      "field": "current_step_id",
+      "target": "approval_steps",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

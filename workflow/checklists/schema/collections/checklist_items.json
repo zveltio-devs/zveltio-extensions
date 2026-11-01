@@ -1,0 +1,102 @@
+{
+  "name": "checklist_items",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "checklist_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "checklists"
+      },
+      "required": true
+    },
+    {
+      "name": "template_item_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "checklist_template_items"
+      }
+    },
+    {
+      "name": "label",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "description",
+      "type": "textarea"
+    },
+    {
+      "name": "required",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": false
+    },
+    {
+      "name": "order_idx",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "checked",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": false
+    },
+    {
+      "name": "checked_at",
+      "type": "datetime"
+    },
+    {
+      "name": "time_spent_minutes",
+      "type": "integer"
+    },
+    {
+      "name": "due_at",
+      "type": "datetime"
+    },
+    {
+      "name": "assignee_user_id",
+      "type": "text"
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    }
+  ],
+  "relations": [
+    {
+      "name": "checklist_items_checklist_id",
+      "type": "m2o",
+      "field": "checklist_id",
+      "target": "checklists",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "checklist_items_template_item_id",
+      "type": "m2o",
+      "field": "template_item_id",
+      "target": "checklist_template_items",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "time_spent_minutes",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "Time spent is zero minutes or more."
+    }
+  ]
+}

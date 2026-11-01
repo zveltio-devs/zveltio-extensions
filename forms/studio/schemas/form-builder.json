@@ -6,9 +6,8 @@
       "id": "formBuilder",
       "layout": "builder",
       "builder": {
-        "loadEndpoint": "/ext/forms/{id}",
-        "loadPath": "form",
-        "saveEndpoint": "/ext/forms/{id}",
+        "loadEndpoint": "/api/data/forms/{id}",
+        "saveEndpoint": "/api/data/forms/{id}",
         "saveMethod": "PATCH",
         "backHref": "/forms",
         "backLabel": "forms.btn.back",
@@ -30,11 +29,6 @@
             "name": "description",
             "label": "forms.form.description",
             "colSpan": 2
-          },
-          {
-            "name": "target_collection",
-            "label": "forms.form.targetCollection",
-            "colSpan": 1
           },
           {
             "name": "active",
@@ -59,15 +53,42 @@
               "label": "forms.field.type",
               "type": "select",
               "options": [
-                { "value": "text", "label": "text" },
-                { "value": "textarea", "label": "textarea" },
-                { "value": "email", "label": "email" },
-                { "value": "number", "label": "number" },
-                { "value": "select", "label": "select" },
-                { "value": "multiselect", "label": "multiselect" },
-                { "value": "checkbox", "label": "checkbox" },
-                { "value": "date", "label": "date" },
-                { "value": "file", "label": "file" }
+                {
+                  "value": "text",
+                  "label": "text"
+                },
+                {
+                  "value": "textarea",
+                  "label": "textarea"
+                },
+                {
+                  "value": "email",
+                  "label": "email"
+                },
+                {
+                  "value": "number",
+                  "label": "number"
+                },
+                {
+                  "value": "select",
+                  "label": "select"
+                },
+                {
+                  "value": "multiselect",
+                  "label": "multiselect"
+                },
+                {
+                  "value": "checkbox",
+                  "label": "checkbox"
+                },
+                {
+                  "value": "date",
+                  "label": "date"
+                },
+                {
+                  "value": "file",
+                  "label": "file"
+                }
               ]
             },
             {
@@ -83,16 +104,22 @@
           "optionsField": {
             "name": "options",
             "label": "forms.field.options",
-            "visibleWhen": { "field": "type", "in": ["select", "multiselect"] },
+            "visibleWhen": {
+              "field": "type",
+              "in": [
+                "select",
+                "multiselect"
+              ]
+            },
             "format": "csv"
           }
         },
         "secondary": {
           "id": "responses",
           "label": "forms.btn.responses",
-          "dataSource": "/ext/forms/{id}/responses",
-          "dataPath": "submissions",
-          "answerLabelsFrom": "form.fields",
+          "dataSource": "/api/data/form_submissions?form_id[eq]={id}&sort=created_at&order=desc&limit=200&expand=form_id",
+          "dataPath": "records",
+          "answerLabelsFrom": "records.0.form_id_expanded.fields",
           "timestampKey": "created_at",
           "dataKey": "data",
           "emptyLabel": "forms.empty.responses"

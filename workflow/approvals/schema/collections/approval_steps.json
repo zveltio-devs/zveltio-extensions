@@ -1,0 +1,68 @@
+{
+  "name": "approval_steps",
+  "fields": [
+    {
+      "name": "workflow_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "approval_workflows"
+      },
+      "required": true
+    },
+    {
+      "name": "step_order",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "approver_role",
+      "type": "text"
+    },
+    {
+      "name": "approver_user_id",
+      "type": "text"
+    },
+    {
+      "name": "deadline_hours",
+      "type": "integer"
+    }
+  ],
+  "relations": [
+    {
+      "name": "approval_steps_workflow_id",
+      "type": "m2o",
+      "field": "workflow_id",
+      "target": "approval_workflows",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "indexes": [
+    {
+      "fields": [
+        "workflow_id",
+        "step_order"
+      ],
+      "unique": true
+    }
+  ],
+  "validation": [
+    {
+      "field": "deadline_hours",
+      "rule": "min",
+      "config": {
+        "value": 1
+      },
+      "message": "A deadline is one hour or more."
+    }
+  ]
+}

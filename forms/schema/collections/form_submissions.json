@@ -1,0 +1,33 @@
+{
+  "name": "form_submissions",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "form_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "forms"
+      },
+      "required": true
+    },
+    {
+      "name": "data",
+      "type": "json",
+      "required": true,
+      "defaultValue": {}
+    }
+  ],
+  "relations": [
+    {
+      "name": "form_submissions_form_id",
+      "type": "m2o",
+      "field": "form_id",
+      "target": "forms",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

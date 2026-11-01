@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.0.0 (2026-11-01)
+
+- feat!: templates, template items, checklists, checklist items, recurrence schedules, scoring schemes, scheme weights and scores are collections declared in `schema/collections/`, created and owned by the engine; no SQL migrations
+- feat!: the hand-written `/ext/workflow/checklists/*` routes are gone — templates, their items, scoring schemes and schedules are plain edits through `/api/data`; the rest is the actions `attachChecklist`, `updateItem`, `checkItems`, `deleteChecklist`, `setSchemeWeights` and `runDueRecurrences` (`POST /ext/workflow/checklists/actions/<name>`)
+- feat!: a checklist, its items, its scores and a scheme's weights are written only by these actions (`writtenBy: actions`, engine 3.0.0-beta.93), so a tick always moves completion and score with it
+- feat!: who may do what is the engine's rules on these collections; the `checklists` resource and the admin check on the recurrence trigger are gone. Who ticked an item or completed a checklist is in the audit log (`checked_by` and `completed_by` are gone; a row's `updated_by` is its last writer)
+- feat!: gone with them: `/summary`, `/stats/:collection` and `/overdue-items` (data API filters cover them), template-level item replacement (items are rows), and the template items' `condition_item_label` / `condition_checked`, which nothing read
+- fix: a checklist created by a recurrence keeps the link to its template items, so its scoring schemes score it; 1.x left it unscorable
+- fix: a bulk tick rescores every checklist it touches, unticks included; 1.x rescored only on the tick that completed one, so its score went stale
+- fix: a bulk tick naming an item that does not exist is refused whole; 1.x skipped it silently
+- fix: a schedule that missed several runs creates one checklist and moves past now; 1.x moved one period per trigger, so catching up created a checklist per missed run
+- fix: a template for one collection attaches only to that collection's records, and an inactive template attaches to none; a schedule on such a template is skipped and reported, not run
+- fix: a tick waits for a concurrent tick on the same checklist and then decides completion on what both wrote; editing notes, time or due date never completes a checklist
+- feat!: schedules step in UTC (1.x stepped in the server's local time); a monthly schedule on the 31st clamps to a shorter month's last day and keeps that day afterwards
+
 ## 1.0.10 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)

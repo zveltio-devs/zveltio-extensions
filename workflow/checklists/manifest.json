@@ -3,12 +3,12 @@
   "displayName": "Checklists",
   "category": "workflow",
   "description": "Attach reusable checklists to any collection record",
-  "version": "1.0.10",
-  "zveltioMinVersion": "1.0.0",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.93",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-checklists",
   "permissions": [
-    "database"
+    "data:write"
   ],
   "i18nPrefixes": [
     "workflow.checklists"
@@ -36,11 +36,294 @@
     "bundled": true,
     "bundlePeers": false
   },
+  "collections": [
+    "checklist_templates",
+    "checklist_template_items",
+    "checklists",
+    "checklist_items",
+    "checklist_recurrences",
+    "checklist_scoring_schemes",
+    "checklist_scheme_weights",
+    "checklist_scores"
+  ],
+  "actions": [
+    {
+      "name": "attachChecklist",
+      "permission": {
+        "resource": "checklists",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "collection",
+          "record_id",
+          "name"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "collection": {
+            "type": "string",
+            "minLength": 1
+          },
+          "record_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "template_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "label"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": {
+                  "type": "string"
+                },
+                "required": {
+                  "type": "boolean"
+                },
+                "order_idx": {
+                  "type": "integer"
+                },
+                "due_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "assignee_user_id": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "reads": [
+        "checklist_templates",
+        "checklist_template_items"
+      ],
+      "writes": [
+        "checklists",
+        "checklist_items"
+      ]
+    },
+    {
+      "name": "updateItem",
+      "permission": {
+        "resource": "checklist_items",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "checked": {
+            "type": "boolean"
+          },
+          "time_spent_minutes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "assignee_user_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "due_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "reads": [
+        "checklists",
+        "checklist_items",
+        "checklist_scoring_schemes",
+        "checklist_scheme_weights",
+        "checklist_scores"
+      ],
+      "writes": [
+        "checklists",
+        "checklist_items",
+        "checklist_scores"
+      ]
+    },
+    {
+      "name": "checkItems",
+      "permission": {
+        "resource": "checklist_items",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "item_ids",
+          "checked"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "item_ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 500,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "checked": {
+            "type": "boolean"
+          }
+        }
+      },
+      "reads": [
+        "checklists",
+        "checklist_items",
+        "checklist_scoring_schemes",
+        "checklist_scheme_weights",
+        "checklist_scores"
+      ],
+      "writes": [
+        "checklists",
+        "checklist_items",
+        "checklist_scores"
+      ]
+    },
+    {
+      "name": "deleteChecklist",
+      "permission": {
+        "resource": "checklists",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "checklists"
+      ],
+      "writes": [
+        "checklists"
+      ]
+    },
+    {
+      "name": "setSchemeWeights",
+      "permission": {
+        "resource": "checklist_scheme_weights",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "weights"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "weights": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "template_item_id",
+                "weight"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "template_item_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "weight": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        }
+      },
+      "reads": [
+        "checklist_scoring_schemes",
+        "checklist_template_items",
+        "checklist_scheme_weights"
+      ],
+      "writes": [
+        "checklist_scoring_schemes",
+        "checklist_scheme_weights"
+      ]
+    },
+    {
+      "name": "runDueRecurrences",
+      "permission": {
+        "resource": "checklist_recurrences",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [],
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "reads": [
+        "checklist_recurrences",
+        "checklist_templates",
+        "checklist_template_items"
+      ],
+      "writes": [
+        "checklist_recurrences",
+        "checklists",
+        "checklist_items"
+      ]
+    }
+  ],
   "integrity": {
-    "engineSha256": "246e48067d0e31aeedb3d53f4dcf13122b2724a4ac7ee347144b550d01de9b9d",
-    "sourceSha256": "a70063f0d9a4bb5463d47660ce320101db6d5416fec0041b7bd869cbdc928141"
-  },
-  "resources": [
-    "checklists"
-  ]
+    "engineSha256": "714d727c90c43b9d6db64d8758e96874e2005220986cedd972284f651d7abc29",
+    "sourceSha256": "d3f9503232adfad282287a7ea342a537876aa210d9b1fe985b1205409e71154b",
+    "schemaSha256": "80c8b7a9c889dc2646903437bc3c5b9502488d618a8bfae3883435a55df84bbf"
+  }
 }

@@ -1,0 +1,65 @@
+{
+  "name": "checklist_template_items",
+  "fields": [
+    {
+      "name": "template_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "checklist_templates"
+      },
+      "required": true
+    },
+    {
+      "name": "label",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "description",
+      "type": "textarea"
+    },
+    {
+      "name": "required",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": false
+    },
+    {
+      "name": "order_idx",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "time_estimate_minutes",
+      "type": "integer"
+    },
+    {
+      "name": "assignee_role",
+      "type": "text"
+    }
+  ],
+  "relations": [
+    {
+      "name": "checklist_template_items_template_id",
+      "type": "m2o",
+      "field": "template_id",
+      "target": "checklist_templates",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "time_estimate_minutes",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "A time estimate is zero minutes or more."
+    }
+  ]
+}

@@ -1,0 +1,82 @@
+{
+  "name": "checklist_scores",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "checklist_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "checklists"
+      },
+      "required": true
+    },
+    {
+      "name": "scheme_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "checklist_scoring_schemes"
+      }
+    },
+    {
+      "name": "scheme_name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "method",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "score",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "passed",
+      "type": "boolean"
+    },
+    {
+      "name": "snapshot",
+      "type": "json"
+    },
+    {
+      "name": "computed_at",
+      "type": "datetime",
+      "required": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "checklist_scores_checklist_id",
+      "type": "m2o",
+      "field": "checklist_id",
+      "target": "checklists",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "checklist_scores_scheme_id",
+      "type": "m2o",
+      "field": "scheme_id",
+      "target": "checklist_scoring_schemes",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "indexes": [
+    {
+      "fields": [
+        "checklist_id",
+        "scheme_id"
+      ],
+      "unique": true
+    }
+  ]
+}

@@ -3,12 +3,12 @@
   "displayName": "Approval Workflows",
   "category": "workflow",
   "description": "Multi-step approval workflows for any collection",
-  "version": "1.0.11",
-  "zveltioMinVersion": "1.0.0",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.93",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-approvals",
   "permissions": [
-    "database"
+    "data:write"
   ],
   "i18nPrefixes": [
     "workflow.approvals"
@@ -39,8 +39,194 @@
     "bundled": true,
     "bundlePeers": false
   },
+  "collections": [
+    "approval_workflows",
+    "approval_steps",
+    "approval_requests",
+    "approval_decisions"
+  ],
+  "actions": [
+    {
+      "name": "requestApproval",
+      "permission": {
+        "resource": "approval_requests",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "workflow_id",
+          "collection",
+          "record_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "workflow_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "collection": {
+            "type": "string",
+            "minLength": 1
+          },
+          "record_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "low",
+              "normal",
+              "high",
+              "urgent"
+            ]
+          }
+        }
+      },
+      "reads": [
+        "approval_workflows",
+        "approval_steps"
+      ],
+      "writes": [
+        "approval_requests"
+      ]
+    },
+    {
+      "name": "decide",
+      "permission": {
+        "resource": "approval_decisions",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "decision"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "rejected"
+            ]
+          },
+          "comment": {
+            "type": "string"
+          }
+        }
+      },
+      "reads": [
+        "approval_requests",
+        "approval_steps"
+      ],
+      "writes": [
+        "approval_requests",
+        "approval_decisions"
+      ]
+    },
+    {
+      "name": "decideMany",
+      "permission": {
+        "resource": "approval_decisions",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "ids",
+          "decision"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 500,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "rejected"
+            ]
+          },
+          "comment": {
+            "type": "string"
+          }
+        }
+      },
+      "reads": [
+        "approval_requests",
+        "approval_steps"
+      ],
+      "writes": [
+        "approval_requests",
+        "approval_decisions"
+      ]
+    },
+    {
+      "name": "cancel",
+      "permission": {
+        "resource": "approval_requests",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "approval_requests"
+      ],
+      "writes": [
+        "approval_requests"
+      ]
+    },
+    {
+      "name": "markOverdue",
+      "permission": {
+        "resource": "approval_requests",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [],
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "reads": [
+        "approval_requests"
+      ],
+      "writes": [
+        "approval_requests"
+      ]
+    }
+  ],
   "integrity": {
-    "engineSha256": "62bbe87d9f50080029c3ce0915bf5f9200b32a8fee5bec0325e3f210e0be3024",
-    "sourceSha256": "27c5d9ed844ea5beb149d776cc7e584d146e00ea035c30df4336ff78a82fd805"
+    "engineSha256": "dd00899de51a88e61a86ab090e3c6b795c75c6f99d7c9415a277682809cd5f78",
+    "sourceSha256": "37b2c1351da2dec6b69ee147a2f56c9a33f4ff2c24154326797b5ff5a7abf188",
+    "schemaSha256": "eef8c5f190eefdfcc8b9062b178b8e1a215f23d70c6797d24c49024e62f3f4d2"
   }
 }

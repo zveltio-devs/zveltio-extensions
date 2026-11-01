@@ -6,8 +6,8 @@
   "resources": [
     {
       "id": "forms",
-      "dataSource": "/ext/forms",
-      "dataPath": "forms",
+      "dataSource": "/api/data/forms?sort=created_at&order=desc&limit=500",
+      "dataPath": "records",
       "columns": [
         {
           "key": "name",
@@ -22,15 +22,6 @@
           "key": "active",
           "label": "forms.form.active",
           "type": "boolean"
-        },
-        {
-          "key": "submission_count",
-          "label": "forms.col.submissions"
-        },
-        {
-          "key": "target_collection",
-          "label": "forms.form.targetCollection",
-          "type": "mono"
         }
       ],
       "rowActions": [
@@ -54,12 +45,12 @@
           "variant": "text-error",
           "label": "common.delete",
           "method": "DELETE",
-          "endpoint": "/ext/forms/{id}",
+          "endpoint": "/api/data/forms/{id}",
           "confirm": "ext.confirm.deleteForm"
         }
       ],
       "form": {
-        "endpoint": "/ext/forms",
+        "endpoint": "/api/data/forms",
         "fields": [
           {
             "name": "name",
@@ -79,11 +70,6 @@
             "label": "forms.form.description",
             "type": "textarea",
             "colSpan": 2
-          },
-          {
-            "name": "target_collection",
-            "label": "forms.form.targetCollection",
-            "colSpan": 1
           },
           {
             "name": "active",
