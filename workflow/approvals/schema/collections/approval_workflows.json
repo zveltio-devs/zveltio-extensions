@@ -1,0 +1,26 @@
+{
+  "name": "approval_workflows",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "description",
+      "type": "textarea"
+    },
+    {
+      "name": "collection",
+      "type": "text",
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true
+    }
+  ]
+}

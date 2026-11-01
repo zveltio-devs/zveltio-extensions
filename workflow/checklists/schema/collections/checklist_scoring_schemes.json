@@ -1,0 +1,76 @@
+{
+  "name": "checklist_scoring_schemes",
+  "fields": [
+    {
+      "name": "template_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "checklist_templates"
+      },
+      "required": true
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "description",
+      "type": "textarea"
+    },
+    {
+      "name": "method",
+      "type": "enum",
+      "options": {
+        "values": [
+          "weighted_completion"
+        ]
+      },
+      "required": true,
+      "defaultValue": "weighted_completion"
+    },
+    {
+      "name": "pass_threshold",
+      "type": "decimal"
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "checklist_scoring_schemes_template_id",
+      "type": "m2o",
+      "field": "template_id",
+      "target": "checklist_templates",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "indexes": [
+    {
+      "fields": [
+        "template_id",
+        "name"
+      ],
+      "unique": true
+    }
+  ],
+  "validation": [
+    {
+      "field": "pass_threshold",
+      "rule": "range",
+      "config": {
+        "min": 0,
+        "max": 100
+      },
+      "message": "A pass threshold is a percentage, 0 to 100."
+    }
+  ]
+}

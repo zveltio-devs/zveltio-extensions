@@ -1,0 +1,71 @@
+{
+  "name": "checklist_scheme_weights",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "scheme_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "checklist_scoring_schemes"
+      },
+      "required": true
+    },
+    {
+      "name": "template_item_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "checklist_template_items"
+      },
+      "required": true
+    },
+    {
+      "name": "weight",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 1
+    }
+  ],
+  "relations": [
+    {
+      "name": "checklist_scheme_weights_scheme_id",
+      "type": "m2o",
+      "field": "scheme_id",
+      "target": "checklist_scoring_schemes",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "checklist_scheme_weights_template_item_id",
+      "type": "m2o",
+      "field": "template_item_id",
+      "target": "checklist_template_items",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "indexes": [
+    {
+      "fields": [
+        "scheme_id",
+        "template_item_id"
+      ],
+      "unique": true
+    }
+  ],
+  "validation": [
+    {
+      "field": "weight",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "A weight is zero or more."
+    }
+  ]
+}

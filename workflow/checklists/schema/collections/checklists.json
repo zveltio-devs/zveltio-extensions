@@ -1,0 +1,50 @@
+{
+  "name": "checklists",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "template_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "checklist_templates"
+      }
+    },
+    {
+      "name": "collection",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "record_id",
+      "type": "uuid",
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "completed_at",
+      "type": "datetime"
+    },
+    {
+      "name": "time_to_complete_minutes",
+      "type": "integer"
+    }
+  ],
+  "relations": [
+    {
+      "name": "checklists_template_id",
+      "type": "m2o",
+      "field": "template_id",
+      "target": "checklist_templates",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "name": "approval_decisions",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "request_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "approval_requests"
+      },
+      "required": true
+    },
+    {
+      "name": "step_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "approval_steps"
+      }
+    },
+    {
+      "name": "step_name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "decision",
+      "type": "enum",
+      "options": {
+        "values": [
+          "approved",
+          "rejected"
+        ]
+      },
+      "required": true
+    },
+    {
+      "name": "comment",
+      "type": "textarea"
+    }
+  ],
+  "relations": [
+    {
+      "name": "approval_decisions_request_id",
+      "type": "m2o",
+      "field": "request_id",
+      "target": "approval_requests",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "approval_decisions_step_id",
+      "type": "m2o",
+      "field": "step_id",
+      "target": "approval_steps",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "indexes": [
+    {
+      "fields": [
+        "request_id",
+        "step_id"
+      ],
+      "unique": true
+    }
+  ]
+}

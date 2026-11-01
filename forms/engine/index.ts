@@ -1,27 +1,18 @@
-import type { ZveltioExtension } from '@zveltio/sdk/extension';
-import { join } from 'path';
-import { formsRoutes } from './routes.js';
+import type { ZveltioExtension } from "@zveltio/sdk/extension";
+import { formsActions } from "./actions.js";
 
+// Forms and their submissions are collections this extension declares in
+// `schema/collections/` (manifest `collections`); the engine creates them,
+// owns their rules and serves them through the data API. What is left in code
+// is taking a submission: the actions in `actions.ts`.
 const extension: ZveltioExtension = {
-  name: 'forms',
-  category: 'forms',
-  // S3-01: per-extension sub-app mounted at /ext/forms by the engine.
-  mountStrategy: 'subapp',
+	name: "forms",
+	category: "forms",
+	mountStrategy: "subapp",
 
-  getMigrations() {
-    return [
-      join(import.meta.dir, 'migrations/001_forms.sql'),
-      join(import.meta.dir, 'migrations/002_tenant_rls.sql'),
-      join(import.meta.dir, 'migrations/003_tenant_scoped_unique_keys.sql'),
-      join(import.meta.dir, 'migrations/004_standalone_submissions.sql'),
-      join(import.meta.dir, 'migrations/005_submission_data_object.sql'),
-    ];
-  },
+	actions: formsActions,
 
-  async register(app, ctx) {
-    // Sub-app gets relative paths; the engine mounts us at /ext/forms.
-    app.route('/', formsRoutes(ctx));
-  },
+	async register() {},
 };
 
 export default extension;

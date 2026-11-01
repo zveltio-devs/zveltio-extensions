@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.0.0 (2026-11-01)
+
+- feat!: forms and their submissions are collections declared in `schema/collections/`, created and owned by the engine; no SQL migrations
+- feat!: the hand-written `/ext/forms/*` routes are gone — a form and its fields are plain edits through `/api/data`; a submission is the action `submit` (`POST /ext/forms/actions/submit` with `{ slug, data }`), and removing one is `deleteSubmission`
+- feat!: a submission is written only by `submit` (`writtenBy: actions`, engine 3.0.0-beta.93): it holds the form's own fields and nothing else, and nobody edits it afterwards
+- feat!: the `/public/*` routes and the admin check are gone. A public form is a page holding an API key the operator issues; what it may read and run is the engine's rules on these collections (`submit` on `form_submissions`, `deleteSubmission` on `forms`, so a key that submits never deletes). The per-IP limit goes with them: the engine limits each key in one hourly bucket (`rate_limit`), shared by every visitor of a page. A key that reads `forms` reads every form; a row rule on `active` keeps inactive ones out
+- feat!: gone with them: `target_collection` (map a submission into a collection with a flow on `form_submissions`), the submission's IP address and user agent, and the submission count on the list
+- fix: a form whose `fields` is not a list refuses submissions instead of storing them empty
+- fix: 1.x inserted a mapped submission into a table named after the collection, which does not exist (collection tables are `zvd_<name>`), so every submission to a form with a target collection failed and was lost
+
 ## 1.0.13 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)

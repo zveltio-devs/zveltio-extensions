@@ -3,18 +3,15 @@
   "displayName": "Form Builder",
   "category": "forms",
   "description": "Drag-and-drop form builder with public submission endpoints",
-  "version": "1.0.13",
-  "zveltioMinVersion": "1.0.0",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.93",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-forms",
   "permissions": [
-    "database"
+    "data:write"
   ],
   "i18nPrefixes": [
     "forms"
-  ],
-  "publicRoutes": [
-    "/public/*"
   ],
   "engine": {
     "entry": "engine/index.js",
@@ -45,8 +42,72 @@
     "studio": true,
     "fieldTypes": []
   },
+  "collections": [
+    "forms",
+    "form_submissions"
+  ],
+  "actions": [
+    {
+      "name": "submit",
+      "permission": {
+        "resource": "form_submissions",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "slug",
+          "data"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "slug": {
+            "type": "string",
+            "minLength": 1
+          },
+          "data": {
+            "type": "object",
+            "maxProperties": 200
+          }
+        }
+      },
+      "reads": [
+        "forms"
+      ],
+      "writes": [
+        "form_submissions"
+      ]
+    },
+    {
+      "name": "deleteSubmission",
+      "permission": {
+        "resource": "forms",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "form_submissions"
+      ],
+      "writes": [
+        "form_submissions"
+      ]
+    }
+  ],
   "integrity": {
-    "engineSha256": "b614e7134cb654995463641ddc1f0d8704bc18b73cb750498e4fa5a6552ee694",
-    "sourceSha256": "c22a62009a158b6beb641c0430a4a766fe7f2e5b55d2f52e5dd7839141469548"
+    "engineSha256": "2bff66b3905863e0106924c52fed62bbe8273b39fb91611517d0029a58c44462",
+    "sourceSha256": "7a7b54d1d368525efb248b0b5ab3c53a7450e806755519649c84664c7637cea8",
+    "schemaSha256": "dc0772e0157ba2e689f431358e6b34bb802b8f53e4aa02aad1421b0e1101bf7a"
   }
 }
