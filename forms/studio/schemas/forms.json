@@ -19,6 +19,11 @@
           "type": "mono"
         },
         {
+          "key": "collection",
+          "label": "forms.form.collection",
+          "type": "mono"
+        },
+        {
           "key": "active",
           "label": "forms.form.active",
           "type": "boolean"
@@ -72,10 +77,282 @@
             "colSpan": 2
           },
           {
+            "name": "collection",
+            "label": "forms.form.collection",
+            "mono": true,
+            "colSpan": 1
+          },
+          {
+            "name": "pass_threshold",
+            "label": "forms.form.passThreshold",
+            "type": "number",
+            "colSpan": 1
+          },
+          {
             "name": "active",
             "label": "forms.form.active",
             "type": "boolean",
             "default": true,
+            "colSpan": 1
+          }
+        ]
+      },
+      "label": "forms.tab.forms"
+    },
+    {
+      "id": "responses",
+      "label": "forms.tab.responses",
+      "newLabel": "forms.btn.attach",
+      "dataSource": "/api/data/form_submissions?sort=created_at&order=desc&limit=500&expand=form_id",
+      "dataPath": "records",
+      "columns": [
+        {
+          "key": "name",
+          "label": "common.col.name"
+        },
+        {
+          "key": "form_id_expanded.name",
+          "label": "forms.col.form"
+        },
+        {
+          "key": "collection",
+          "label": "common.col.collection",
+          "type": "mono"
+        },
+        {
+          "key": "record_id",
+          "label": "forms.col.record",
+          "type": "mono"
+        },
+        {
+          "key": "completed_at",
+          "label": "forms.col.completed",
+          "type": "date"
+        },
+        {
+          "key": "score",
+          "label": "forms.col.score"
+        },
+        {
+          "key": "passed",
+          "label": "forms.col.passed",
+          "type": "boolean"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "POST",
+          "endpoint": "/ext/forms/actions/deleteSubmission",
+          "body": {
+            "id": "{id}"
+          },
+          "confirm": "forms.confirm.deleteResponse"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/forms/actions/attach",
+        "fields": [
+          {
+            "name": "form_id",
+            "label": "forms.col.form",
+            "type": "relation",
+            "required": true,
+            "colSpan": 2,
+            "relation": {
+              "dataSource": "/api/data/forms?active[eq]=true&sort=name&order=asc&limit=500",
+              "dataPath": "records",
+              "valueKey": "id",
+              "labelKey": "name"
+            }
+          },
+          {
+            "name": "name",
+            "label": "common.col.name",
+            "colSpan": 2
+          },
+          {
+            "name": "collection",
+            "label": "common.col.collection",
+            "mono": true,
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "record_id",
+            "label": "forms.col.record",
+            "mono": true,
+            "required": true,
+            "colSpan": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "answers",
+      "label": "forms.tab.answers",
+      "dataSource": "/api/data/form_answers?sort=updated_at&order=desc&limit=500&expand=submission_id",
+      "dataPath": "records",
+      "columns": [
+        {
+          "key": "submission_id_expanded.name",
+          "label": "forms.col.response"
+        },
+        {
+          "key": "field_id",
+          "label": "forms.col.field",
+          "type": "mono"
+        },
+        {
+          "key": "value",
+          "label": "forms.col.value"
+        },
+        {
+          "key": "assignee_user_id",
+          "label": "forms.col.assignee",
+          "type": "mono"
+        },
+        {
+          "key": "due_at",
+          "label": "forms.col.due",
+          "type": "date"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "check",
+          "icon": "Check",
+          "label": "forms.action.check",
+          "method": "POST",
+          "endpoint": "/ext/forms/actions/updateAnswer",
+          "body": {
+            "id": "{id}",
+            "value": true
+          }
+        },
+        {
+          "id": "uncheck",
+          "icon": "Undo2",
+          "label": "forms.action.uncheck",
+          "method": "POST",
+          "endpoint": "/ext/forms/actions/updateAnswer",
+          "body": {
+            "id": "{id}",
+            "value": null
+          },
+          "visibleWhen": {
+            "field": "value",
+            "equals": "true"
+          }
+        }
+      ]
+    },
+    {
+      "id": "recurrences",
+      "label": "forms.tab.recurrences",
+      "icon": "Repeat",
+      "dataSource": "/api/data/form_recurrences?is_active[eq]=true&sort=next_run_at&order=asc&limit=500&expand=form_id",
+      "dataPath": "records",
+      "columns": [
+        {
+          "key": "form_id_expanded.name",
+          "label": "forms.col.form"
+        },
+        {
+          "key": "collection",
+          "label": "common.col.collection",
+          "type": "mono"
+        },
+        {
+          "key": "record_id",
+          "label": "forms.col.record",
+          "type": "mono"
+        },
+        {
+          "key": "frequency",
+          "label": "forms.col.frequency"
+        },
+        {
+          "key": "next_run_at",
+          "label": "forms.col.nextRun",
+          "type": "date"
+        },
+        {
+          "key": "is_active",
+          "label": "common.col.active",
+          "type": "boolean"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "edit",
+          "kind": "edit",
+          "label": "common.edit"
+        }
+      ],
+      "form": {
+        "endpoint": "/api/data/form_recurrences",
+        "fields": [
+          {
+            "name": "form_id",
+            "label": "forms.col.form",
+            "type": "relation",
+            "required": true,
+            "colSpan": 2,
+            "relation": {
+              "dataSource": "/api/data/forms?active[eq]=true&sort=name&order=asc&limit=500",
+              "dataPath": "records",
+              "valueKey": "id",
+              "labelKey": "name"
+            }
+          },
+          {
+            "name": "collection",
+            "label": "common.col.collection",
+            "mono": true,
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "record_id",
+            "label": "forms.col.record",
+            "mono": true,
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "frequency",
+            "label": "forms.col.frequency",
+            "type": "select",
+            "default": "weekly",
+            "colSpan": 1,
+            "options": [
+              {
+                "value": "daily",
+                "label": "forms.ui.daily"
+              },
+              {
+                "value": "weekly",
+                "label": "forms.ui.weekly"
+              },
+              {
+                "value": "monthly",
+                "label": "forms.ui.monthly"
+              },
+              {
+                "value": "quarterly",
+                "label": "forms.ui.quarterly"
+              }
+            ]
+          },
+          {
+            "name": "next_run_at",
+            "label": "forms.col.nextRun",
+            "type": "datetime",
+            "required": true,
             "colSpan": 1
           }
         ]

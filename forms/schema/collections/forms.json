@@ -27,6 +27,14 @@
       "type": "boolean",
       "required": true,
       "defaultValue": true
+    },
+    {
+      "name": "collection",
+      "type": "text"
+    },
+    {
+      "name": "pass_threshold",
+      "type": "decimal"
     }
   ],
   "validation": [
@@ -37,6 +45,15 @@
         "pattern": "^[a-z0-9-]+$"
       },
       "message": "A slug is lowercase letters, digits and hyphens."
+    },
+    {
+      "field": "pass_threshold",
+      "rule": "range",
+      "config": {
+        "min": 0,
+        "max": 100
+      },
+      "message": "A pass threshold is a percentage, 0 to 100."
     }
   ]
 }

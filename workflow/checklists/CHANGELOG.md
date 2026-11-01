@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.1 (2026-11-01)
+
+- chore: deprecated: forms 3.0.0 covers checklists (responses attached to records, checkbox fields with weights and assignees, completion, scoring and recurrence); install forms instead
+
 ## 2.0.0 (2026-11-01)
 
 - feat!: templates, template items, checklists, checklist items, recurrence schedules, scoring schemes, scheme weights and scores are collections declared in `schema/collections/`, created and owned by the engine; no SQL migrations

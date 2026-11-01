@@ -31,6 +31,18 @@
             "colSpan": 2
           },
           {
+            "name": "collection",
+            "label": "forms.form.collection",
+            "mono": true,
+            "colSpan": 1
+          },
+          {
+            "name": "pass_threshold",
+            "label": "forms.form.passThreshold",
+            "type": "number",
+            "colSpan": 1
+          },
+          {
             "name": "active",
             "label": "forms.form.active",
             "type": "boolean",
@@ -99,6 +111,16 @@
               "name": "required",
               "label": "forms.field.required",
               "type": "boolean"
+            },
+            {
+              "name": "weight",
+              "label": "forms.field.weight",
+              "type": "number"
+            },
+            {
+              "name": "assignee",
+              "label": "forms.field.assignee",
+              "mono": true
             }
           ],
           "optionsField": {

@@ -108,6 +108,10 @@ d(`${NAME}: declared collections`, () => {
        WHERE tenant_id IS NULL AND collection IN (${sql.join(COLLECTIONS)}) ORDER BY 1`.execute(
 			db,
 		);
-		expect(rules.rows.map((r: { r: string }) => r.r)).toEqual(["forms.slug:pattern"]);
+		expect(rules.rows.map((r: { r: string }) => r.r)).toEqual([
+			"form_answers.time_spent_minutes:min",
+			"forms.pass_threshold:range",
+			"forms.slug:pattern",
+		]);
 	}, 120_000);
 });

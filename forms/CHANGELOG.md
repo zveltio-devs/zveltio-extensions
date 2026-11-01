@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.0.0 (2026-11-01)
+
+- feat!: forms absorb workflow/checklists. A response (`form_submissions`) is either one-shot (`submit`, as before: every required field at once, closed afterwards) or attached to a record (`attach` with `form_id`, `collection`, `record_id`) and filled field by field (`answer` with a map of field ids to values, `updateAnswer` for one answer's value, notes, assignee, due date and time spent); `submit` refuses a form that names a collection (`form_for_records`)
+- feat!: answers are rows (`form_answers`, one per field, unique per response), written only by the actions; the response's `data` is kept as the answer map, rewritten by the same action, so the builder's responses panel and a one-shot submission still read whole
+- feat: a field may be a `checkbox` (answered when ticked), carry a `weight` and an `assignee` (copied to its answer when a response is attached); a form may name the `collection` whose records it is for and a `pass_threshold`
+- feat: completion follows the answers: a response completes when every required field is answered (with `time_to_complete_minutes`) and reopens when one is emptied; the score is the weight of the answered fields over the weight of every weighted field, with `passed` against the threshold and a `score_snapshot` of what it was computed from
+- feat: `form_recurrences` and `runDueRecurrences` attach a response to a record on a schedule (daily, weekly, monthly, quarterly), one per run however many were missed; a schedule whose form is gone, inactive or for another collection is skipped and reported; a month-end schedule stays on the month end (checklists 2.0.0 drifted to the 28th after February)
+- feat!: dropped from checklists: several scoring schemes per template (one score per form now, from the field weights), checklists made of ad-hoc items without a template (make a form), ticking items of several checklists in one call, and `time_estimate_minutes` and `assignee_role` on template items (a field's `assignee` is a user id)
+
 ## 2.0.0 (2026-11-01)
 
 - feat!: forms and their submissions are collections declared in `schema/collections/`, created and owned by the engine; no SQL migrations
