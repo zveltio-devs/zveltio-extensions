@@ -1,0 +1,65 @@
+{
+  "name": "form_recurrences",
+  "fields": [
+    {
+      "name": "form_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "forms"
+      },
+      "required": true
+    },
+    {
+      "name": "collection",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "record_id",
+      "type": "uuid",
+      "required": true
+    },
+    {
+      "name": "frequency",
+      "type": "enum",
+      "options": {
+        "values": [
+          "daily",
+          "weekly",
+          "monthly",
+          "quarterly"
+        ]
+      },
+      "required": true,
+      "defaultValue": "weekly"
+    },
+    {
+      "name": "next_run_at",
+      "type": "datetime",
+      "required": true
+    },
+    {
+      "name": "last_run_at",
+      "type": "datetime"
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "form_recurrences_form_id",
+      "type": "m2o",
+      "field": "form_id",
+      "target": "forms",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

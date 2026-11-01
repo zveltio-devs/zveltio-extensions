@@ -1,0 +1,76 @@
+{
+  "name": "form_answers",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "submission_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "form_submissions"
+      },
+      "required": true
+    },
+    {
+      "name": "field_id",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "value",
+      "type": "text"
+    },
+    {
+      "name": "answered_at",
+      "type": "datetime"
+    },
+    {
+      "name": "assignee_user_id",
+      "type": "text",
+      "indexed": true
+    },
+    {
+      "name": "due_at",
+      "type": "datetime"
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    },
+    {
+      "name": "time_spent_minutes",
+      "type": "integer"
+    }
+  ],
+  "indexes": [
+    {
+      "fields": [
+        "submission_id",
+        "field_id"
+      ],
+      "unique": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "form_answers_submission_id",
+      "type": "m2o",
+      "field": "submission_id",
+      "target": "form_submissions",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "time_spent_minutes",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "Time spent is zero minutes or more."
+    }
+  ]
+}

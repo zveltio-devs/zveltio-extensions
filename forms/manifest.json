@@ -2,8 +2,8 @@
   "name": "forms",
   "displayName": "Form Builder",
   "category": "forms",
-  "description": "Drag-and-drop form builder with public submission endpoints",
-  "version": "2.0.0",
+  "description": "Forms, checklists and inspections: public one-shot forms and responses attached to records, filled field by field, with completion, scoring and recurrence",
+  "version": "3.0.0",
   "zveltioMinVersion": "3.0.0-beta.93",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-forms",
@@ -44,7 +44,9 @@
   },
   "collections": [
     "forms",
-    "form_submissions"
+    "form_submissions",
+    "form_answers",
+    "form_recurrences"
   ],
   "actions": [
     {
@@ -75,7 +77,138 @@
         "forms"
       ],
       "writes": [
-        "form_submissions"
+        "form_submissions",
+        "form_answers"
+      ]
+    },
+    {
+      "name": "attach",
+      "permission": {
+        "resource": "form_answers",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "form_id",
+          "collection",
+          "record_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "form_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "collection": {
+            "type": "string",
+            "minLength": 1
+          },
+          "record_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "reads": [
+        "forms",
+        "form_answers"
+      ],
+      "writes": [
+        "form_submissions",
+        "form_answers"
+      ]
+    },
+    {
+      "name": "answer",
+      "permission": {
+        "resource": "form_answers",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "submission_id",
+          "answers"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "submission_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "answers": {
+            "type": "object",
+            "minProperties": 1,
+            "maxProperties": 200
+          }
+        }
+      },
+      "reads": [
+        "forms",
+        "form_submissions",
+        "form_answers"
+      ],
+      "writes": [
+        "form_submissions",
+        "form_answers"
+      ]
+    },
+    {
+      "name": "updateAnswer",
+      "permission": {
+        "resource": "form_answers",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "value": {},
+          "time_spent_minutes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "assignee_user_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "due_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "reads": [
+        "forms",
+        "form_submissions",
+        "form_answers"
+      ],
+      "writes": [
+        "form_submissions",
+        "form_answers"
       ]
     },
     {
@@ -103,11 +236,34 @@
       "writes": [
         "form_submissions"
       ]
+    },
+    {
+      "name": "runDueRecurrences",
+      "permission": {
+        "resource": "form_recurrences",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [],
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "reads": [
+        "form_recurrences",
+        "forms",
+        "form_answers"
+      ],
+      "writes": [
+        "form_recurrences",
+        "form_submissions",
+        "form_answers"
+      ]
     }
   ],
   "integrity": {
-    "engineSha256": "2bff66b3905863e0106924c52fed62bbe8273b39fb91611517d0029a58c44462",
-    "sourceSha256": "7a7b54d1d368525efb248b0b5ab3c53a7450e806755519649c84664c7637cea8",
-    "schemaSha256": "dc0772e0157ba2e689f431358e6b34bb802b8f53e4aa02aad1421b0e1101bf7a"
+    "engineSha256": "5fd1aae233cb2f0ec7f83e2d58f09dfaa3a19afefad1844e76ca930a0899dda1",
+    "sourceSha256": "6bd95da65b36a9efe8d434320dcc24f5648ce0aca6afba53b0382036cd6286fa",
+    "schemaSha256": "e3b2a7d8f72cbcdd2f017e306257ce70935158e7ed37445e44be27ac69631c1d"
   }
 }

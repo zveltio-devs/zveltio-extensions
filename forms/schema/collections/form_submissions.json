@@ -16,6 +16,39 @@
       "type": "json",
       "required": true,
       "defaultValue": {}
+    },
+    {
+      "name": "collection",
+      "type": "text"
+    },
+    {
+      "name": "record_id",
+      "type": "uuid",
+      "indexed": true
+    },
+    {
+      "name": "name",
+      "type": "text"
+    },
+    {
+      "name": "completed_at",
+      "type": "datetime"
+    },
+    {
+      "name": "time_to_complete_minutes",
+      "type": "integer"
+    },
+    {
+      "name": "score",
+      "type": "decimal"
+    },
+    {
+      "name": "passed",
+      "type": "boolean"
+    },
+    {
+      "name": "score_snapshot",
+      "type": "json"
     }
   ],
   "relations": [
