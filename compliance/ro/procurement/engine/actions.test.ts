@@ -107,7 +107,7 @@ describe('compliance/ro/procurement actions', () => {
   });
 
   it('an order moves draft, approved, received; cancel only before receipt', async () => {
-    const { host, order } = await setup();
+    const { host, rows, order } = await setup();
     const o = await order();
     await refusal(run('receiveOrder', { id: o.id }, host), 'order_not_approved');
     expect((await run('approveOrder', { id: o.id }, host)).status).toBe('approved');
@@ -117,6 +117,11 @@ describe('compliance/ro/procurement actions', () => {
     await refusal(run('cancelOrder', { id: o.id, reason: 'x' }, host), 'order_not_cancellable');
     const c = await run('cancelOrder', { id: (await order()).id, reason: 'buget' }, host);
     expect(c).toMatchObject({ status: 'cancelled', cancellation_reason: 'buget' });
+    // Each decision is a row of the collection both actions are gated on.
+    expect(rows('procurement_order_decisions').map((d) => [d.order_id, d.decision, d.reason])).toEqual([
+      [o.id, 'approved', undefined],
+      [c.id, 'cancelled', 'buget'],
+    ]);
     await refusal(run('approveOrder', { id: '00000000-0000-0000-0000-999999999999' }, host), 'order_not_found');
   });
 

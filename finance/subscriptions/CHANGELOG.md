@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.0 (2026-11-01)
+
+- feat: marking an invoice paid or cancelling a subscriber writes a row of the new `subscription_settlements` collection (subscriber, invoice, kind; the engine stamps who). `markInvoicePaid` and `cancel` are gated on that collection's `execute` instead of `subscription_invoices` and `subscribers`, so an operator can let one role bill and another settle, as `subscriptions:settle` did in 1.x (ADR 0015)
+
 ## 2.0.0 (2026-10-31)
 
 - feat!: plans, subscribers, invoices, usage, dunning attempts and plan changes are collections declared in `schema/collections/`, created and owned by the engine; no SQL migrations

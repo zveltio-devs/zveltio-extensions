@@ -10,7 +10,10 @@ import {
 // every invoice, usage line, dunning attempt and plan change, are written only
 // by these actions (`writtenBy: actions`). The engine runs each action as the
 // caller, inside the request transaction: a refusal rolls back everything it
-// wrote. Who may do what is the engine's rules on these collections.
+// wrote. Who may do what is the engine's rules on these collections. Marking an
+// invoice paid and cancelling a subscriber write a row of
+// `subscription_settlements` and are gated on that collection, so the operator
+// can let one role bill and another settle (ADR 0015).
 
 type Host = Parameters<ExtensionAction>[1];
 type Row = Record<string, unknown>;
@@ -19,6 +22,7 @@ const P = "subscription_plans";
 const S = "subscribers";
 const I = "subscription_invoices";
 const U = "subscription_usage";
+const T = "subscription_settlements";
 const PAGE = 500;
 const DAY = 86_400_000;
 /** Days after each failed payment before the next try; a failure past the last one makes the subscriber past due. */
@@ -184,7 +188,7 @@ const cancel: ExtensionAction = async (input, host) => {
 	const s = await get(host, S, d.id, "subscriber");
 	if (s.status === "cancelled")
 		throw new ActionRefusal(409, "already_cancelled", "The subscriber is already cancelled.");
-	return updateSubscriber(
+	const updated = await updateSubscriber(
 		host,
 		s,
 		d.at_period_end
@@ -195,6 +199,11 @@ const cancel: ExtensionAction = async (input, host) => {
 					cancelled_at: new Date().toISOString(),
 				},
 	);
+	await host.collections.insert(T, {
+		subscriber_id: d.id,
+		kind: d.at_period_end ? "cancel_at_period_end" : "cancelled",
+	});
+	return updated;
 };
 
 const reactivate: ExtensionAction = async (input, host) => {
@@ -321,6 +330,7 @@ const markInvoicePaid: ExtensionAction = async (input, host) => {
 		{ status: "paid", paid_at: new Date().toISOString() },
 		{ expect: { status: ["open"] } },
 	);
+	await host.collections.insert(T, { subscriber_id: inv.subscriber_id, invoice_id: d.id, kind: "invoice_paid" });
 	const open = await all(host, I, { subscriber_id: inv.subscriber_id, status: "open" });
 	if (open.length > 0) return paid;
 	const s = await get(host, S, String(inv.subscriber_id), "subscriber");

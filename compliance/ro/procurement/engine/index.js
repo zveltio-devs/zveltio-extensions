@@ -41,6 +41,7 @@ var N = "procurement_reception_notes";
 var S = "procurement_suppliers";
 var E = "procurement_supplier_evaluations";
 var B = "procurement_budget_lines";
+var D = "procurement_order_decisions";
 var PAGE = 500;
 var SPENT = ["approved", "received"];
 var cents = (x) => Math.round(x * 100);
@@ -111,7 +112,9 @@ var deleteDraft = async (input, host) => {
 };
 var approveOrder = async (input, host) => {
   const { id } = input;
-  return move(host, O, id, ["draft"], { status: "approved", approved_at: new Date().toISOString() }, "order_not_draft", "Only a draft order is approved.");
+  const order = await move(host, O, id, ["draft"], { status: "approved", approved_at: new Date().toISOString() }, "order_not_draft", "Only a draft order is approved.");
+  await host.collections.insert(D, { order_id: id, decision: "approved" });
+  return order;
 };
 var receiveOrder = async (input, host) => {
   const { id } = input;
@@ -119,7 +122,9 @@ var receiveOrder = async (input, host) => {
 };
 var cancelOrder = async (input, host) => {
   const { id, reason } = input;
-  return move(host, O, id, ["draft", "approved"], { status: "cancelled", cancellation_reason: reason, cancelled_at: new Date().toISOString() }, "order_not_cancellable", "Only a draft or approved order is cancelled.");
+  const order = await move(host, O, id, ["draft", "approved"], { status: "cancelled", cancellation_reason: reason, cancelled_at: new Date().toISOString() }, "order_not_cancellable", "Only a draft or approved order is cancelled.");
+  await host.collections.insert(D, { order_id: id, decision: "cancelled", reason });
+  return order;
 };
 var createReceptionNote = async (input, host) => {
   const { items, order_id, supplier_id, supplier_name, ...d } = input;

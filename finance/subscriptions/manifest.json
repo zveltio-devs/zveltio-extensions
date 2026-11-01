@@ -3,7 +3,7 @@
   "displayName": "Subscriptions",
   "category": "finance",
   "description": "Recurring billing plans, subscribers, metered usage, invoices and dunning",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "zveltioMinVersion": "3.0.0-beta.93",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-subscriptions",
@@ -42,7 +42,8 @@
     "subscription_invoices",
     "subscription_usage",
     "dunning_attempts",
-    "plan_changes"
+    "plan_changes",
+    "subscription_settlements"
   ],
   "actions": [
     {
@@ -134,7 +135,7 @@
     {
       "name": "cancel",
       "permission": {
-        "resource": "subscribers",
+        "resource": "subscription_settlements",
         "action": "execute"
       },
       "input": {
@@ -157,7 +158,8 @@
         "subscribers"
       ],
       "writes": [
-        "subscribers"
+        "subscribers",
+        "subscription_settlements"
       ]
     },
     {
@@ -266,7 +268,7 @@
     {
       "name": "markInvoicePaid",
       "permission": {
-        "resource": "subscription_invoices",
+        "resource": "subscription_settlements",
         "action": "execute"
       },
       "input": {
@@ -288,7 +290,8 @@
       ],
       "writes": [
         "subscription_invoices",
-        "subscribers"
+        "subscribers",
+        "subscription_settlements"
       ]
     },
     {
@@ -325,8 +328,8 @@
     }
   ],
   "integrity": {
-    "engineSha256": "47ce798a42e08424c1d6ead1f7e8003787d2e42888a5936464868f7831587b05",
-    "sourceSha256": "ec8510b3e92e48a0783c432503ed9e231ac7fc3fa14a96060de0c7e1492a46c8",
-    "schemaSha256": "510a622088bd9c9a7ee28c3a5645bb4d2d3d0a55a9e5e12fde535b5634ec8d09"
+    "engineSha256": "8527c62e7b21f9f8f90ca724ab49034da8e3c2fcd6d75ba8eedb7013cad4699c",
+    "sourceSha256": "0dc6e23cd7eb6279572726fbad78907d7a554808a94efbd04abf59095fbf4de0",
+    "schemaSha256": "fef753faef2d06c4d58f12b765570d4f250424301190e2360a0371c282fae9e7"
   }
 }

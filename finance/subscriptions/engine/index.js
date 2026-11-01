@@ -40,6 +40,7 @@ var P = "subscription_plans";
 var S = "subscribers";
 var I = "subscription_invoices";
 var U = "subscription_usage";
+var T = "subscription_settlements";
 var PAGE = 500;
 var DAY = 86400000;
 var DUNNING_DAYS = [1, 3, 7, 14];
@@ -147,11 +148,16 @@ var cancel = async (input, host) => {
   const s = await get(host, S, d.id, "subscriber");
   if (s.status === "cancelled")
     throw new ActionRefusal(409, "already_cancelled", "The subscriber is already cancelled.");
-  return updateSubscriber(host, s, d.at_period_end ? { cancel_at_period_end: true } : {
+  const updated = await updateSubscriber(host, s, d.at_period_end ? { cancel_at_period_end: true } : {
     status: "cancelled",
     cancel_at_period_end: false,
     cancelled_at: new Date().toISOString()
   });
+  await host.collections.insert(T, {
+    subscriber_id: d.id,
+    kind: d.at_period_end ? "cancel_at_period_end" : "cancelled"
+  });
+  return updated;
 };
 var reactivate = async (input, host) => {
   const d = input;
@@ -244,6 +250,7 @@ var markInvoicePaid = async (input, host) => {
   const d = input;
   const inv = await openInvoice(host, d.id);
   const paid = await host.collections.update(I, d.id, { status: "paid", paid_at: new Date().toISOString() }, { expect: { status: ["open"] } });
+  await host.collections.insert(T, { subscriber_id: inv.subscriber_id, invoice_id: d.id, kind: "invoice_paid" });
   const open = await all(host, I, { subscriber_id: inv.subscriber_id, status: "open" });
   if (open.length > 0)
     return paid;

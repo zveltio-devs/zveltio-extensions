@@ -161,6 +161,8 @@ describe("invoices", () => {
 		expect(r.invoice).toBeNull();
 		expect(rows("subscribers")[0]).toMatchObject({ status: "cancelled", cancel_at_period_end: false });
 		expect(rows("subscription_invoices")).toHaveLength(0);
+		// Only the decision is a settlement; the cancel that billing carries out is not.
+		expect(rows("subscription_settlements").map((x) => [x.subscriber_id, x.kind])).toEqual([[s.id, "cancel_at_period_end"]]);
 		const t = await run("subscribe", {
 			plan_id: s.plan_id,
 			name: "Later",
@@ -190,6 +192,11 @@ describe("invoices", () => {
 		await run("markInvoicePaid", { id: later.id });
 		expect(rows("subscribers")[0]).toMatchObject({ status: "active", dunning_count: 0 });
 		await refusal(run("markInvoicePaid", { id: inv.id }), "invoice_not_open");
+		// Each payment is a row of the collection markInvoicePaid is gated on.
+		expect(rows("subscription_settlements").map((x) => [x.invoice_id, x.kind])).toEqual([
+			[inv.id, "invoice_paid"],
+			[later.id, "invoice_paid"],
+		]);
 	});
 });
 

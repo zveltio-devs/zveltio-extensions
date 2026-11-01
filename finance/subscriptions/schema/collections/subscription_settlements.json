@@ -1,0 +1,57 @@
+{
+  "name": "subscription_settlements",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "subscriber_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "subscribers"
+      },
+      "required": true
+    },
+    {
+      "name": "invoice_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "subscription_invoices"
+      }
+    },
+    {
+      "name": "kind",
+      "type": "enum",
+      "required": true,
+      "options": {
+        "values": [
+          "invoice_paid",
+          "cancelled",
+          "cancel_at_period_end"
+        ]
+      }
+    }
+  ],
+  "relations": [
+    {
+      "name": "subscription_settlements_subscriber_id",
+      "type": "m2o",
+      "field": "subscriber_id",
+      "target": "subscribers",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "subscription_settlements_invoice_id",
+      "type": "m2o",
+      "field": "invoice_id",
+      "target": "subscription_invoices",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}
