@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.0 (2026-11-01)
+
+- feat: approving or cancelling an order writes a row of the new `procurement_order_decisions` collection (order, decision, reason; the engine stamps who). `approveOrder` and `cancelOrder` are gated on that collection's `execute` instead of `procurement_orders`, so an operator can let one role create orders and another decide them, as `procurement:approve` did in 1.x (ADR 0015)
+
 ## 2.0.1 (2026-11-01)
 
 - fix: `evaluateSupplier` converts the three scores to numbers before adding them, so a score sent as a string no longer concatenates into the overall score

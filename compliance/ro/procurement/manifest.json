@@ -3,7 +3,7 @@
   "displayName": "Achizitii Publice RO",
   "category": "compliance/ro",
   "description": "Romanian public procurement management — purchase orders, supplier registry, budget tracking",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "zveltioMinVersion": "3.0.0-beta.96",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-ro-procurement",
@@ -37,15 +37,16 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "2291624510995385599906cdf33916d1370afce38cc7ab320fb03cc7866fbdf0",
-    "sourceSha256": "f36b15ccb89e537406b5095525330c140eedce9555101da7f969d92dff0231f4",
-    "schemaSha256": "20e5ac06070d4d3f112de88aa522cff68d8965b5676169dcdebe44703873dff6"
+    "engineSha256": "338d5a7d9fff5ce031f6d5b105d431a7ce54be5344effc6a11830dce890abeb6",
+    "sourceSha256": "327a996b6e57bf3ba331abd92cf83c6b1aefb25f12a19ed0b6fcacc1fea696a8",
+    "schemaSha256": "5cde4d77dbbf0d0a82da8e77fe8d394085a469fa4b47c8256226dbc7a748d34a"
   },
   "collections": [
     "procurement_suppliers",
     "procurement_budget_lines",
     "procurement_contracts",
     "procurement_orders",
+    "procurement_order_decisions",
     "procurement_reception_notes",
     "procurement_supplier_evaluations"
   ],
@@ -192,7 +193,7 @@
     {
       "name": "approveOrder",
       "permission": {
-        "resource": "procurement_orders",
+        "resource": "procurement_order_decisions",
         "action": "execute"
       },
       "input": {
@@ -212,7 +213,8 @@
         "procurement_orders"
       ],
       "writes": [
-        "procurement_orders"
+        "procurement_orders",
+        "procurement_order_decisions"
       ]
     },
     {
@@ -244,7 +246,7 @@
     {
       "name": "cancelOrder",
       "permission": {
-        "resource": "procurement_orders",
+        "resource": "procurement_order_decisions",
         "action": "execute"
       },
       "input": {
@@ -269,7 +271,8 @@
         "procurement_orders"
       ],
       "writes": [
-        "procurement_orders"
+        "procurement_orders",
+        "procurement_order_decisions"
       ]
     },
     {

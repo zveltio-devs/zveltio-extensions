@@ -1,0 +1,13 @@
+{
+  "name": "procurement_order_decisions",
+  "writtenBy": "actions",
+  "fields": [
+    { "name": "order_id", "type": "m2o", "required": true, "options": { "related_collection": "procurement_orders" } },
+    { "name": "decision", "type": "enum", "required": true, "options": { "values": ["approved", "cancelled"] } },
+    { "name": "reason", "type": "textarea" }
+  ],
+  "indexes": [{ "fields": ["order_id", "decision"], "unique": true }],
+  "relations": [
+    { "name": "procurement_order_decisions_order_id", "type": "m2o", "field": "order_id", "target": "procurement_orders", "targetField": "id", "onDelete": "RESTRICT", "onUpdate": "CASCADE", "metadata": {} }
+  ]
+}

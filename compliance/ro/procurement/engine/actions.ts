@@ -9,7 +9,10 @@ import { ActionRefusal, type ExtensionAction, todayIn } from '@zveltio/sdk/exten
 // written only here (`writtenBy: "actions"`): their totals are computed from
 // their lines, and an order or a note moves only along its status. Suppliers,
 // contracts and budget lines are plain collections. Who may approve, receive or
-// cancel an order is the engine's rules on these collections, not this file's.
+// cancel an order is the engine's rules on these collections, not this file's:
+// approving and cancelling write a row of `procurement_order_decisions` and are
+// gated on that collection, so the operator can let one role buy and another
+// decide (ADR 0015).
 
 type Host = Parameters<ExtensionAction>[1];
 type Row = Record<string, unknown>;
@@ -19,6 +22,7 @@ const N = 'procurement_reception_notes';
 const S = 'procurement_suppliers';
 const E = 'procurement_supplier_evaluations';
 const B = 'procurement_budget_lines';
+const D = 'procurement_order_decisions';
 const PAGE = 500;
 /** An order counts as money spent once approved. */
 const SPENT = ['approved', 'received'];
@@ -111,7 +115,9 @@ const deleteDraft: ExtensionAction = async (input, host) => {
 
 const approveOrder: ExtensionAction = async (input, host) => {
   const { id } = input as { id: string };
-  return move(host, O, id, ['draft'], { status: 'approved', approved_at: new Date().toISOString() }, 'order_not_draft', 'Only a draft order is approved.');
+  const order = await move(host, O, id, ['draft'], { status: 'approved', approved_at: new Date().toISOString() }, 'order_not_draft', 'Only a draft order is approved.');
+  await host.collections.insert(D, { order_id: id, decision: 'approved' });
+  return order;
 };
 
 const receiveOrder: ExtensionAction = async (input, host) => {
@@ -121,7 +127,7 @@ const receiveOrder: ExtensionAction = async (input, host) => {
 
 const cancelOrder: ExtensionAction = async (input, host) => {
   const { id, reason } = input as { id: string; reason: string };
-  return move(
+  const order = await move(
     host,
     O,
     id,
@@ -130,6 +136,8 @@ const cancelOrder: ExtensionAction = async (input, host) => {
     'order_not_cancellable',
     'Only a draft or approved order is cancelled.',
   );
+  await host.collections.insert(D, { order_id: id, decision: 'cancelled', reason });
+  return order;
 };
 
 type NoteItem = { description: string; ordered_qty: number; received_qty: number; unit?: string; unit_price: number };
