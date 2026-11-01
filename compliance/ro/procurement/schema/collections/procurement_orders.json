@@ -1,0 +1,40 @@
+{
+  "name": "procurement_orders",
+  "writtenBy": "actions",
+  "fields": [
+    { "name": "number", "type": "text", "required": true, "unique": true },
+    { "name": "date", "type": "date", "required": true, "indexed": true },
+    { "name": "supplier_id", "type": "m2o", "indexed": true, "options": { "related_collection": "procurement_suppliers" } },
+    { "name": "supplier_name", "type": "text", "required": true },
+    { "name": "supplier_cui", "type": "text", "required": true },
+    { "name": "contract_id", "type": "m2o", "options": { "related_collection": "procurement_contracts" } },
+    { "name": "budget_line_id", "type": "m2o", "indexed": true, "options": { "related_collection": "procurement_budget_lines" } },
+    { "name": "description", "type": "textarea", "required": true },
+    { "name": "category", "type": "text" },
+    { "name": "items", "type": "json", "required": true },
+    { "name": "subtotal", "type": "decimal", "required": true, "defaultValue": 0 },
+    { "name": "vat_total", "type": "decimal", "required": true, "defaultValue": 0 },
+    { "name": "total", "type": "decimal", "required": true, "defaultValue": 0 },
+    { "name": "currency", "type": "text", "required": true, "defaultValue": "RON" },
+    { "name": "priority", "type": "enum", "required": true, "defaultValue": "normal", "options": { "values": ["low", "normal", "high", "urgent"] } },
+    { "name": "status", "type": "enum", "required": true, "defaultValue": "draft", "indexed": true, "options": { "values": ["draft", "approved", "received", "cancelled"] } },
+    { "name": "approved_at", "type": "datetime" },
+    { "name": "received_at", "type": "datetime" },
+    { "name": "cancelled_at", "type": "datetime" },
+    { "name": "cancellation_reason", "type": "textarea" },
+    { "name": "notes", "type": "textarea" }
+  ],
+  "relations": [
+    { "name": "procurement_orders_supplier_id", "type": "m2o", "field": "supplier_id", "target": "procurement_suppliers", "targetField": "id", "onDelete": "RESTRICT", "onUpdate": "CASCADE", "metadata": {} },
+    { "name": "procurement_orders_contract_id", "type": "m2o", "field": "contract_id", "target": "procurement_contracts", "targetField": "id", "onDelete": "RESTRICT", "onUpdate": "CASCADE", "metadata": {} },
+    { "name": "procurement_orders_budget_line_id", "type": "m2o", "field": "budget_line_id", "target": "procurement_budget_lines", "targetField": "id", "onDelete": "RESTRICT", "onUpdate": "CASCADE", "metadata": {} }
+  ],
+  "validation": [
+    {
+      "field": "status",
+      "rule": "transition",
+      "config": { "expression": "previous == null ? value == null || value == 'draft' : previous == 'draft' ? value in ['draft', 'approved', 'cancelled'] : previous == 'approved' ? value in ['approved', 'received', 'cancelled'] : value == previous" },
+      "message": "An order goes draft, approved, then received; a draft or approved order is cancelled; received and cancelled are final."
+    }
+  ]
+}

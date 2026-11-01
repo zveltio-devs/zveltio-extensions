@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.0.0 (2026-11-01)
+
+- feat!: suppliers, budget lines, contracts, purchase orders, reception notes (NIR) and supplier evaluations are collections declared in `schema/collections/`, created and owned by the engine; no SQL migrations
+- feat!: the hand-written `/ext/compliance/ro/procurement/*` routes are gone — suppliers, contracts and budget lines are plain edits through `/api/data`; the rest is the actions `createOrder`, `deleteDraft`, `approveOrder`, `receiveOrder`, `cancelOrder`, `createReceptionNote`, `confirmReceptionNote`, `evaluateSupplier`, `budgetReport` and `spendingReport` (`POST /ext/compliance/ro/procurement/actions/<name>`)
+- feat!: orders, reception notes and evaluations are written only by these actions (`writtenBy: actions`); needs engine 3.0.0-beta.96, which defaults a required field left out on create; an order moves draft, approved, received or cancelled, a note is confirmed once, a contract moves draft, active, then expired or terminated (transition rules)
+- feat!: who may approve, receive or cancel an order is the engine's rules on these collections; the `procurement` resource and `procurement:approve` are gone
+- feat!: an order line carries its `vat_rate`; line totals, subtotal, VAT and total are computed in cents by `createOrder` instead of taken from the client. A note's value is received quantity × unit price
+- feat!: an order names its budget line by id (`budget_line_id`) instead of a free code; the budget report charges an order to that line only, so a line's year is its own (1.x summed every year's orders into every line with the same code)
+- feat!: a supplier is deactivated with `is_active`, and an inactive supplier takes no new order; deleting a supplier with orders, contracts, notes or evaluations is refused
+- feat!: gone: the `disputed` note state and the record of who approved or confirmed (the engine's audit and revisions keep the author); the Studio budget tab lists lines without spent and remaining (the `budgetReport` action returns them)
+- fix: a reception note against an order takes the order's supplier and currency, and only an approved or received order is received against
+- fix: spending sums are per currency; 1.x added RON and EUR together
+
 ## 1.0.3 (2026-09-03)
 
 - feat(sdui): convert 6 CRUD Studio pages to schemas

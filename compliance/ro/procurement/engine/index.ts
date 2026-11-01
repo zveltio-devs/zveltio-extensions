@@ -1,25 +1,19 @@
 import type { ZveltioExtension } from '@zveltio/sdk/extension';
-import { join } from 'path';
-import { roProcurementRoutes } from './routes.js';
+import { procurementActions } from './actions.js';
 
+// Suppliers, budget lines, contracts, orders, reception notes and supplier
+// evaluations are collections this extension declares in `schema/collections/`
+// (manifest `collections`); the engine creates them, owns their rules and
+// serves them through the data API. What is left in code is what procurement
+// does beyond a plain edit: the actions in `actions.ts`.
 const extension: ZveltioExtension = {
   name: 'compliance/ro/procurement',
   category: 'compliance',
-  // S3-01: sub-app mounted at /ext/compliance/ro/procurement by the engine.
   mountStrategy: 'subapp',
 
-  getMigrations() {
-    return [
-      join(import.meta.dir, 'migrations/001_initial.sql'),
-      join(import.meta.dir, 'migrations/002_tenant_rls.sql'),
-      join(import.meta.dir, 'migrations/003_tenant_scoped_unique_keys.sql'),
-      join(import.meta.dir, 'migrations/004_user_ref_text.sql'),
-    ];
-  },
+  actions: procurementActions,
 
-  async register(app, ctx) {
-    app.route('/', roProcurementRoutes(ctx));
-  },
+  async register() {},
 };
 
 export default extension;

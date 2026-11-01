@@ -1,0 +1,31 @@
+{
+  "name": "procurement_contracts",
+  "fields": [
+    { "name": "number", "type": "text", "required": true, "unique": true },
+    { "name": "supplier_id", "type": "m2o", "indexed": true, "options": { "related_collection": "procurement_suppliers" } },
+    { "name": "supplier_name", "type": "text", "required": true },
+    { "name": "supplier_cui", "type": "text", "required": true },
+    { "name": "title", "type": "text", "required": true },
+    { "name": "type", "type": "enum", "required": true, "defaultValue": "services", "options": { "values": ["services", "goods", "works", "framework"] } },
+    { "name": "value", "type": "decimal" },
+    { "name": "currency", "type": "text", "required": true, "defaultValue": "RON" },
+    { "name": "start_date", "type": "date" },
+    { "name": "end_date", "type": "date", "indexed": true },
+    { "name": "auto_renew", "type": "boolean", "required": true, "defaultValue": false },
+    { "name": "status", "type": "enum", "required": true, "defaultValue": "draft", "indexed": true, "options": { "values": ["draft", "active", "expired", "cancelled", "terminated"] } },
+    { "name": "file_url", "type": "url" },
+    { "name": "notes", "type": "textarea" }
+  ],
+  "relations": [
+    { "name": "procurement_contracts_supplier_id", "type": "m2o", "field": "supplier_id", "target": "procurement_suppliers", "targetField": "id", "onDelete": "RESTRICT", "onUpdate": "CASCADE", "metadata": {} }
+  ],
+  "validation": [
+    {
+      "field": "status",
+      "rule": "transition",
+      "config": { "expression": "previous == null ? value == null || value == 'draft' : previous == 'draft' ? value in ['draft', 'active', 'cancelled'] : previous == 'active' ? value in ['active', 'expired', 'terminated'] : value == previous" },
+      "message": "A contract starts as a draft, is activated or cancelled, and an active contract expires or is terminated; cancelled, expired and terminated are final."
+    },
+    { "field": "value", "rule": "min", "config": { "value": 0 }, "message": "A contract value is not negative." }
+  ]
+}

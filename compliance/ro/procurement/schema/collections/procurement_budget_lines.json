@@ -1,0 +1,14 @@
+{
+  "name": "procurement_budget_lines",
+  "fields": [
+    { "name": "code", "type": "text", "required": true, "unique": true },
+    { "name": "name", "type": "text", "required": true },
+    { "name": "year", "type": "integer", "required": true, "indexed": true },
+    { "name": "allocated", "type": "decimal", "required": true, "defaultValue": 0 },
+    { "name": "currency", "type": "text", "required": true, "defaultValue": "RON" },
+    { "name": "notes", "type": "textarea" }
+  ],
+  "validation": [
+    { "field": "allocated", "rule": "min", "config": { "value": 0 }, "message": "An allocation is not negative." }
+  ]
+}
