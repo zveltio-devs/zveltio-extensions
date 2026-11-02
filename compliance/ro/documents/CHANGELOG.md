@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.0.0 (2026-11-02)
+
+- feat!: the register is the `ro_documents`, `ro_document_versions`, `ro_document_series` and `ro_document_signatures` collections, declared in `schema/collections/` and created and owned by the engine; no SQL migrations
+- feat!: the hand-written `/ext/compliance/ro/documents` routes are gone — read through `/api/data/ro_documents` (and `ro_document_versions`); writing is the `create`, `edit`, `restore`, `sign`, `archive` and `remove` actions
+- feat!: the `ro-documents` resource and the `ro-documents:sign` check are gone; signing writes a row of `ro_document_signatures` and is gated on that collection's `execute` (ADR 0015); the row names the document's author, so the operator can keep anyone from signing their own with the row rule `document_author neq user_id` (ADR 0016); the row also records the version signed
+- feat!: numbers come from a series per type and year (`CTR-2026-0001`), claimed so no two documents share one; a number is unique per type; a number given by hand cannot take the series' prefix; the per-company prefix and format are gone
+- feat!: the `/stats`, `/templates` and `/bulk-sign` routes are gone (the templates were placeholders, nothing called the others), and so are the unused signatories table and the `compliance/ro/documents.nationalId` service, which nothing reads
+- fix: restoring a version no longer turns a signed document back into an editable draft; only a draft is restored
+- 1.x rows (`zv_ro_*` tables) are not carried over
+- requires engine 3.0.0-beta.96
+
 ## 1.1.1 (2026-10-11)
 
 - fix: nine update handlers bind their jsonb column with toJsonb (#208)

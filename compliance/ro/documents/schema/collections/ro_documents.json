@@ -1,0 +1,34 @@
+{
+  "name": "ro_documents",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "type",
+      "type": "enum",
+      "required": true,
+      "indexed": true,
+      "options": { "values": ["contract", "pv", "nir", "dispozitie_plata", "proces_verbal", "notificare", "other"] }
+    },
+    { "name": "number", "type": "text", "required": true },
+    { "name": "date", "type": "date", "required": true, "indexed": true },
+    { "name": "title", "type": "text", "required": true },
+    { "name": "category", "type": "text", "indexed": true },
+    { "name": "parties", "type": "json" },
+    { "name": "content", "type": "textarea" },
+    { "name": "metadata", "type": "json" },
+    { "name": "internal_notes", "type": "textarea" },
+    { "name": "file_url", "type": "text" },
+    {
+      "name": "status",
+      "type": "enum",
+      "required": true,
+      "indexed": true,
+      "defaultValue": "draft",
+      "options": { "values": ["draft", "signed", "archived"] }
+    },
+    { "name": "version_number", "type": "integer", "required": true, "defaultValue": 1 },
+    { "name": "signed_at", "type": "datetime" },
+    { "name": "archived_at", "type": "datetime" }
+  ],
+  "indexes": [{ "fields": ["type", "number"], "unique": true }]
+}

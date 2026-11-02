@@ -1,0 +1,15 @@
+{
+  "name": "ro_document_series",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "type",
+      "type": "enum",
+      "required": true,
+      "options": { "values": ["contract", "pv", "nir", "dispozitie_plata", "proces_verbal", "notificare", "other"] }
+    },
+    { "name": "year", "type": "integer", "required": true },
+    { "name": "next_number", "type": "integer", "required": true, "defaultValue": 1 }
+  ],
+  "indexes": [{ "fields": ["type", "year"], "unique": true }]
+}

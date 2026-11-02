@@ -1,0 +1,14 @@
+{
+  "name": "ro_document_versions",
+  "writtenBy": "actions",
+  "fields": [
+    { "name": "document_id", "type": "m2o", "required": true, "options": { "related_collection": "ro_documents" } },
+    { "name": "version", "type": "integer", "required": true },
+    { "name": "content", "type": "textarea" },
+    { "name": "change_note", "type": "text" }
+  ],
+  "indexes": [{ "fields": ["document_id", "version"], "unique": true }],
+  "relations": [
+    { "name": "ro_document_versions_document_id", "type": "m2o", "field": "document_id", "target": "ro_documents", "targetField": "id", "onDelete": "CASCADE", "onUpdate": "CASCADE", "metadata": {} }
+  ]
+}

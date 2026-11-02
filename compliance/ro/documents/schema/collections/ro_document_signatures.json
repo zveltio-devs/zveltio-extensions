@@ -1,0 +1,36 @@
+{
+  "name": "ro_document_signatures",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "document_id",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "ro_documents"
+      },
+      "unique": true
+    },
+    {
+      "name": "document_author",
+      "type": "text"
+    },
+    {
+      "name": "signed_version",
+      "type": "integer",
+      "required": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "ro_document_signatures_document_id",
+      "type": "m2o",
+      "field": "document_id",
+      "target": "ro_documents",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}
