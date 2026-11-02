@@ -1,0 +1,21 @@
+{
+  "name": "i18n_locales",
+  "fields": [
+    {
+      "name": "code",
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "defaultValue": true
+    }
+  ]
+}

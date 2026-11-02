@@ -1,0 +1,37 @@
+{
+  "name": "i18n_approvals",
+  "fields": [
+    {
+      "name": "translation_id",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "i18n_translations"
+      },
+      "writtenBy": "actions"
+    },
+    {
+      "name": "value",
+      "type": "text",
+      "required": true,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "translation_author",
+      "type": "text",
+      "writtenBy": "actions"
+    }
+  ],
+  "relations": [
+    {
+      "name": "i18n_approvals_translation_id",
+      "type": "m2o",
+      "field": "translation_id",
+      "target": "i18n_translations",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

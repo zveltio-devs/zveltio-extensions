@@ -2,13 +2,13 @@
   "name": "i18n/translations",
   "displayName": "Translations",
   "category": "i18n",
-  "description": "Internationalization: manage locales, translation keys and per-locale string values",
-  "version": "1.0.11",
-  "zveltioMinVersion": "1.0.0",
+  "description": "Internationalization: locales, translation keys, per-locale values, a glossary and approvals",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.96",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-translations",
   "permissions": [
-    "database"
+    "data:write"
   ],
   "i18nPrefixes": [
     "i18n"
@@ -35,11 +35,45 @@
     "bundled": true,
     "bundlePeers": false
   },
+  "collections": [
+    "i18n_locales",
+    "i18n_settings",
+    "i18n_keys",
+    "i18n_translations",
+    "i18n_approvals",
+    "i18n_glossary"
+  ],
+  "actions": [
+    {
+      "name": "approve",
+      "permission": {
+        "resource": "i18n_approvals",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "i18n_translations"
+      ],
+      "writes": [
+        "i18n_approvals"
+      ]
+    }
+  ],
   "integrity": {
-    "engineSha256": "a4df03147a5e805b13c6e0b3e125837b4ca2d234d09b1652211f5429d08e241d",
-    "sourceSha256": "fbe2da9c856f3a0d12ea72c99ad7336493371f1e9e4317d64c38e4a49c7c1640"
-  },
-  "publicRoutes": [
-    "/public/*"
-  ]
+    "engineSha256": "0051d93140759377d31c32c85547c5bf69cbff2dcab1c66bdab9fbb94eff8f23",
+    "sourceSha256": "96f7b83e55f8f835cb72e225cdfa3f2cd6a6086902f50f4c12c1c4713bc191d0",
+    "schemaSha256": "dc6fe02ee45186e3e1d5c33353bbbded74666cefc00927b6cad2424f2dbe4349"
+  }
 }

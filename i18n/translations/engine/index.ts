@@ -1,25 +1,17 @@
 import type { ZveltioExtension } from '@zveltio/sdk/extension';
-import { join } from 'path';
-import { translationsRoutes } from './routes.js';
+import { translationsActions } from './actions.js';
 
+// The register is collections this extension declares in `schema/collections/`
+// (manifest `collections`); the engine creates them, owns their rules and serves
+// them through the data API. What is left in code is approving a translation.
 const extension: ZveltioExtension = {
   name: 'i18n/translations',
   category: 'i18n',
-  // S3-01: sub-app mounted at /ext/i18n/translations by the engine.
   mountStrategy: 'subapp',
 
-  getMigrations() {
-    return [
-      join(import.meta.dir, 'migrations/001_initial.sql'),
-      join(import.meta.dir, 'migrations/002_tenant_rls.sql'),
-      join(import.meta.dir, 'migrations/003_tenant_scoped_unique_keys.sql'),
-      join(import.meta.dir, 'migrations/004_translation_keys_tenant_scoped.sql'),
-    ];
-  },
+  actions: translationsActions,
 
-  async register(app, ctx) {
-    app.route('/', translationsRoutes(ctx));
-  },
+  async register() {},
 };
 
 export default extension;
