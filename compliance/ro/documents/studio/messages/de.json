@@ -1,4 +1,5 @@
 {
+  "compliance.ro.documents.btn.archive": "Archivieren",
   "compliance.ro.documents.btn.create": "Erstellen",
   "compliance.ro.documents.btn.new": "Neues Dokument",
   "compliance.ro.documents.col.data": "Datum",
@@ -6,6 +7,7 @@
   "compliance.ro.documents.col.signed": "Signiert",
   "compliance.ro.documents.col.title": "Titel",
   "compliance.ro.documents.col.type": "Typ",
+  "compliance.ro.documents.confirmArchive": "Dieses Dokument archivieren?",
   "compliance.ro.documents.confirmDelete": "Dokument löschen?",
   "compliance.ro.documents.confirmSign": "Dokument als signiert markieren?",
   "compliance.ro.documents.empty": "Noch keine Dokumente.",
@@ -22,6 +24,7 @@
   "compliance.ro.documents.ui.data": "Daten",
   "compliance.ro.documents.ui.denumire": "Name",
   "compliance.ro.documents.ui.document_nou": "New document",
+  "compliance.ro.documents.ui.num_auto": "Nummer (leer: nächste im Register)",
   "compliance.ro.documents.ui.num_r": "Number",
   "compliance.ro.documents.ui.parties": "Beteiligte Parteien",
   "compliance.ro.documents.ui.rol": "Role",

@@ -1,4 +1,5 @@
 {
+  "compliance.ro.documents.btn.archive": "Archivar",
   "compliance.ro.documents.btn.create": "Crear",
   "compliance.ro.documents.btn.new": "Nuevo documento",
   "compliance.ro.documents.col.data": "Fecha",
@@ -6,6 +7,7 @@
   "compliance.ro.documents.col.signed": "Firmado",
   "compliance.ro.documents.col.title": "Título",
   "compliance.ro.documents.col.type": "Tipo",
+  "compliance.ro.documents.confirmArchive": "¿Archivar este documento?",
   "compliance.ro.documents.confirmDelete": "¿Eliminar el documento?",
   "compliance.ro.documents.confirmSign": "¿Marcar el documento como firmado?",
   "compliance.ro.documents.empty": "Aún no hay documentos.",
@@ -22,6 +24,7 @@
   "compliance.ro.documents.ui.data": "Datos",
   "compliance.ro.documents.ui.denumire": "Name",
   "compliance.ro.documents.ui.document_nou": "New document",
+  "compliance.ro.documents.ui.num_auto": "Número (vacío: el siguiente del registro)",
   "compliance.ro.documents.ui.num_r": "Number",
   "compliance.ro.documents.ui.parties": "Partes implicadas",
   "compliance.ro.documents.ui.rol": "Role",

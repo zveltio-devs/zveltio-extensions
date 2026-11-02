@@ -3,12 +3,12 @@
   "displayName": "RO Documents",
   "category": "compliance/ro",
   "description": "Romanian compliance document management — contracts, PVs, NIRs, dispozitii de plata",
-  "version": "1.1.1",
-  "zveltioMinVersion": "1.0.0",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.96",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-ro-documents",
   "permissions": [
-    "database"
+    "data:write"
   ],
   "i18nPrefixes": [
     "compliance.ro.documents"
@@ -37,10 +37,289 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "b78ee5728b3d3415acfa3b11ab82e44b61b57330c12b2932b9739c2977b22d7a",
-    "sourceSha256": "1bead0314987b6ed6e2983eb3e8faa3574fb4f7546501bd1ae6107e7c4d68200"
+    "engineSha256": "c32e0df32c77e6918ac8daad7aecaad2dbb92f54eb4f5785cc270c0d106cd1b9",
+    "sourceSha256": "18d3ff609753a831b0d9328b831e546e3eabee166e4d992bbd31f45ffc0731f7",
+    "schemaSha256": "bb31ced66e39fc2b4a8ccd1c9fe5c38c0db4f1521861c075e915d24aca9e762f"
   },
-  "resources": [
-    "ro-documents"
+  "collections": [
+    "ro_documents",
+    "ro_document_versions",
+    "ro_document_series",
+    "ro_document_signatures"
+  ],
+  "actions": [
+    {
+      "name": "create",
+      "permission": {
+        "resource": "ro_documents",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "type",
+          "date",
+          "title"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "contract",
+              "pv",
+              "nir",
+              "dispozitie_plata",
+              "proces_verbal",
+              "notificare",
+              "other"
+            ]
+          },
+          "number": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "category": {
+            "type": "string"
+          },
+          "parties": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "name",
+                "role"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "cui": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          "content": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "internal_notes": {
+            "type": "string"
+          },
+          "file_url": {
+            "type": "string"
+          }
+        }
+      },
+      "reads": [
+        "ro_document_series"
+      ],
+      "writes": [
+        "ro_documents",
+        "ro_document_series"
+      ]
+    },
+    {
+      "name": "edit",
+      "permission": {
+        "resource": "ro_documents",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "change_note": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "category": {
+            "type": "string"
+          },
+          "parties": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "name",
+                "role"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "cui": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          "content": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "internal_notes": {
+            "type": "string"
+          },
+          "file_url": {
+            "type": "string"
+          }
+        }
+      },
+      "reads": [
+        "ro_documents"
+      ],
+      "writes": [
+        "ro_documents",
+        "ro_document_versions"
+      ]
+    },
+    {
+      "name": "restore",
+      "permission": {
+        "resource": "ro_documents",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "version"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "reads": [
+        "ro_documents",
+        "ro_document_versions"
+      ],
+      "writes": [
+        "ro_documents",
+        "ro_document_versions"
+      ]
+    },
+    {
+      "name": "sign",
+      "permission": {
+        "resource": "ro_document_signatures",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "ro_documents"
+      ],
+      "writes": [
+        "ro_documents",
+        "ro_document_signatures"
+      ]
+    },
+    {
+      "name": "archive",
+      "permission": {
+        "resource": "ro_documents",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "ro_documents"
+      ],
+      "writes": [
+        "ro_documents"
+      ]
+    },
+    {
+      "name": "remove",
+      "permission": {
+        "resource": "ro_documents",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "ro_documents"
+      ],
+      "writes": [
+        "ro_documents",
+        "ro_document_versions"
+      ]
+    }
   ]
 }

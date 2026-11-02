@@ -6,11 +6,11 @@
   "resources": [
     {
       "id": "documents",
-      "dataSource": "/ext/compliance/ro/documents",
-      "dataPath": "documents",
+      "dataSource": "/api/data/ro_documents?sort=date&order=desc&limit=500",
+      "dataPath": "records",
       "filters": [
         {
-          "param": "type",
+          "param": "type[eq]",
           "options": [
             {
               "value": "all",
@@ -105,8 +105,11 @@
           "id": "sign",
           "label": "compliance.ro.documents.col.signed",
           "icon": "CheckCircle",
-          "method": "PATCH",
-          "endpoint": "/ext/compliance/ro/documents/{id}/sign",
+          "method": "POST",
+          "endpoint": "/ext/compliance/ro/documents/actions/sign",
+          "body": {
+            "id": "{id}"
+          },
           "visibleWhen": {
             "field": "status",
             "equals": "draft"
@@ -114,11 +117,30 @@
           "confirm": "compliance.ro.documents.confirmSign"
         },
         {
+          "id": "archive",
+          "label": "compliance.ro.documents.btn.archive",
+          "icon": "Archive",
+          "method": "POST",
+          "endpoint": "/ext/compliance/ro/documents/actions/archive",
+          "body": {
+            "id": "{id}"
+          },
+          "visibleWhen": {
+            "field": "status",
+            "equals": "signed"
+          },
+          "confirm": "compliance.ro.documents.confirmArchive"
+        },
+        {
           "id": "delete",
           "icon": "Trash2",
           "variant": "text-error",
-          "method": "DELETE",
-          "endpoint": "/ext/compliance/ro/documents/{id}",
+          "label": "common.delete",
+          "method": "POST",
+          "endpoint": "/ext/compliance/ro/documents/actions/remove",
+          "body": {
+            "id": "{id}"
+          },
           "visibleWhen": {
             "field": "status",
             "equals": "draft"
@@ -127,7 +149,7 @@
         }
       ],
       "form": {
-        "endpoint": "/ext/compliance/ro/documents",
+        "endpoint": "/ext/compliance/ro/documents/actions/create",
         "fields": [
           {
             "name": "type",
@@ -168,10 +190,9 @@
           },
           {
             "name": "number",
-            "label": "compliance.ro.documents.ui.num_r",
+            "label": "compliance.ro.documents.ui.num_auto",
             "colSpan": 1,
-            "mono": true,
-            "required": true
+            "mono": true
           },
           {
             "name": "date",
