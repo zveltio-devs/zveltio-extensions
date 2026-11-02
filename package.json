@@ -19,7 +19,7 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
-    "@node-saml/node-saml": "^5.1.0",
+    "@node-saml/node-saml": "^5.2.0",
     "@types/sanitize-html": "^2.16.2",
     "bun-types": "latest",
     "dompurify": "3.4.17",
