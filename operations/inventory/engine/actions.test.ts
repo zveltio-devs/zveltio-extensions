@@ -170,7 +170,7 @@ describe('purchase orders', () => {
     await refusal(a.cancelPurchaseOrder({ id: po.id }, host), 'not_cancellable');
   });
 
-  it('a first order that loses the series insert reads the series that won', async () => {
+  it('a first order that loses the series insert is refused, not read on an aborted transaction', async () => {
     const { host, rows, c } = fakeHost();
     const insert = c.insert;
     let raced = false;
@@ -179,10 +179,9 @@ describe('purchase orders', () => {
       if (col !== 'purchase_order_series' || raced) return insert(col, data);
       raced = true;
       await insert(col, { singleton: 'po', next_number: 2 });
-      throw Object.assign(new Error('duplicate key'), { code: 'unique_violation' });
+      throw Object.assign(new Error('duplicate key'), { code: '23505' });
     };
-    const po = (await a.createPurchaseOrder({ supplier_id: 's', lines: [{ product_id: 'p', quantity_ordered: 1, unit_cost: 1 }] }, host)) as Row;
-    expect(po.number).toBe('PO-00002');
+    await refusal(a.createPurchaseOrder({ supplier_id: 's', lines: [{ product_id: 'p', quantity_ordered: 1, unit_cost: 1 }] }, host), 'series_busy');
     expect(rows('purchase_order_series')).toHaveLength(1);
   });
 

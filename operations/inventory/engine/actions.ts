@@ -133,20 +133,22 @@ const moveStock: ExtensionAction = async (input, host) => {
 
 /**
  * The tenant's one series row. The first order since 2.1.0 creates it, counting
- * on from the highest number 2.0.0 gave out; two such orders at once meet on
- * its unique key and the loser reads the winner's row.
+ * on from the highest number 2.0.0 gave out. Two such orders at once meet on its
+ * unique key; the loser's request transaction is aborted by then (the insert
+ * takes no savepoint), so it is refused and its retry finds the row.
  */
 async function series(host: Host): Promise<Row> {
   const s = await first(host, SERIES, {});
   if (s) return s;
   const res = await host.collections.list('purchase_orders', { sort: 'number', order: 'desc', limit: 1, count: 'none' });
   const last = Number(/(\d+)$/.exec(String(((res.records as Row[]) ?? [])[0]?.number ?? ''))?.[1] ?? 0);
-  return host.collections.insert(SERIES, { next_number: last + 1 }).catch(async (err) => {
-    const won = await first(host, SERIES, {});
-    if (!won) throw err;
-    return won;
+  return host.collections.insert(SERIES, { next_number: last + 1 }).catch((err) => {
+    if ((err as { code?: unknown }).code === '23505') throw seriesBusy();
+    throw err;
   });
 }
+
+const seriesBusy = () => new ActionRefusal(409, 'series_busy', 'The series is being used by other requests; try again.');
 
 /**
  * The next `PO-00001` number, claimed from the series only if nobody claimed it
@@ -165,7 +167,7 @@ async function nextNumber(host: Host): Promise<string> {
     }
     return `PO-${String(n).padStart(5, '0')}`;
   }
-  throw new ActionRefusal(409, 'series_busy', 'The series is being used by other requests; try again.');
+  throw seriesBusy();
 }
 
 const createPurchaseOrder: ExtensionAction = async (input, host) => {
