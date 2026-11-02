@@ -2,14 +2,12 @@
   "name": "developer/api-docs",
   "displayName": "API Documentation",
   "category": "developer",
-  "description": "Swagger UI + OpenAPI spec auto-generated from collections",
-  "version": "1.0.7",
-  "zveltioMinVersion": "1.0.0",
+  "description": "Swagger UI over the data API: each visitor sees the collections they may read",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.96",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-api-docs",
-  "permissions": [
-    "database"
-  ],
+  "permissions": [],
   "i18nPrefixes": [
     "developer.api-docs"
   ],
@@ -36,11 +34,15 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "83a03c25ab48d0dfb0ad0f4837d8f4e2215759abbc97f3e09e0f2e94c8d45add",
-    "sourceSha256": "2d3985f86881e3a0a21626030e8152321f031aa6f3d4d23dc212660c2224db82"
+    "engineSha256": "6f46e1a7697e74b51d0a2715e3dd7154e4cb7f1712bafdc2732aeb9a4aae95ad",
+    "sourceSha256": "8a2489f4e14b2e1c1f09c38e37b8fdf57b4541c95f55bf3f98140f96e9fdceac",
+    "schemaSha256": "a8cab673d0bc4cdd39861c1366bf7fec171e028504460705b89fcf699b3535c6"
   },
   "publicRoutes": [
-    "/",
-    "/openapi.json"
+    "/"
+  ],
+  "collections": [
+    "apidoc_changelogs",
+    "apidoc_pages"
   ]
 }

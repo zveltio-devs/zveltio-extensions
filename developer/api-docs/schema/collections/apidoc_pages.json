@@ -1,0 +1,34 @@
+{
+  "name": "apidoc_pages",
+  "defaultGrants": false,
+  "fields": [
+    {
+      "name": "slug",
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    {
+      "name": "title",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "body",
+      "type": "textarea",
+      "required": true
+    },
+    {
+      "name": "sort_order",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "is_published",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true
+    }
+  ]
+}
