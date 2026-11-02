@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.0 (2026-11-02)
+
+- feat!: layouts are the collection `dashboard_layouts`, declared in `schema/collections/` and created and owned by the engine (unique per `scope` and `owner`); no SQL migrations, `zv_dashboard_layouts` is no longer created; layouts saved by 1.x are not carried over (users and roles start from the default again), and the old table is left in place
+- fix: saving a layout is one upsert; two first saves at once no longer fail the second on the unique key
+- feat!: who may read or write layouts through the data API is the engine's rules: with the default grants a member reads every layout and may create or update any, a role's included, until the operator adds a row rule (for `tenant_member`, `owner eq $user.id` keeps members on their own row, but then they no longer read their role's layout and fall back to the default). A member's write changes only which widgets show: a layout still cannot widen what anyone sees: every read is clamped to the viewer's widgets, and the tenant widgets need the engine object `admin` (ADR 0002)
+- feat!: resetting a personal layout clears its widgets instead of deleting the row, so it needs only `update`, which members hold
+- chore: the legacy `database` permission label is dropped
+
 ## 1.0.12 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)
