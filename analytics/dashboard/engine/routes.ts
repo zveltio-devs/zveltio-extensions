@@ -75,11 +75,17 @@ async function visibleWidgets(userId: string, checkPermission: CheckPermission):
   return new Set(WIDGET_CATALOG.filter((w) => admin || !w.admin).map((w) => w.id));
 }
 
-// ── Layout storage (own table, tenant-scoped via RLS) ────────────────
+// ── Layout storage (the declared collection `dashboard_layouts`) ──────
+//
+// The engine creates and serves it; who may read or write it through the data
+// API is the operator's rules (default grants: members read, create, update).
+// These routes write only the session user's own row, and a role's row on the
+// admin routes below. A layout cannot widen what anyone sees: every read is
+// clamped to the viewer's visible widgets.
 
 async function readLayout(dbh: Db, scope: 'role' | 'user', owner: string): Promise<WidgetId[] | null> {
   const r = await sql<{ widgets: unknown }>`
-    SELECT widgets FROM zv_dashboard_layouts WHERE scope = ${scope} AND owner = ${owner} LIMIT 1
+    SELECT widgets FROM zvd_dashboard_layouts WHERE scope = ${scope} AND owner = ${owner} LIMIT 1
   `
     .execute(dbh)
     .catch((err) => {
@@ -129,30 +135,26 @@ async function writeLayout(
   // matched an inline `JSON.stringify(...)` immediately before the `}` and could
   // not see a value stringified on the line above.
   //
-  // Update-then-insert (no ON CONFLICT): with RLS active the UPDATE only ever
-  // touches the current tenant's row, and INSERT stamps tenant_id via DEFAULT.
-  const updated = await sql<{ id: string }>`
-    UPDATE zv_dashboard_layouts
-    SET widgets = ${json}::text::jsonb, updated_by = ${updatedBy}, updated_at = NOW()
-    WHERE scope = ${scope} AND owner = ${owner}
-    RETURNING id
+  // One upsert: of two first saves at once, an update-then-insert had both
+  // insert and the second fail on the unique key. The key is the engine's
+  // composite unique index, per tenant (`tenant_id` filled by its default).
+  await sql`
+    INSERT INTO zvd_dashboard_layouts (scope, owner, widgets, created_by, updated_by)
+    VALUES (${scope}, ${owner}, ${json}::text::jsonb, ${updatedBy}, ${updatedBy})
+    ON CONFLICT (tenant_id, scope, owner) DO UPDATE
+      SET widgets = EXCLUDED.widgets, updated_by = EXCLUDED.updated_by, updated_at = NOW()
   `.execute(db);
-  if (updated.rows.length === 0) {
-    await sql`
-      INSERT INTO zv_dashboard_layouts (scope, owner, widgets, updated_by)
-      VALUES (${scope}, ${owner}, ${json}::text::jsonb, ${updatedBy})
-    `.execute(db);
-  }
 }
 
-// No `.catch()` here on purpose. Deleting a layout that was never saved is a
-// no-op in SQL, not an error, so the only way this rejects is a genuine
-// failure — and swallowing it would answer "reset done" to a user whose
-// layout is still on screen. A write that failed must not report success.
-async function deleteUserLayout(dbh: Db, userId: string): Promise<void> {
-  await sql`DELETE FROM zv_dashboard_layouts WHERE scope = 'user' AND owner = ${userId}`.execute(
-    dbh,
-  );
+// No `.catch()` here on purpose: the only way this rejects is a genuine
+// failure, and swallowing it would answer "reset done" to a user whose layout
+// is still on screen. A cleared row (`widgets` null) reads as not personalised;
+// clearing rather than deleting needs only `update`, which members hold.
+async function clearUserLayout(dbh: Db, userId: string): Promise<void> {
+  await sql`
+    UPDATE zvd_dashboard_layouts SET widgets = NULL, updated_by = ${userId}, updated_at = NOW()
+    WHERE scope = 'user' AND owner = ${userId}
+  `.execute(dbh);
 }
 
 // ── Resolution ───────────────────────────────────────────────────────
@@ -407,7 +409,7 @@ export function dashboardRoutes(ctx: ExtensionContext): Hono {
   // DELETE / — drop personalisation, fall back to the role / default layout.
   app.delete('/', async (c) => {
     const uid = userId(c);
-    await deleteUserLayout(db, uid);
+    await clearUserLayout(db, uid);
     const resolved = await resolveDashboard(db, uid, checkPermission, getUserRoles);
     const data = await computeWidgetData(db, resolved.widgets, ctx.config, ctx.internals);
     return c.json({

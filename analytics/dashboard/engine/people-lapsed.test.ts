@@ -7,7 +7,9 @@
 //
 // The single-tenant test runs FIRST: it needs the default tenant to be the only
 // one, and the tests after it add more.
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { Kysely, PostgresDialect, sql } from 'kysely';
 import { Pool } from 'pg';
 import { mountForTest } from '../../../testing/ext-harness';
@@ -23,7 +25,22 @@ d('analytics/dashboard — people counts only memberships in force', () => {
   const tenantId = crypto.randomUUID();
   const userIds: string[] = [];
 
+  // The PUT writes the caller's layout into the declared collection.
+  const ENGINE = join(import.meta.dir, '../../../../zveltio/packages/engine/src');
+  const EXT_DIR = join(import.meta.dir, '..');
+  beforeAll(async () => {
+    const manifest = JSON.parse(readFileSync(join(EXT_DIR, 'manifest.json'), 'utf8'));
+    const { getTestApp } = await import(join(ENGINE, 'testing/app-harness.js'));
+    const { applyDeclaredCollections, readDeclaredCollections } = await import(
+      join(ENGINE, 'lib/extensions/declared-collections.js')
+    );
+    const files = await readDeclaredCollections(manifest.name, EXT_DIR, manifest.collections, manifest.integrity?.schemaSha256);
+    await applyDeclaredCollections((await getTestApp()).db, manifest.name, files, true);
+  });
+
   afterAll(async () => {
+    const { dropTestCollection, getTestApp } = await import(join(ENGINE, 'testing/app-harness.js'));
+    await dropTestCollection((await getTestApp()).db, 'dashboard_layouts');
     for (const id of userIds) await sql`DELETE FROM "user" WHERE id = ${id}`.execute(db);
     await sql`DELETE FROM zv_tenants WHERE id = ${tenantId}::uuid`.execute(db);
     await db.destroy();

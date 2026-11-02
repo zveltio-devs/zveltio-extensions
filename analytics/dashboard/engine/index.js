@@ -1,7 +1,4 @@
 // @bun
-// engine/index.ts
-import { join } from "path";
-
 // /zveltio-extension/node_modules/hono/dist/compose.js
 var compose = (middleware, onError, onNotFound) => {
   return (context, next) => {
@@ -10080,7 +10077,7 @@ async function visibleWidgets(userId, checkPermission) {
 }
 async function readLayout(dbh, scope, owner) {
   const r = await sql`
-    SELECT widgets FROM zv_dashboard_layouts WHERE scope = ${scope} AND owner = ${owner} LIMIT 1
+    SELECT widgets FROM zvd_dashboard_layouts WHERE scope = ${scope} AND owner = ${owner} LIMIT 1
   `.execute(dbh).catch((err) => {
     console.error(`[dashboard] reading the ${scope} layout failed: ${err instanceof Error ? err.message : String(err)}`);
     return { rows: [] };
@@ -10092,21 +10089,18 @@ async function readLayout(dbh, scope, owner) {
 }
 async function writeLayout(db, scope, owner, widgets, updatedBy) {
   const json = JSON.stringify(widgets);
-  const updated = await sql`
-    UPDATE zv_dashboard_layouts
-    SET widgets = ${json}::text::jsonb, updated_by = ${updatedBy}, updated_at = NOW()
-    WHERE scope = ${scope} AND owner = ${owner}
-    RETURNING id
+  await sql`
+    INSERT INTO zvd_dashboard_layouts (scope, owner, widgets, created_by, updated_by)
+    VALUES (${scope}, ${owner}, ${json}::text::jsonb, ${updatedBy}, ${updatedBy})
+    ON CONFLICT (tenant_id, scope, owner) DO UPDATE
+      SET widgets = EXCLUDED.widgets, updated_by = EXCLUDED.updated_by, updated_at = NOW()
   `.execute(db);
-  if (updated.rows.length === 0) {
-    await sql`
-      INSERT INTO zv_dashboard_layouts (scope, owner, widgets, updated_by)
-      VALUES (${scope}, ${owner}, ${json}::text::jsonb, ${updatedBy})
-    `.execute(db);
-  }
 }
-async function deleteUserLayout(dbh, userId) {
-  await sql`DELETE FROM zv_dashboard_layouts WHERE scope = 'user' AND owner = ${userId}`.execute(dbh);
+async function clearUserLayout(dbh, userId) {
+  await sql`
+    UPDATE zvd_dashboard_layouts SET widgets = NULL, updated_by = ${userId}, updated_at = NOW()
+    WHERE scope = 'user' AND owner = ${userId}
+  `.execute(dbh);
 }
 async function roleUnion(dbh, userId, getUserRoles) {
   const roles = await getUserRoles(userId).catch((err) => {
@@ -10235,7 +10229,7 @@ function dashboardRoutes(ctx) {
   });
   app.delete("/", async (c) => {
     const uid = userId(c);
-    await deleteUserLayout(db, uid);
+    await clearUserLayout(db, uid);
     const resolved = await resolveDashboard(db, uid, checkPermission, getUserRoles);
     const data = await computeWidgetData(db, resolved.widgets, ctx.config, ctx.internals);
     return c.json({
@@ -10284,13 +10278,6 @@ var extension = {
   name: "analytics/dashboard",
   category: "analytics",
   mountStrategy: "subapp",
-  getMigrations() {
-    return [
-      join(import.meta.dir, "migrations/001_initial.sql"),
-      join(import.meta.dir, "migrations/002_tenant_rls.sql"),
-      join(import.meta.dir, "migrations/003_widgets_unwrap_string.sql")
-    ];
-  },
   async register(app, ctx) {
     app.route("/", dashboardRoutes(ctx));
   }
