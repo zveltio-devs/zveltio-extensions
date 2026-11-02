@@ -1,7 +1,7 @@
 // The GDPR actions over an in-memory data API. What the data API checks (the
 // rules on each collection, `writtenBy`, `expect`) is tested in the engine; this
 // proves what each action reads and what it writes.
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, setSystemTime } from 'bun:test';
 import { gdprActions as a } from './actions';
 
 type Row = Record<string, unknown>;
@@ -53,12 +53,15 @@ describe('consents', () => {
 
 describe('subject requests', () => {
   it('is due 30 days after the tenant’s today, pending', async () => {
-    const { host } = fakeHost();
-    const r = (await a.submitRequest({ request_type: 'access' }, host)) as Row;
-    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Bucharest' }).format(new Date());
-    const due = new Date(`${today}T00:00:00Z`);
-    due.setUTCDate(due.getUTCDate() + 30);
-    expect(r).toMatchObject({ request_type: 'access', status: 'pending', due_date: due.toISOString().slice(0, 10) });
+    // 23:30 UTC on 31 Jan is already 1 Feb in Bucharest: the due date counts from there.
+    setSystemTime(new Date('2027-01-31T23:30:00Z'));
+    try {
+      const { host } = fakeHost();
+      const r = (await a.submitRequest({ request_type: 'access' }, host)) as Row;
+      expect(r).toMatchObject({ request_type: 'access', status: 'pending', due_date: '2027-03-03' });
+    } finally {
+      setSystemTime();
+    }
   });
 
   it('records each status change as a decision, and completion time', async () => {

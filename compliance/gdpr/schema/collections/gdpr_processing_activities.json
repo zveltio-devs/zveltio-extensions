@@ -67,5 +67,15 @@
       "defaultValue": true,
       "indexed": true
     }
+  ],
+  "validation": [
+    {
+      "field": "retention_period_days",
+      "rule": "min",
+      "config": {
+        "value": 1
+      },
+      "message": "A retention period is at least one day."
+    }
   ]
 }

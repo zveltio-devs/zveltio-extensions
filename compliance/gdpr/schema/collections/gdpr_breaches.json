@@ -70,5 +70,15 @@
       "name": "remediation_steps",
       "type": "textarea"
     }
+  ],
+  "validation": [
+    {
+      "field": "affected_records_estimate",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "An estimate of affected records is never negative."
+    }
   ]
 }

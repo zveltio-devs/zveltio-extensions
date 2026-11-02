@@ -42,7 +42,9 @@ import { join, relative } from 'node:path';
 const ROOT = process.argv[2] ?? process.cwd();
 
 /**
- * Extensions exempt from the requirement, with the reason.
+ * Engine files whose write routes are exempt from the requirement, with the
+ * reason. Per file, not per extension: the extension's other files, and its
+ * global-route and resource checks, are still read.
  *
  * Short on purpose. An entry here is a decision someone has to defend in
  * review, which is the only thing that keeps a list like this short.
@@ -52,7 +54,7 @@ const ALLOWLIST: Record<string, string> = {
   // account after a password re-check. Art. 17 is the data subject's right, not
   // a grant, and the subject is the session's user: there is no permission for
   // the route to ask. Everything else it writes goes through actions.
-  'compliance/gdpr': 'self-service erasure of the caller’s own account (Art. 17)',
+  'compliance/gdpr/engine/self-service.ts': 'self-service erasure of the caller’s own account (Art. 17)',
 };
 
 /** Any helper that represents an authorization decision. */
@@ -290,15 +292,16 @@ let exempt = 0;
 
 for (const extDir of findExtensions(ROOT).sort()) {
   const rel = relative(ROOT, extDir) || extDir;
-  if (ALLOWLIST[rel]) {
-    exempt++;
-    continue;
-  }
 
   let source = '';
+  // What the write-route requirement reads: every file but an allowlisted one.
+  let guarded = '';
   for (const file of walk(join(extDir, 'engine'))) {
     try {
-      source += `${readFileSync(file, 'utf8')}\n`;
+      const text = `${readFileSync(file, 'utf8')}\n`;
+      source += text;
+      if (ALLOWLIST[relative(ROOT, file)]) exempt++;
+      else guarded += text;
     } catch {
       /* unreadable — nothing to assert about it */
     }
@@ -311,7 +314,7 @@ for (const extDir of findExtensions(ROOT).sort()) {
   const resourceIssue = checkResourceDeclaration(extDir, code);
   if (resourceIssue) resourceFindings.push(`${rel} — ${resourceIssue}`);
 
-  if (!WRITE_ROUTE.test(code)) continue;
+  if (!WRITE_ROUTE.test(stripComments(guarded))) continue;
 
   checked++;
   if (!AUTHORIZATION.some((re) => re.test(code))) findings.push(rel);
