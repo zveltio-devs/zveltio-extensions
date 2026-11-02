@@ -1,5 +1,6 @@
 {
   "name": "billing_usage_events",
+  "defaultGrants": false,
   "fields": [
     {
       "name": "event_type",

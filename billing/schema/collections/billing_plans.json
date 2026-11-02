@@ -1,5 +1,6 @@
 {
   "name": "billing_plans",
+  "defaultGrants": false,
   "fields": [
     {
       "name": "name",
