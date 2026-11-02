@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.0.0 (2026-11-02)
+
+- feat!: plans, subscriptions, usage events and webhook event ids are 4 collections declared in `schema/collections/` and created and owned by the engine (`billing_plans`, `billing_subscriptions`, `billing_usage_events`, `billing_webhook_events`); no SQL migrations
+- feat!: the hand-written `/plans`, `/subscriptions` and `/usage` routes are gone — records go through `/api/data/<collection>`; the 30-day usage roll-up by day is gone, Studio lists the events
+- feat!: the admin gate is gone; who may read or edit them is the engine's rules. `billing_subscriptions` and `billing_webhook_events` take no default grants (`defaultGrants: false`): members reach them only through a rule the operator adds, so none can mark their own subscription active. `writtenBy: "actions"` cannot protect them: the webhook is a route, and only actions and jobs write such a collection (ADR 0013)
+- feat!: `POST /webhook/stripe` writes as the system on `billing_subscriptions` and `billing_webhook_events`, and reads `billing_plans`, only (`data:system`, one audit row per event); the event-id claim and the state change commit together in the request's transaction
+- feat!: a plan's `price_cents` has no default: the data API ignores a field it does not know, so `{"price": 49}` would have made a free plan, which 1.x refused with a strict schema; a plan without `price_cents` is now refused, and a free plan says `0`
+- feat: `customer.subscription.created` and `updated` now create the subscription when it is not there yet, on the plan whose `stripe_price_id` matches; 1.x only updated rows that nothing ever created
+- feat: Stripe API versions from 2025-03 are read too (period on the subscription item, subscription under `invoice.parent`); unknown statuses are ignored instead of written
+- fix: Stripe delivers out of order; an event older than the last one applied to a subscription (`last_event_at`) leaves it alone, and an invoice event never revives a canceled subscription
+- fix: an event whose `data.object` is not an object is refused (400) instead of failing after the claim (500, retried forever)
+- fix: the usage tracker that nothing called is gone; another extension or client records usage by creating `billing_usage_events` rows
+- 1.x rows (`zv_billing_*`, `zv_usage_events`) are not carried over: re-create the plans, and each subscription returns with its next `customer.subscription.*` event (or resend one from the Stripe dashboard)
+- requires engine 3.0.0-beta.96
+
 ## 1.0.11 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)

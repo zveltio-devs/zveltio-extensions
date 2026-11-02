@@ -1,0 +1,17 @@
+{
+  "name": "billing_webhook_events",
+  "defaultGrants": false,
+  "fields": [
+    {
+      "name": "event_id",
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    {
+      "name": "event_type",
+      "type": "text",
+      "required": true
+    }
+  ]
+}

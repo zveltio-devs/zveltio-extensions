@@ -1,0 +1,36 @@
+{
+  "name": "billing_plans",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "stripe_price_id",
+      "type": "text",
+      "unique": true
+    },
+    {
+      "name": "limits",
+      "type": "json"
+    },
+    {
+      "name": "price_cents",
+      "type": "integer",
+      "required": true
+    },
+    {
+      "name": "interval",
+      "type": "enum",
+      "options": {
+        "values": [
+          "month",
+          "year"
+        ]
+      },
+      "required": true,
+      "defaultValue": "month"
+    }
+  ]
+}
