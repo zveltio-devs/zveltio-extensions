@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trasabilitate</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 32rem; margin: 2rem auto; padding: 0 1rem; color: #1f2937; }
+  label { display: block; margin: .75rem 0 .25rem; font-weight: 600; }
+  select, input, button { font: inherit; padding: .5rem; width: 100%; box-sizing: border-box; }
+  button { margin-top: 1rem; background: #0f766e; color: #fff; border: 0; border-radius: .375rem; cursor: pointer; }
+  #msg { margin-top: 1rem; color: #b91c1c; }
+</style>
+</head>
+<body>
+<!--
+  Labels and register exports, for Studio: `?label=<lot id>[,<lot id>…]` opens
+  the labels PDF; no parameter shows the report form. Both are this extension's
+  actions, called as the signed-in user; the page holds no data.
+-->
+<h1 id="title"></h1>
+<form id="report" hidden>
+  <label for="kind" id="l-kind"></label>
+  <select id="kind"></select>
+  <label for="from" id="l-from"></label>
+  <input id="from" type="date">
+  <label for="to" id="l-to"></label>
+  <input id="to" type="date">
+  <button id="go" type="submit"></button>
+</form>
+<p id="msg"></p>
+<script>
+  const ro = (navigator.language || 'ro').toLowerCase().startsWith('ro');
+  const t = ro
+    ? { reports: 'Rapoarte (CSV)', labels: 'Etichete', kind: 'Raport', from: 'De la', to: 'Până la', go: 'Descarcă CSV', range: 'Registrul ANSVSA cere ambele date.', empty: 'Nicio înregistrare în interval.',
+        kinds: { ansvsa: 'Registru trasabilitate ANSVSA', receptions: 'Recepții', consumptions: 'Consumuri', stock: 'Stoc disponibil', haccp: 'HACCP' } }
+    : { reports: 'Reports (CSV)', labels: 'Labels', kind: 'Report', from: 'From', to: 'To', go: 'Download CSV', range: 'The ANSVSA register needs both dates.', empty: 'Nothing in that range.',
+        kinds: { ansvsa: 'ANSVSA traceability register', receptions: 'Receptions', consumptions: 'Consumptions', stock: 'Available stock', haccp: 'HACCP' } };
+  const msg = (m) => { document.getElementById('msg').textContent = m; };
+
+  async function action(name, input) {
+    const res = await fetch('/ext/operations/traceability/actions/' + name, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    if (res.status === 401) { window.location.href = '/admin/login?redirect=' + encodeURIComponent('/admin/traceability'); throw new Error(''); }
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.detail || body.title || body.error || res.statusText);
+    return body.result;
+  }
+
+  function save(blob, filename) {
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = href;
+    a.download = filename;
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(href), 0);
+  }
+
+  // A cell a spreadsheet would run as a formula (= + - @, tab, CR) is written as text.
+  function cell(v) {
+    let s = v == null ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v);
+    if (/^[=+\-@\t\r]/.test(s) && !/^-?\d+(\.\d+)?$/.test(s)) s = "'" + s;
+    return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+
+  async function labels(ids) {
+    document.getElementById('title').textContent = t.labels;
+    try {
+      const r = await action('labels', { lot_ids: ids });
+      const bytes = Uint8Array.from(atob(r.data), (c) => c.charCodeAt(0));
+      const blob = new Blob([bytes], { type: r.content_type });
+      window.location.replace(URL.createObjectURL(blob));
+    } catch (e) { if (e.message) msg(e.message); }
+  }
+
+  function reports() {
+    document.getElementById('title').textContent = t.reports;
+    for (const id of ['kind', 'from', 'to', 'go']) document.getElementById(id === 'go' ? id : 'l-' + id).textContent = t[id];
+    const sel = document.getElementById('kind');
+    for (const [value, label] of Object.entries(t.kinds)) sel.append(new Option(label, value));
+    const form = document.getElementById('report');
+    form.hidden = false;
+    form.onsubmit = async (ev) => {
+      ev.preventDefault();
+      msg('');
+      const kind = sel.value;
+      const from = document.getElementById('from').value || undefined;
+      const to = document.getElementById('to').value || undefined;
+      if (kind === 'ansvsa' && (!from || !to)) { msg(t.range); return; }
+      try {
+        const r = await action('report', { kind, from, to });
+        if (!r.rows.length) { msg(t.empty); return; }
+        const cols = Object.keys(r.rows[0]);
+        const csv = [cols, ...r.rows.map((row) => cols.map((c) => row[c]))].map((line) => line.map(cell).join(',')).join('\r\n');
+        save(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }), `${kind}-${from || 'all'}-${to || 'all'}.csv`);
+      } catch (e) { if (e.message) msg(e.message); }
+    };
+  }
+
+  const ids = new URLSearchParams(location.search).get('label');
+  if (ids) labels(ids.split(',').filter(Boolean));
+  else reports();
+</script>
+</body>
+</html>

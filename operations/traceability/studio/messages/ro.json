@@ -230,5 +230,13 @@
   "operations.traceability.ui.toate": "Toate",
   "operations.traceability.ui.toate_statusurile": "Toate statusurile",
   "operations.traceability.ui.uuid_lot_sau_scana_i_qr_ul": "UUID lot sau scanați QR-ul...",
-  "operations.traceability.ui.valoare": "Valoare"
+  "operations.traceability.ui.valoare": "Valoare",
+  "operations.traceability.action.reports": "Rapoarte (CSV)",
+  "operations.traceability.action.setStatus": "Schimbă statusul",
+  "operations.traceability.col.checkedAt": "Verificat la",
+  "operations.traceability.col.customer": "Client",
+  "operations.traceability.col.reference": "Referință",
+  "operations.traceability.col.unit": "UM",
+  "operations.traceability.col.warehouse": "Depozit",
+  "operations.traceability.status.returned": "Returnat"
 }

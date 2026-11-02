@@ -1,0 +1,103 @@
+{
+  "name": "trace_production_orders",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "order_number",
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    {
+      "name": "recipe_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "trace_recipes"
+      }
+    },
+    {
+      "name": "output_lot_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "trace_lots"
+      }
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "values": [
+          "draft",
+          "in_progress",
+          "completed",
+          "cancelled"
+        ]
+      }
+    },
+    {
+      "name": "planned_quantity",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "actual_quantity",
+      "type": "decimal"
+    },
+    {
+      "name": "unit",
+      "type": "enum",
+      "required": true,
+      "options": {
+        "values": [
+          "kg",
+          "g",
+          "l",
+          "ml",
+          "buc",
+          "cutie",
+          "sac",
+          "palet"
+        ]
+      }
+    },
+    {
+      "name": "started_at",
+      "type": "datetime"
+    },
+    {
+      "name": "completed_at",
+      "type": "datetime"
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    }
+  ],
+  "relations": [
+    {
+      "name": "trace_production_orders_recipe_id",
+      "type": "m2o",
+      "field": "recipe_id",
+      "target": "trace_recipes",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "trace_production_orders_output_lot_id",
+      "type": "m2o",
+      "field": "output_lot_id",
+      "target": "trace_lots",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

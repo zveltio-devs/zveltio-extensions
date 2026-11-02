@@ -1,0 +1,99 @@
+{
+  "name": "trace_dispatches",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "invoice_id",
+      "type": "uuid",
+      "indexed": true
+    },
+    {
+      "name": "invoice_number",
+      "type": "text"
+    },
+    {
+      "name": "invoice_line_id",
+      "type": "uuid",
+      "unique": true
+    },
+    {
+      "name": "customer_id",
+      "type": "uuid",
+      "indexed": true
+    },
+    {
+      "name": "customer_name",
+      "type": "text"
+    },
+    {
+      "name": "lot_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "trace_lots"
+      }
+    },
+    {
+      "name": "item_name_from_invoice",
+      "type": "text"
+    },
+    {
+      "name": "quantity_invoiced",
+      "type": "decimal"
+    },
+    {
+      "name": "quantity_dispatched",
+      "type": "decimal"
+    },
+    {
+      "name": "unit",
+      "type": "enum",
+      "required": true,
+      "options": {
+        "values": [
+          "kg",
+          "g",
+          "l",
+          "ml",
+          "buc",
+          "cutie",
+          "sac",
+          "palet"
+        ]
+      }
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "values": [
+          "pending",
+          "confirmed",
+          "cancelled"
+        ]
+      }
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    },
+    {
+      "name": "confirmed_at",
+      "type": "datetime"
+    }
+  ],
+  "relations": [
+    {
+      "name": "trace_dispatches_lot_id",
+      "type": "m2o",
+      "field": "lot_id",
+      "target": "trace_lots",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

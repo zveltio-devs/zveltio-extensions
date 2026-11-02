@@ -6,10 +6,10 @@
       "id": "lotDetail",
       "layout": "detail",
       "detail": {
-        "loadEndpoint": "/ext/operations/traceability/lots/{id}",
-        "loadPath": "data",
+        "loadEndpoint": "/api/data/trace_lots?id[eq]={id}&expand=item_id,supplier_id,location_id&limit=1",
+        "loadPath": "records.0",
         "titleKey": "lot_number",
-        "subtitleKey": "item_name",
+        "subtitleKey": "item_id_expanded.name",
         "badgeKey": "status",
         "badge": {
           "colors": {
@@ -24,22 +24,10 @@
         "backLabel": "operations.traceability.btn.back",
         "actions": [
           {
-            "id": "release",
-            "icon": "CheckCircle",
-            "label": "operations.traceability.action.release",
-            "method": "PATCH",
-            "endpoint": "/ext/operations/traceability/lots/{id}/release",
-            "visibleWhen": {
-              "field": "status",
-              "equals": "quarantine"
-            },
-            "confirm": "operations.traceability.confirmReleaseLot"
-          },
-          {
             "id": "label",
             "kind": "download",
             "label": "operations.traceability.ui.printeaz_etichet",
-            "endpoint": "/ext/operations/traceability/labels/{id}"
+            "endpoint": "/ext/operations/traceability/app/tools.html?label={id}"
           }
         ],
         "panels": [
@@ -49,7 +37,7 @@
             "kind": "fields",
             "fields": [
               {
-                "key": "item_name",
+                "key": "item_id_expanded.name",
                 "label": "operations.traceability.form.product"
               },
               {
@@ -61,11 +49,11 @@
                 "label": "operations.traceability.form.unit"
               },
               {
-                "key": "supplier_name",
+                "key": "supplier_id_expanded.name",
                 "label": "operations.traceability.form.supplier"
               },
               {
-                "key": "warehouse",
+                "key": "location_id_expanded.warehouse",
                 "label": "operations.traceability.form.location"
               },
               {
@@ -94,32 +82,14 @@
             ]
           },
           {
-            "id": "qr",
-            "label": "operations.traceability.lot.tab.qr",
-            "kind": "image",
-            "dataSource": "/ext/operations/traceability/labels/{id}/qr-dataurl",
-            "dataPath": "data",
-            "caption": "operations.traceability.lot.qrCaption",
-            "maxWidth": "240px"
-          },
-          {
-            "id": "tree",
-            "label": "operations.traceability.lot.tab.tree",
-            "kind": "tree",
-            "dataSource": "/ext/operations/traceability/tree/{id}/upstream",
-            "dataPath": "data",
-            "childrenKey": "inputs",
-            "nodeTemplate": "{item_name} — {lot_number} [{status}]"
-          },
-          {
             "id": "timeline",
             "label": "operations.traceability.lot.tab.timeline",
             "kind": "table",
-            "dataSource": "/ext/operations/traceability/tree/{id}/timeline",
-            "dataPath": "data",
+            "dataSource": "/api/data/trace_movements?lot_id[eq]={id}&expand=from_location_id,to_location_id&sort=created_at&order=asc&limit=500",
+            "dataPath": "records",
             "columns": [
               {
-                "key": "performed_at",
+                "key": "created_at",
                 "label": "common.col.created",
                 "type": "date"
               },

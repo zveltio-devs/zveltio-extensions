@@ -10,6 +10,13 @@
       "icon": "ScanSearch",
       "label": "operations.traceability.action.openScanner",
       "endpoint": "/ext/operations/traceability/app/"
+    },
+    {
+      "id": "reports",
+      "kind": "open",
+      "icon": "FileSpreadsheet",
+      "label": "operations.traceability.action.reports",
+      "endpoint": "/ext/operations/traceability/app/tools.html"
     }
   ],
   "resources": [
@@ -17,10 +24,10 @@
       "id": "suppliers",
       "label": "operations.traceability.tab.suppliers",
       "icon": "Truck",
-      "dataSource": "/ext/operations/traceability/suppliers",
-      "dataPath": "data",
+      "dataSource": "/api/data/trace_suppliers?sort=name&order=asc&limit=500",
+      "dataPath": "records",
       "search": {
-        "param": "q",
+        "param": "search",
         "placeholder": "common.search"
       },
       "columns": [
@@ -51,7 +58,7 @@
         }
       ],
       "form": {
-        "endpoint": "/ext/operations/traceability/suppliers",
+        "endpoint": "/api/data/trace_suppliers",
         "fields": [
           {
             "name": "name",
@@ -99,10 +106,10 @@
       "id": "items",
       "label": "operations.traceability.tab.items",
       "icon": "Package",
-      "dataSource": "/ext/operations/traceability/items",
-      "dataPath": "data",
+      "dataSource": "/api/data/trace_items?sort=name&order=asc&limit=500",
+      "dataPath": "records",
       "search": {
-        "param": "q",
+        "param": "search",
         "placeholder": "common.search"
       },
       "columns": [
@@ -133,7 +140,7 @@
         }
       ],
       "form": {
-        "endpoint": "/ext/operations/traceability/items",
+        "endpoint": "/api/data/trace_items",
         "fields": [
           {
             "name": "code",
@@ -227,8 +234,8 @@
       "id": "locations",
       "label": "operations.traceability.tab.locations",
       "icon": "MapPin",
-      "dataSource": "/ext/operations/traceability/locations",
-      "dataPath": "data",
+      "dataSource": "/api/data/trace_locations?sort=warehouse&order=asc&limit=500",
+      "dataPath": "records",
       "columns": [
         {
           "key": "warehouse",
@@ -260,12 +267,12 @@
           "variant": "text-error",
           "label": "common.delete",
           "method": "DELETE",
-          "endpoint": "/ext/operations/traceability/locations/{id}",
+          "endpoint": "/api/data/trace_locations/{id}",
           "confirm": "ext.confirmDelete"
         }
       ],
       "form": {
-        "endpoint": "/ext/operations/traceability/locations",
+        "endpoint": "/api/data/trace_locations",
         "fields": [
           {
             "name": "warehouse",
@@ -313,8 +320,8 @@
       "id": "lots",
       "label": "operations.traceability.tab.lots",
       "icon": "Package",
-      "dataSource": "/ext/operations/traceability/lots",
-      "dataPath": "data",
+      "dataSource": "/api/data/trace_lots?expand=item_id,supplier_id&sort=created_at&order=desc",
+      "dataPath": "records",
       "columns": [
         {
           "key": "lot_number",
@@ -322,7 +329,7 @@
           "type": "mono"
         },
         {
-          "key": "item_name",
+          "key": "item_id_expanded.name",
           "label": "operations.traceability.form.product"
         },
         {
@@ -363,7 +370,7 @@
           ]
         },
         {
-          "key": "supplier_name",
+          "key": "supplier_id_expanded.name",
           "label": "operations.traceability.form.supplier"
         }
       ],
@@ -377,26 +384,75 @@
         },
         {
           "id": "label",
-          "kind": "download",
+          "kind": "open",
           "icon": "Download",
           "label": "operations.traceability.ui.printeaz_etichet",
-          "endpoint": "/ext/operations/traceability/labels/{id}"
+          "endpoint": "/ext/operations/traceability/app/tools.html?label={id}"
         },
         {
           "id": "release",
           "icon": "CheckCircle",
           "label": "operations.traceability.action.release",
-          "method": "PATCH",
-          "endpoint": "/ext/operations/traceability/lots/{id}/release",
+          "method": "POST",
+          "endpoint": "/ext/operations/traceability/actions/releaseLot",
           "visibleWhen": {
             "field": "status",
             "equals": "quarantine"
           },
-          "confirm": "operations.traceability.confirmReleaseLot"
+          "confirm": "operations.traceability.confirmReleaseLot",
+          "body": {
+            "id": "{id}"
+          }
+        },
+        {
+          "id": "status",
+          "label": "operations.traceability.action.setStatus",
+          "method": "POST",
+          "endpoint": "/ext/operations/traceability/actions/setLotStatus",
+          "body": {
+            "id": "{id}"
+          },
+          "prompt": {
+            "fields": [
+              {
+                "name": "status",
+                "label": "common.col.status",
+                "type": "select",
+                "required": true,
+                "options": [
+                  {
+                    "value": "quarantine",
+                    "label": "operations.traceability.status.quarantine"
+                  },
+                  {
+                    "value": "available",
+                    "label": "operations.traceability.status.available"
+                  },
+                  {
+                    "value": "exhausted",
+                    "label": "operations.traceability.status.exhausted"
+                  },
+                  {
+                    "value": "recalled",
+                    "label": "operations.traceability.status.recalled"
+                  },
+                  {
+                    "value": "returned",
+                    "label": "operations.traceability.status.returned"
+                  }
+                ]
+              },
+              {
+                "name": "notes",
+                "label": "common.col.notes",
+                "type": "textarea"
+              }
+            ]
+          }
         }
       ],
       "form": {
-        "endpoint": "/ext/operations/traceability/lots",
+        "endpoint": "/ext/operations/traceability/actions/receiveLot",
         "fields": [
           {
             "name": "gs1_scan",
@@ -405,15 +461,14 @@
             "placeholder": "operations.traceability.form.gs1Placeholder",
             "lookup": {
               "label": "operations.traceability.action.parseGs1",
-              "endpoint": "/ext/operations/traceability/scan/parse-gs1",
+              "endpoint": "/ext/operations/traceability/actions/parseGs1",
               "body": {
                 "raw": "{gs1_scan}"
               },
               "map": {
-                "supplier_lot_ref": "data.supplier_lot_ref",
-                "best_before_date": "data.best_before_date",
-                "gtin_scanned": "data.gtin",
-                "sscc": "data.sscc"
+                "supplier_lot_ref": "result.supplier_lot_ref",
+                "best_before_date": "result.best_before_date",
+                "gtin_scanned": "result.gtin"
               }
             }
           },
@@ -424,10 +479,13 @@
             "required": true,
             "colSpan": 1,
             "relation": {
-              "dataSource": "/ext/operations/traceability/items",
-              "dataPath": "data",
+              "dataSource": "/api/data/trace_items?is_active[eq]=true&sort=name&order=asc&limit=500",
+              "dataPath": "records",
               "valueKey": "id",
-              "labelKey": "name"
+              "labelKey": [
+                "code",
+                "name"
+              ]
             }
           },
           {
@@ -494,8 +552,8 @@
             "type": "relation",
             "colSpan": 1,
             "relation": {
-              "dataSource": "/ext/operations/traceability/suppliers",
-              "dataPath": "data",
+              "dataSource": "/api/data/trace_suppliers?is_active[eq]=true&sort=name&order=asc&limit=500",
+              "dataPath": "records",
               "valueKey": "id",
               "labelKey": "name"
             }
@@ -506,10 +564,14 @@
             "type": "relation",
             "colSpan": 1,
             "relation": {
-              "dataSource": "/ext/operations/traceability/locations",
-              "dataPath": "data",
+              "dataSource": "/api/data/trace_locations?sort=warehouse&order=asc&limit=500",
+              "dataPath": "records",
               "valueKey": "id",
-              "labelKey": "warehouse"
+              "labelKey": [
+                "warehouse",
+                "row",
+                "shelf"
+              ]
             }
           },
           {
@@ -562,7 +624,7 @@
       },
       "filters": [
         {
-          "param": "status",
+          "param": "status[eq]",
           "options": [
             {
               "value": "all",
@@ -589,18 +651,24 @@
       ],
       "pagination": {
         "limit": 50
-      }
+      },
+      "readOnlyReason": "a lot is received, released and drawn from only through the actions, so its stock and its trail stay one record."
     },
     {
       "id": "production",
       "label": "operations.traceability.tab.production",
       "icon": "Factory",
-      "dataSource": "/ext/operations/traceability/production",
-      "dataPath": "data",
+      "dataSource": "/api/data/trace_production_orders?expand=output_lot_id&sort=created_at&order=desc",
+      "dataPath": "records",
       "columns": [
         {
           "key": "order_number",
           "label": "operations.traceability.col.order",
+          "type": "mono"
+        },
+        {
+          "key": "output_lot_id_expanded.lot_number",
+          "label": "operations.traceability.col.lot",
           "type": "mono"
         },
         {
@@ -641,19 +709,109 @@
           "id": "start",
           "icon": "Play",
           "label": "operations.traceability.action.start",
-          "method": "PATCH",
-          "endpoint": "/ext/operations/traceability/production/{id}/start",
+          "method": "POST",
+          "endpoint": "/ext/operations/traceability/actions/startProduction",
           "visibleWhen": {
             "field": "status",
             "equals": "draft"
+          },
+          "body": {
+            "id": "{id}"
+          }
+        },
+        {
+          "id": "consume",
+          "label": "operations.traceability.action.consume",
+          "method": "POST",
+          "endpoint": "/ext/operations/traceability/actions/consumeLot",
+          "body": {
+            "production_order_id": "{id}"
+          },
+          "visibleWhen": {
+            "field": "status",
+            "equals": "in_progress"
+          },
+          "prompt": {
+            "fields": [
+              {
+                "name": "lot_id",
+                "label": "operations.traceability.col.lot",
+                "type": "relation",
+                "required": true,
+                "relation": {
+                  "dataSource": "/api/data/trace_lots?status[eq]=available&expand=item_id&sort=lot_number&order=asc&limit=500",
+                  "dataPath": "records",
+                  "valueKey": "id",
+                  "labelKey": [
+                    "lot_number",
+                    "item_id_expanded.name"
+                  ]
+                }
+              },
+              {
+                "name": "quantity_used",
+                "label": "operations.traceability.col.qty",
+                "type": "number",
+                "required": true
+              }
+            ]
+          }
+        },
+        {
+          "id": "haccp",
+          "label": "operations.traceability.action.haccp",
+          "method": "POST",
+          "endpoint": "/ext/operations/traceability/actions/recordHaccp",
+          "body": {
+            "production_order_id": "{id}"
+          },
+          "visibleWhen": {
+            "field": "status",
+            "equals": "in_progress"
+          },
+          "prompt": {
+            "fields": [
+              {
+                "name": "ccp",
+                "label": "operations.traceability.col.ccp",
+                "required": true
+              },
+              {
+                "name": "value",
+                "label": "operations.traceability.col.value",
+                "type": "number",
+                "required": true
+              },
+              {
+                "name": "unit",
+                "label": "operations.traceability.col.unit",
+                "required": true
+              },
+              {
+                "name": "limit_min",
+                "label": "operations.traceability.col.limitMin",
+                "type": "number"
+              },
+              {
+                "name": "limit_max",
+                "label": "operations.traceability.col.limitMax",
+                "type": "number"
+              },
+              {
+                "name": "ok",
+                "label": "operations.traceability.col.ok",
+                "type": "boolean",
+                "required": true
+              }
+            ]
           }
         },
         {
           "id": "complete",
           "icon": "CheckCircle",
           "label": "operations.traceability.action.complete",
-          "method": "PATCH",
-          "endpoint": "/ext/operations/traceability/production/{id}/complete",
+          "method": "POST",
+          "endpoint": "/ext/operations/traceability/actions/completeProduction",
           "visibleWhen": {
             "field": "status",
             "equals": "in_progress"
@@ -668,11 +826,14 @@
                 "required": true
               }
             ]
+          },
+          "body": {
+            "id": "{id}"
           }
         }
       ],
       "form": {
-        "endpoint": "/ext/operations/traceability/production",
+        "endpoint": "/ext/operations/traceability/actions/createProductionOrder",
         "fields": [
           {
             "name": "recipe_id",
@@ -680,8 +841,8 @@
             "type": "relation",
             "colSpan": 2,
             "relation": {
-              "dataSource": "/ext/operations/traceability/production/recipes",
-              "dataPath": "data",
+              "dataSource": "/api/data/trace_recipes?is_active[eq]=true&sort=name&order=asc&limit=500",
+              "dataPath": "records",
               "valueKey": "id",
               "labelKey": "name"
             }
@@ -693,10 +854,13 @@
             "required": true,
             "colSpan": 2,
             "relation": {
-              "dataSource": "/ext/operations/traceability/items",
-              "dataPath": "data",
+              "dataSource": "/api/data/trace_items?is_active[eq]=true&sort=name&order=asc&limit=500",
+              "dataPath": "records",
               "valueKey": "id",
-              "labelKey": "name"
+              "labelKey": [
+                "code",
+                "name"
+              ]
             }
           },
           {
@@ -749,7 +913,7 @@
       },
       "filters": [
         {
-          "param": "status",
+          "param": "status[eq]",
           "options": [
             {
               "value": "all",
@@ -769,28 +933,37 @@
             }
           ]
         }
-      ]
+      ],
+      "readOnlyReason": "an order is created, started, fed and completed only through the actions, so its output lot follows it."
     },
     {
       "id": "dispatches",
       "label": "operations.traceability.tab.dispatches",
       "icon": "Truck",
-      "dataSource": "/ext/operations/traceability/dispatches",
-      "dataPath": "data",
+      "dataSource": "/api/data/trace_dispatches?expand=lot_id&sort=created_at&order=desc",
+      "dataPath": "records",
       "columns": [
         {
-          "key": "id",
-          "label": "operations.traceability.col.dispatchId",
+          "key": "invoice_number",
+          "label": "operations.traceability.col.invoice",
           "type": "mono"
         },
         {
-          "key": "lot_number",
+          "key": "customer_name",
+          "label": "operations.traceability.col.customer"
+        },
+        {
+          "key": "lot_id_expanded.lot_number",
           "label": "operations.traceability.col.lot",
           "type": "mono"
         },
         {
-          "key": "item_name",
+          "key": "item_name_from_invoice",
           "label": "operations.traceability.form.product"
+        },
+        {
+          "key": "quantity_invoiced",
+          "label": "operations.traceability.col.qty"
         },
         {
           "key": "status",
@@ -799,7 +972,7 @@
         },
         {
           "key": "created_at",
-          "label": "common.col.created",
+          "label": "common.col.date",
           "type": "date"
         }
       ],
@@ -808,7 +981,7 @@
           "id": "assign",
           "label": "operations.traceability.action.assignLot",
           "method": "POST",
-          "endpoint": "/ext/operations/traceability/dispatches/{id}/assign-lot",
+          "endpoint": "/ext/operations/traceability/actions/assignDispatchLot",
           "visibleWhen": {
             "field": "status",
             "equals": "pending"
@@ -821,16 +994,19 @@
                 "type": "relation",
                 "required": true,
                 "relation": {
-                  "dataSource": "/ext/operations/traceability/lots?status=available",
-                  "dataPath": "data",
+                  "dataSource": "/api/data/trace_lots?status[eq]=available&expand=item_id&sort=lot_number&order=asc&limit=500",
+                  "dataPath": "records",
                   "valueKey": "id",
                   "labelKey": [
                     "lot_number",
-                    "item_name"
+                    "item_id_expanded.name"
                   ]
                 }
               }
             ]
+          },
+          "body": {
+            "id": "{id}"
           }
         },
         {
@@ -838,7 +1014,7 @@
           "icon": "CheckCircle",
           "label": "operations.traceability.action.confirm",
           "method": "POST",
-          "endpoint": "/ext/operations/traceability/dispatches/{id}/confirm",
+          "endpoint": "/ext/operations/traceability/actions/confirmDispatch",
           "prompt": {
             "fields": [
               {
@@ -852,6 +1028,9 @@
           "visibleWhen": {
             "field": "status",
             "equals": "pending"
+          },
+          "body": {
+            "id": "{id}"
           }
         },
         {
@@ -860,7 +1039,7 @@
           "variant": "text-error",
           "label": "common.cancel",
           "method": "POST",
-          "endpoint": "/ext/operations/traceability/dispatches/{id}/cancel",
+          "endpoint": "/ext/operations/traceability/actions/cancelDispatch",
           "prompt": {
             "fields": [
               {
@@ -873,12 +1052,15 @@
           "visibleWhen": {
             "field": "status",
             "equals": "pending"
+          },
+          "body": {
+            "id": "{id}"
           }
         }
       ],
       "filters": [
         {
-          "param": "status",
+          "param": "status[eq]",
           "options": [
             {
               "value": "all",
@@ -900,7 +1082,7 @@
         }
       ],
       "form": {
-        "endpoint": "/ext/operations/traceability/dispatches/direct",
+        "endpoint": "/ext/operations/traceability/actions/directDispatch",
         "fields": [
           {
             "name": "lot_id",
@@ -909,10 +1091,13 @@
             "required": true,
             "colSpan": 2,
             "relation": {
-              "dataSource": "/ext/operations/traceability/lots?status=available",
-              "dataPath": "data",
+              "dataSource": "/api/data/trace_lots?status[eq]=available&expand=item_id&sort=lot_number&order=asc&limit=500",
+              "dataPath": "records",
               "valueKey": "id",
-              "labelKey": "lot_number"
+              "labelKey": [
+                "lot_number",
+                "item_id_expanded.name"
+              ]
             }
           },
           {
@@ -922,9 +1107,8 @@
             "colSpan": 1
           },
           {
-            "name": "invoice_ref",
-            "label": "operations.traceability.col.invoice",
-            "colSpan": 1
+            "name": "invoice_number",
+            "label": "operations.traceability.col.invoice"
           },
           {
             "name": "quantity_dispatched",
@@ -946,17 +1130,13 @@
       "id": "recalls",
       "label": "operations.traceability.tab.recalls",
       "icon": "AlertTriangle",
-      "dataSource": "/ext/operations/traceability/recalls",
-      "dataPath": "data",
+      "dataSource": "/api/data/trace_recalls?expand=lot_id&sort=created_at&order=desc",
+      "dataPath": "records",
       "columns": [
         {
-          "key": "lot_number",
+          "key": "lot_id_expanded.lot_number",
           "label": "operations.traceability.col.lot",
           "type": "mono"
-        },
-        {
-          "key": "item_name",
-          "label": "operations.traceability.form.product"
         },
         {
           "key": "scope",
@@ -973,7 +1153,7 @@
           "label": "common.col.reason"
         },
         {
-          "key": "initiated_at",
+          "key": "created_at",
           "label": "common.col.created",
           "type": "date"
         }
@@ -983,15 +1163,11 @@
           "id": "resolve",
           "icon": "CheckCircle",
           "label": "operations.traceability.action.resolve",
-          "method": "PATCH",
-          "endpoint": "/ext/operations/traceability/recalls/{id}/resolve",
+          "method": "POST",
+          "endpoint": "/ext/operations/traceability/actions/resolveRecall",
           "visibleWhen": {
             "field": "status",
-            "in": [
-              "open",
-              "in_progress",
-              "active"
-            ]
+            "equals": "active"
           },
           "prompt": {
             "fields": [
@@ -1002,52 +1178,14 @@
                 "required": true
               }
             ]
+          },
+          "body": {
+            "id": "{id}"
           }
         }
       ],
       "form": {
-        "endpoint": "/ext/operations/traceability/recalls/initiate",
-        "preview": {
-          "endpoint": "/ext/operations/traceability/recalls/simulate/{lot_id}",
-          "statsPath": "data",
-          "submitLabel": "operations.traceability.action.simulate",
-          "confirmLabel": "operations.traceability.action.initiateRecall",
-          "stats": [
-            {
-              "label": "operations.traceability.recall.lotsAffected",
-              "key": "total_lots_affected"
-            },
-            {
-              "label": "operations.traceability.recall.customersAffected",
-              "key": "total_customers_affected"
-            },
-            {
-              "label": "operations.traceability.recall.recommended",
-              "key": "recommended_action"
-            }
-          ],
-          "listPath": "data.affected_lots",
-          "listColumns": [
-            {
-              "key": "lot_number",
-              "label": "operations.traceability.col.lot",
-              "type": "mono"
-            },
-            {
-              "key": "item_name",
-              "label": "operations.traceability.form.product"
-            },
-            {
-              "key": "status",
-              "label": "common.col.status",
-              "type": "badge"
-            },
-            {
-              "key": "quantity_remaining",
-              "label": "operations.traceability.col.qtyRemaining"
-            }
-          ]
-        },
+        "endpoint": "/ext/operations/traceability/actions/initiateRecall",
         "fields": [
           {
             "name": "lot_id",
@@ -1056,10 +1194,13 @@
             "required": true,
             "colSpan": 2,
             "relation": {
-              "dataSource": "/ext/operations/traceability/lots",
-              "dataPath": "data",
+              "dataSource": "/api/data/trace_lots?expand=item_id&sort=created_at&order=desc&limit=500",
+              "dataPath": "records",
               "valueKey": "id",
-              "labelKey": "lot_number"
+              "labelKey": [
+                "lot_number",
+                "item_id_expanded.name"
+              ]
             }
           },
           {
@@ -1094,7 +1235,7 @@
       },
       "filters": [
         {
-          "param": "status",
+          "param": "status[eq]",
           "options": [
             {
               "value": "all",
@@ -1116,47 +1257,35 @@
       "id": "receptionLog",
       "label": "operations.traceability.report.reception",
       "icon": "FileText",
-      "dataSource": "/ext/operations/traceability/reports/reception-log",
-      "dataPath": "data",
-      "filters": [
-        {
-          "type": "dateRange",
-          "fromParam": "from",
-          "toParam": "to",
-          "label": "operations.traceability.report.dateRange"
-        }
-      ],
+      "dataSource": "/api/data/trace_movements?type[eq]=reception&expand=lot_id,to_location_id&sort=created_at&order=desc&limit=500",
+      "dataPath": "records",
       "columns": [
         {
-          "key": "Număr lot",
+          "key": "created_at",
+          "label": "common.col.date",
+          "type": "date"
+        },
+        {
+          "key": "lot_id_expanded.lot_number",
           "label": "operations.traceability.col.lot",
           "type": "mono"
         },
         {
-          "key": "Produs",
-          "label": "operations.traceability.form.product"
-        },
-        {
-          "key": "Cantitate",
+          "key": "quantity",
           "label": "operations.traceability.col.qty"
         },
         {
-          "key": "Furnizor",
-          "label": "operations.traceability.form.supplier"
+          "key": "unit",
+          "label": "operations.traceability.col.unit"
         },
         {
-          "key": "Data/Ora",
-          "label": "common.col.created",
-          "type": "date"
-        }
-      ],
-      "rowActions": [
+          "key": "to_location_id_expanded.warehouse",
+          "label": "operations.traceability.col.warehouse"
+        },
         {
-          "id": "csv",
-          "kind": "download",
-          "icon": "Download",
-          "label": "common.download",
-          "endpoint": "/ext/operations/traceability/reports/reception-log?format=csv"
+          "key": "reference_number",
+          "label": "operations.traceability.col.reference",
+          "type": "mono"
         }
       ]
     },
@@ -1164,40 +1293,34 @@
       "id": "stockSnapshot",
       "label": "operations.traceability.report.stock",
       "icon": "FileText",
-      "dataSource": "/ext/operations/traceability/reports/stock-snapshot",
-      "dataPath": "data",
+      "dataSource": "/api/data/trace_lots?status[eq]=available&expand=item_id,location_id&sort=best_before_date&order=asc&limit=500",
+      "dataPath": "records",
       "columns": [
         {
-          "key": "Produs",
+          "key": "item_id_expanded.name",
           "label": "operations.traceability.form.product"
         },
         {
-          "key": "Lot",
+          "key": "lot_number",
           "label": "operations.traceability.col.lot",
           "type": "mono"
         },
         {
-          "key": "Cantitate",
+          "key": "quantity_remaining",
           "label": "operations.traceability.col.qty"
         },
         {
-          "key": "Status",
-          "label": "common.col.status",
-          "type": "badge"
+          "key": "unit",
+          "label": "operations.traceability.col.unit"
         },
         {
-          "key": "Valabil până",
+          "key": "best_before_date",
           "label": "operations.traceability.col.bbd",
           "type": "date"
-        }
-      ],
-      "rowActions": [
+        },
         {
-          "id": "csv",
-          "kind": "download",
-          "icon": "Download",
-          "label": "common.download",
-          "endpoint": "/ext/operations/traceability/reports/stock-snapshot?format=csv"
+          "key": "location_id_expanded.warehouse",
+          "label": "operations.traceability.col.warehouse"
         }
       ]
     },
@@ -1205,48 +1328,31 @@
       "id": "consumptionLog",
       "label": "operations.traceability.report.consumption",
       "icon": "FileText",
-      "dataSource": "/ext/operations/traceability/reports/consumption-log",
-      "dataPath": "data",
-      "filters": [
-        {
-          "type": "dateRange",
-          "fromParam": "from",
-          "toParam": "to",
-          "label": "operations.traceability.report.dateRange"
-        }
-      ],
+      "dataSource": "/api/data/trace_lot_consumptions?expand=lot_id,production_order_id&sort=created_at&order=desc&limit=500",
+      "dataPath": "records",
       "columns": [
         {
-          "key": "Ordin",
+          "key": "created_at",
+          "label": "common.col.date",
+          "type": "date"
+        },
+        {
+          "key": "production_order_id_expanded.order_number",
           "label": "operations.traceability.col.order",
           "type": "mono"
         },
         {
-          "key": "Lot",
+          "key": "lot_id_expanded.lot_number",
           "label": "operations.traceability.col.lot",
           "type": "mono"
         },
         {
-          "key": "Produs",
-          "label": "operations.traceability.form.product"
-        },
-        {
-          "key": "Cantitate",
+          "key": "quantity_used",
           "label": "operations.traceability.col.qty"
         },
         {
-          "key": "Data/Ora",
-          "label": "common.col.created",
-          "type": "date"
-        }
-      ],
-      "rowActions": [
-        {
-          "id": "csv",
-          "kind": "download",
-          "icon": "Download",
-          "label": "common.download",
-          "endpoint": "/ext/operations/traceability/reports/consumption-log?format=csv"
+          "key": "unit",
+          "label": "operations.traceability.col.unit"
         }
       ]
     },
@@ -1254,92 +1360,35 @@
       "id": "haccpLog",
       "label": "operations.traceability.report.haccp",
       "icon": "FileText",
-      "dataSource": "/ext/operations/traceability/reports/haccp-log",
-      "dataPath": "data",
-      "filters": [
-        {
-          "type": "dateRange",
-          "fromParam": "from",
-          "toParam": "to",
-          "label": "operations.traceability.report.dateRange"
-        }
-      ],
+      "dataSource": "/api/data/trace_haccp_checks?expand=production_order_id&sort=checked_at&order=desc&limit=500",
+      "dataPath": "records",
       "columns": [
         {
-          "key": "Ordin",
+          "key": "checked_at",
+          "label": "common.col.date",
+          "type": "date"
+        },
+        {
+          "key": "production_order_id_expanded.order_number",
           "label": "operations.traceability.col.order",
           "type": "mono"
         },
         {
-          "key": "CCP",
+          "key": "ccp",
           "label": "operations.traceability.col.ccp"
         },
         {
-          "key": "Valoare",
+          "key": "value",
           "label": "operations.traceability.col.value"
         },
         {
-          "key": "OK",
+          "key": "unit",
+          "label": "operations.traceability.col.unit"
+        },
+        {
+          "key": "ok",
           "label": "operations.traceability.col.ok",
           "type": "boolean"
-        },
-        {
-          "key": "Data/Ora",
-          "label": "common.col.created",
-          "type": "date"
-        }
-      ],
-      "rowActions": [
-        {
-          "id": "csv",
-          "kind": "download",
-          "icon": "Download",
-          "label": "common.download",
-          "endpoint": "/ext/operations/traceability/reports/haccp-log?format=csv"
-        }
-      ]
-    },
-    {
-      "id": "ansvsa",
-      "label": "operations.traceability.report.ansvsa",
-      "icon": "FileText",
-      "dataSource": "/ext/operations/traceability/reports/ansvsa-traceability",
-      "dataPath": "data",
-      "filters": [
-        {
-          "type": "dateRange",
-          "fromParam": "from",
-          "toParam": "to",
-          "label": "operations.traceability.report.dateRange",
-          "required": true
-        }
-      ],
-      "columns": [
-        {
-          "key": "Lot",
-          "label": "operations.traceability.col.lot",
-          "type": "mono"
-        },
-        {
-          "key": "Produs",
-          "label": "operations.traceability.form.product"
-        },
-        {
-          "key": "Furnizor",
-          "label": "operations.traceability.form.supplier"
-        },
-        {
-          "key": "Mișcări",
-          "label": "operations.traceability.col.movements"
-        }
-      ],
-      "rowActions": [
-        {
-          "id": "csv",
-          "kind": "download",
-          "icon": "Download",
-          "label": "common.download",
-          "endpoint": "/ext/operations/traceability/reports/ansvsa-traceability?format=csv"
         }
       ]
     }

@@ -230,5 +230,13 @@
   "operations.traceability.ui.toate": "All",
   "operations.traceability.ui.toate_statusurile": "All statuses",
   "operations.traceability.ui.uuid_lot_sau_scana_i_qr_ul": "Lot UUID or scan the QR...",
-  "operations.traceability.ui.valoare": "Value"
+  "operations.traceability.ui.valoare": "Value",
+  "operations.traceability.action.reports": "Reports (CSV)",
+  "operations.traceability.action.setStatus": "Change status",
+  "operations.traceability.col.checkedAt": "Checked at",
+  "operations.traceability.col.customer": "Customer",
+  "operations.traceability.col.reference": "Reference",
+  "operations.traceability.col.unit": "Unit",
+  "operations.traceability.col.warehouse": "Warehouse",
+  "operations.traceability.status.returned": "Returned"
 }

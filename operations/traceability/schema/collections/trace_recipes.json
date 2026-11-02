@@ -1,0 +1,74 @@
+{
+  "name": "trace_recipes",
+  "fields": [
+    {
+      "name": "output_item_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "trace_items"
+      }
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "version",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 1
+    },
+    {
+      "name": "output_quantity",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "output_unit",
+      "type": "enum",
+      "required": true,
+      "options": {
+        "values": [
+          "kg",
+          "g",
+          "l",
+          "ml",
+          "buc",
+          "cutie",
+          "sac",
+          "palet"
+        ]
+      }
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "defaultValue": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "trace_recipes_output_item_id",
+      "type": "m2o",
+      "field": "output_item_id",
+      "target": "trace_items",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "output_quantity",
+      "rule": "min",
+      "config": {
+        "value": 1e-06
+      },
+      "message": "A recipe yields a positive quantity."
+    }
+  ]
+}

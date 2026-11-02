@@ -1,0 +1,60 @@
+{
+  "name": "trace_haccp_checks",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "production_order_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "trace_production_orders"
+      }
+    },
+    {
+      "name": "ccp",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "value",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "unit",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "limit_min",
+      "type": "decimal"
+    },
+    {
+      "name": "limit_max",
+      "type": "decimal"
+    },
+    {
+      "name": "ok",
+      "type": "boolean",
+      "required": true
+    },
+    {
+      "name": "checked_at",
+      "type": "datetime",
+      "required": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "trace_haccp_checks_production_order_id",
+      "type": "m2o",
+      "field": "production_order_id",
+      "target": "trace_production_orders",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

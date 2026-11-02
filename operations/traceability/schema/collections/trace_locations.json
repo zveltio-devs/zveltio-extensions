@@ -1,0 +1,33 @@
+{
+  "name": "trace_locations",
+  "fields": [
+    {
+      "name": "warehouse",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "row",
+      "type": "text"
+    },
+    {
+      "name": "shelf",
+      "type": "text"
+    },
+    {
+      "name": "description",
+      "type": "textarea"
+    },
+    {
+      "name": "temperature_zone",
+      "type": "enum",
+      "options": {
+        "values": [
+          "ambient",
+          "chilled",
+          "frozen"
+        ]
+      }
+    }
+  ]
+}

@@ -6,10 +6,10 @@
       "id": "productionDetail",
       "layout": "detail",
       "detail": {
-        "loadEndpoint": "/ext/operations/traceability/production/{id}",
-        "loadPath": "data",
+        "loadEndpoint": "/api/data/trace_production_orders?id[eq]={id}&expand=recipe_id,output_lot_id&limit=1",
+        "loadPath": "records.0",
         "titleKey": "order_number",
-        "subtitleKey": "recipe_name",
+        "subtitleKey": "recipe_id_expanded.name",
         "badgeKey": "status",
         "badge": {
           "colors": {
@@ -20,19 +20,6 @@
         },
         "backHref": "/traceability",
         "backLabel": "operations.traceability.btn.back",
-        "actions": [
-          {
-            "id": "start",
-            "icon": "Play",
-            "label": "operations.traceability.action.start",
-            "method": "PATCH",
-            "endpoint": "/ext/operations/traceability/production/{id}/start",
-            "visibleWhen": {
-              "field": "status",
-              "equals": "draft"
-            }
-          }
-        ],
         "panels": [
           {
             "id": "info",
@@ -52,7 +39,7 @@
                 "label": "operations.traceability.form.unit"
               },
               {
-                "key": "output_lot_number",
+                "key": "output_lot_id_expanded.lot_number",
                 "label": "operations.traceability.col.lot",
                 "type": "mono"
               },
@@ -68,121 +55,16 @@
             ]
           },
           {
-            "id": "consume",
-            "label": "operations.traceability.action.consume",
-            "kind": "form",
-            "form": {
-              "endpoint": "/ext/operations/traceability/production/{id}/consume",
-              "method": "POST",
-              "submitLabel": "operations.traceability.action.consume",
-              "visibleWhen": {
-                "field": "status",
-                "equals": "in_progress"
-              },
-              "fields": [
-                {
-                  "name": "lot_id",
-                  "label": "operations.traceability.col.lot",
-                  "type": "relation",
-                  "required": true,
-                  "colSpan": 2,
-                  "relation": {
-                    "dataSource": "/ext/operations/traceability/lots?status=available",
-                    "dataPath": "data",
-                    "valueKey": "id",
-                    "labelKey": [
-                      "lot_number",
-                      "item_name"
-                    ]
-                  }
-                },
-                {
-                  "name": "quantity_used",
-                  "label": "operations.traceability.col.qty",
-                  "type": "number",
-                  "required": true,
-                  "colSpan": 2
-                }
-              ]
-            }
-          },
-          {
-            "id": "haccp",
-            "label": "operations.traceability.action.haccp",
-            "kind": "form",
-            "form": {
-              "endpoint": "/ext/operations/traceability/production/{id}/haccp",
-              "method": "PATCH",
-              "bodyWrap": "check",
-              "submitLabel": "operations.traceability.action.haccp",
-              "visibleWhen": {
-                "field": "status",
-                "equals": "in_progress"
-              },
-              "fields": [
-                {
-                  "name": "ccp",
-                  "label": "operations.traceability.col.ccp",
-                  "required": true,
-                  "colSpan": 1
-                },
-                {
-                  "name": "value",
-                  "label": "operations.traceability.col.value",
-                  "type": "number",
-                  "required": true,
-                  "colSpan": 1
-                },
-                {
-                  "name": "unit",
-                  "label": "operations.traceability.form.unit",
-                  "required": true,
-                  "colSpan": 1
-                },
-                {
-                  "name": "ok",
-                  "label": "operations.traceability.col.ok",
-                  "type": "boolean",
-                  "default": true,
-                  "colSpan": 1
-                },
-                {
-                  "name": "limit_min",
-                  "label": "operations.traceability.col.limitMin",
-                  "type": "number",
-                  "colSpan": 1
-                },
-                {
-                  "name": "limit_max",
-                  "label": "operations.traceability.col.limitMax",
-                  "type": "number",
-                  "colSpan": 1
-                },
-                {
-                  "name": "checked_at",
-                  "label": "common.col.created",
-                  "type": "date",
-                  "required": true,
-                  "colSpan": 2
-                }
-              ]
-            }
-          },
-          {
             "id": "consumptions",
             "label": "operations.traceability.tab.consumptions",
             "kind": "table",
-            "dataSource": "/ext/operations/traceability/production/{id}",
-            "dataPath": "data.consumptions",
+            "dataSource": "/api/data/trace_lot_consumptions?production_order_id[eq]={id}&expand=lot_id&sort=created_at&order=asc&limit=500",
+            "dataPath": "records",
             "columns": [
               {
-                "key": "lot_number",
+                "key": "lot_id_expanded.lot_number",
                 "label": "operations.traceability.col.lot",
                 "type": "mono"
-              },
-              {
-                "key": "item_name",
-                "label": "operations.traceability.form.product"
               },
               {
                 "key": "quantity_used",
@@ -193,9 +75,40 @@
                 "label": "operations.traceability.form.unit"
               },
               {
-                "key": "scanned_at",
+                "key": "created_at",
                 "label": "common.col.created",
                 "type": "date"
+              }
+            ]
+          },
+          {
+            "id": "haccp",
+            "label": "operations.traceability.action.haccp",
+            "kind": "table",
+            "dataSource": "/api/data/trace_haccp_checks?production_order_id[eq]={id}&sort=checked_at&order=asc&limit=500",
+            "dataPath": "records",
+            "columns": [
+              {
+                "key": "checked_at",
+                "label": "operations.traceability.col.checkedAt",
+                "type": "date"
+              },
+              {
+                "key": "ccp",
+                "label": "operations.traceability.col.ccp"
+              },
+              {
+                "key": "value",
+                "label": "operations.traceability.col.value"
+              },
+              {
+                "key": "unit",
+                "label": "operations.traceability.col.unit"
+              },
+              {
+                "key": "ok",
+                "label": "operations.traceability.col.ok",
+                "type": "boolean"
               }
             ]
           }
