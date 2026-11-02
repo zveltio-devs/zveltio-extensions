@@ -136,13 +136,13 @@ async function series(host) {
     return s;
   const res = await host.collections.list("purchase_orders", { sort: "number", order: "desc", limit: 1, count: "none" });
   const last = Number(/(\d+)$/.exec(String((res.records ?? [])[0]?.number ?? ""))?.[1] ?? 0);
-  return host.collections.insert(SERIES, { next_number: last + 1 }).catch(async (err) => {
-    const won = await first(host, SERIES, {});
-    if (!won)
-      throw err;
-    return won;
+  return host.collections.insert(SERIES, { next_number: last + 1 }).catch((err) => {
+    if (err.code === "23505")
+      throw seriesBusy();
+    throw err;
   });
 }
+var seriesBusy = () => new ActionRefusal(409, "series_busy", "The series is being used by other requests; try again.");
 async function nextNumber(host) {
   for (let attempt = 0;attempt < TRIES; attempt++) {
     const s = await series(host);
@@ -156,7 +156,7 @@ async function nextNumber(host) {
     }
     return `PO-${String(n).padStart(5, "0")}`;
   }
-  throw new ActionRefusal(409, "series_busy", "The series is being used by other requests; try again.");
+  throw seriesBusy();
 }
 var createPurchaseOrder = async (input, host) => {
   const d = input;

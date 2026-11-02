@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.2 (2026-11-02)
+
+- fix: a first purchase order that loses the race to create the number series answers 409 `series_busy` (retry) instead of 500; it used to read the winner's row on a transaction Postgres had already aborted
+
 ## 2.1.1 (2026-10-31)
 
 - fix: the stock level, batch and purchase order line keys refuse (`RESTRICT`) instead of cascading or clearing: a product, warehouse, batch or purchase order line that nothing names deletes again through the data API, and one still named answers the foreign key refusal instead of 409 `written_by_actions`
