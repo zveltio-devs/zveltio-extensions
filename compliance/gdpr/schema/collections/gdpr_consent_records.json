@@ -1,0 +1,51 @@
+{
+  "name": "gdpr_consent_records",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "purpose",
+      "type": "text",
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "processing_activity_id",
+      "type": "m2o",
+      "options": {
+        "related_collection": "gdpr_processing_activities"
+      },
+      "indexed": true
+    },
+    {
+      "name": "granted",
+      "type": "boolean",
+      "required": true
+    },
+    {
+      "name": "source",
+      "type": "text",
+      "required": true,
+      "defaultValue": "web"
+    },
+    {
+      "name": "expires_at",
+      "type": "date"
+    },
+    {
+      "name": "withdrawn_at",
+      "type": "datetime"
+    }
+  ],
+  "relations": [
+    {
+      "name": "gdpr_consent_records_processing_activity_id",
+      "type": "m2o",
+      "field": "processing_activity_id",
+      "target": "gdpr_processing_activities",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

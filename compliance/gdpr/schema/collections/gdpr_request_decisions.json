@@ -1,0 +1,59 @@
+{
+  "name": "gdpr_request_decisions",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "request_id",
+      "type": "m2o",
+      "options": {
+        "related_collection": "gdpr_subject_requests"
+      },
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "from_status",
+      "type": "enum",
+      "options": {
+        "values": [
+          "pending",
+          "in_progress",
+          "completed",
+          "rejected",
+          "withdrawn"
+        ]
+      },
+      "required": true
+    },
+    {
+      "name": "to_status",
+      "type": "enum",
+      "options": {
+        "values": [
+          "pending",
+          "in_progress",
+          "completed",
+          "rejected",
+          "withdrawn"
+        ]
+      },
+      "required": true
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    }
+  ],
+  "relations": [
+    {
+      "name": "gdpr_request_decisions_request_id",
+      "type": "m2o",
+      "field": "request_id",
+      "target": "gdpr_subject_requests",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

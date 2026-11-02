@@ -7,8 +7,8 @@
       "id": "requests",
       "label": "compliance.gdpr.tab.requests",
       "icon": "Users",
-      "dataSource": "/ext/compliance/gdpr/access-requests",
-      "dataPath": "access_requests",
+      "dataSource": "/api/data/gdpr_subject_requests?sort=created_at&order=desc&limit=500",
+      "dataPath": "records",
       "columns": [
         {
           "key": "request_type",
@@ -19,7 +19,7 @@
           }
         },
         {
-          "key": "requester_email",
+          "key": "created_by",
           "label": "common.col.subject"
         },
         {
@@ -46,9 +46,10 @@
         {
           "id": "fulfill",
           "label": "compliance.gdpr.btn.fulfill",
-          "method": "PATCH",
-          "endpoint": "/ext/compliance/gdpr/access-requests/{id}",
+          "method": "POST",
+          "endpoint": "/ext/compliance/gdpr/actions/setRequestStatus",
           "body": {
+            "id": "{id}",
             "status": "completed"
           },
           "visibleWhen": {
@@ -60,9 +61,10 @@
           "id": "reject",
           "label": "common.reject",
           "variant": "text-error",
-          "method": "PATCH",
-          "endpoint": "/ext/compliance/gdpr/access-requests/{id}",
+          "method": "POST",
+          "endpoint": "/ext/compliance/gdpr/actions/setRequestStatus",
           "body": {
+            "id": "{id}",
             "status": "rejected"
           },
           "visibleWhen": {
@@ -76,8 +78,8 @@
       "id": "breaches",
       "label": "compliance.gdpr.tab.breaches",
       "icon": "XCircle",
-      "dataSource": "/ext/compliance/gdpr/breaches",
-      "dataPath": "breaches",
+      "dataSource": "/api/data/gdpr_breaches?sort=discovered_at&order=desc&limit=500",
+      "dataPath": "records",
       "columns": [
         {
           "key": "discovered_at",
@@ -115,11 +117,11 @@
     {
       "id": "consents",
       "label": "compliance.gdpr.tab.consents",
-      "dataSource": "/ext/compliance/gdpr/consents/me",
-      "dataPath": "consents",
+      "dataSource": "/api/data/gdpr_consent_records?sort=created_at&order=desc&limit=500",
+      "dataPath": "records",
       "columns": [
         {
-          "key": "subject_id",
+          "key": "created_by",
           "label": "common.col.subject"
         },
         {
@@ -127,7 +129,7 @@
           "label": "compliance.gdpr.col.purpose"
         },
         {
-          "key": "granted_at",
+          "key": "created_at",
           "label": "compliance.gdpr.col.granted",
           "type": "date"
         },
@@ -142,8 +144,8 @@
       "id": "records",
       "label": "compliance.gdpr.tab.records",
       "icon": "Boxes",
-      "dataSource": "/ext/compliance/gdpr/processing-records",
-      "dataPath": "processing_records",
+      "dataSource": "/api/data/gdpr_processing_activities?is_active[eq]=true&sort=name&order=asc&limit=500",
+      "dataPath": "records",
       "columns": [
         {
           "key": "name",

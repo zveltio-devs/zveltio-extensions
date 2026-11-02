@@ -1,0 +1,74 @@
+{
+  "name": "gdpr_breaches",
+  "fields": [
+    {
+      "name": "title",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "description",
+      "type": "textarea",
+      "required": true
+    },
+    {
+      "name": "discovered_at",
+      "type": "datetime",
+      "required": true
+    },
+    {
+      "name": "affected_records_estimate",
+      "type": "integer"
+    },
+    {
+      "name": "data_categories",
+      "type": "tags"
+    },
+    {
+      "name": "severity",
+      "type": "enum",
+      "options": {
+        "values": [
+          "low",
+          "medium",
+          "high",
+          "critical"
+        ]
+      },
+      "required": true,
+      "defaultValue": "low"
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "options": {
+        "values": [
+          "open",
+          "investigating",
+          "contained",
+          "reported",
+          "closed"
+        ]
+      },
+      "required": true,
+      "defaultValue": "open",
+      "indexed": true
+    },
+    {
+      "name": "dpa_reported_at",
+      "type": "datetime"
+    },
+    {
+      "name": "affected_users_notified_at",
+      "type": "datetime"
+    },
+    {
+      "name": "root_cause",
+      "type": "textarea"
+    },
+    {
+      "name": "remediation_steps",
+      "type": "textarea"
+    }
+  ]
+}
