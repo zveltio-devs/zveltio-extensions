@@ -1,24 +1,18 @@
 import type { ZveltioExtension } from '@zveltio/sdk/extension';
-import { join } from 'path';
-import { saftRoutes } from './routes.js';
+import { saftActions } from './actions.js';
 
+// Exports are a collection this extension declares in `schema/collections/`
+// (manifest `collections`); the engine creates it, owns its rules and serves it
+// through the data API. What is left in code is building the file: the
+// `generate` action, which reads `finance/accounting`'s ledger.
 const extension: ZveltioExtension = {
   name: 'compliance/ro/saft',
   category: 'compliance',
-  // S3-01: sub-app mounted at /ext/compliance/ro/saft by the engine.
   mountStrategy: 'subapp',
 
-  getMigrations() {
-    return [
-      join(import.meta.dir, 'migrations/001_saft.sql'),
-      join(import.meta.dir, 'migrations/002_tenant_rls.sql'),
-      join(import.meta.dir, 'migrations/003_tenant_scoped_unique_keys.sql'),
-    ];
-  },
+  actions: saftActions,
 
-  async register(app, ctx) {
-    app.route('/', saftRoutes(ctx));
-  },
+  async register() {},
 };
 
 export default extension;

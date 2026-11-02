@@ -1,0 +1,26 @@
+{
+  "name": "saft_files",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "export_id",
+      "type": "m2o",
+      "required": true,
+      "unique": true,
+      "options": { "related_collection": "saft_exports" }
+    },
+    { "name": "xml", "type": "textarea", "required": true }
+  ],
+  "relations": [
+    {
+      "name": "saft_files_export_id",
+      "type": "m2o",
+      "field": "export_id",
+      "target": "saft_exports",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

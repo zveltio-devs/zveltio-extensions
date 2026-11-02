@@ -2,13 +2,13 @@
   "name": "compliance/ro/saft",
   "displayName": "SAF-T RO",
   "category": "compliance/ro",
-  "description": "Romanian Standard Audit File for Tax (SAF-T D.394) — generate XML audit files for ANAF",
-  "version": "1.0.1",
-  "zveltioMinVersion": "1.0.0",
+  "description": "Romanian SAF-T (D406) — build the audit file XML from the finance/accounting ledger",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.96",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-ro-saft",
   "permissions": [
-    "database"
+    "data:write"
   ],
   "i18nPrefixes": [
     "compliance.ro.saft"
@@ -37,10 +37,51 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "34569f3c725c7ab3296a1e45fa7e80588b1b022add26692f18fd47e21e5116d1",
-    "sourceSha256": "d65f929422889a5c5e7186766c3abbbd917a3a73ba08fb7fe10d6a1788a8c81e"
+    "engineSha256": "031e51c86c660144d681a458bf8ebda45eae836be293ac71a039990413e76174",
+    "sourceSha256": "007940686e82a6f46794384463b2bdefd0c2222e35216a9ba110d8bd3d9d9a79",
+    "schemaSha256": "d67fc6048d6e3706ce1ba6520c721f2f299838c7e5bab6b5985835ca37aee865"
   },
-  "resources": [
-    "saft"
+  "dependencies": [
+    {
+      "name": "finance/accounting",
+      "minVersion": "2.1.1"
+    }
+  ],
+  "collections": [
+    "saft_exports",
+    "saft_files"
+  ],
+  "actions": [
+    {
+      "name": "generate",
+      "permission": {
+        "resource": "saft_exports",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "saft_exports",
+        "accounts",
+        "journal_entries",
+        "journal_lines",
+        "saft_files"
+      ],
+      "writes": [
+        "saft_exports",
+        "saft_files"
+      ]
+    }
   ]
 }
