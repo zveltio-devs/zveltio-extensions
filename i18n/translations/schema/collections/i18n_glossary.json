@@ -1,0 +1,53 @@
+{
+  "name": "i18n_glossary",
+  "fields": [
+    {
+      "name": "term",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "locale_id",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "i18n_locales"
+      }
+    },
+    {
+      "name": "translation",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "definition",
+      "type": "text"
+    },
+    {
+      "name": "forbidden",
+      "type": "boolean",
+      "defaultValue": false
+    }
+  ],
+  "indexes": [
+    {
+      "fields": [
+        "term",
+        "locale_id"
+      ],
+      "unique": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "i18n_glossary_locale_id",
+      "type": "m2o",
+      "field": "locale_id",
+      "target": "i18n_locales",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

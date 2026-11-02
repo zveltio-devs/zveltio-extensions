@@ -1,0 +1,67 @@
+{
+  "name": "i18n_translations",
+  "fields": [
+    {
+      "name": "key_id",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "i18n_keys"
+      }
+    },
+    {
+      "name": "locale_id",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "i18n_locales"
+      }
+    },
+    {
+      "name": "value",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "is_machine_translated",
+      "type": "boolean",
+      "defaultValue": false
+    },
+    {
+      "name": "reviewed",
+      "type": "boolean",
+      "defaultValue": false
+    }
+  ],
+  "indexes": [
+    {
+      "fields": [
+        "key_id",
+        "locale_id"
+      ],
+      "unique": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "i18n_translations_key_id",
+      "type": "m2o",
+      "field": "key_id",
+      "target": "i18n_keys",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "i18n_translations_locale_id",
+      "type": "m2o",
+      "field": "locale_id",
+      "target": "i18n_locales",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

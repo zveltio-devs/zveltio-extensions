@@ -1,0 +1,37 @@
+{
+  "name": "i18n_settings",
+  "fields": [
+    {
+      "name": "scope",
+      "type": "enum",
+      "required": true,
+      "unique": true,
+      "defaultValue": "instance",
+      "options": {
+        "values": [
+          "instance"
+        ]
+      }
+    },
+    {
+      "name": "default_locale",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "i18n_locales"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "name": "i18n_settings_default_locale",
+      "type": "m2o",
+      "field": "default_locale",
+      "target": "i18n_locales",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

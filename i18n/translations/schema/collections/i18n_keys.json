@@ -1,0 +1,41 @@
+{
+  "name": "i18n_keys",
+  "fields": [
+    {
+      "name": "key",
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    {
+      "name": "context",
+      "type": "text",
+      "indexed": true
+    },
+    {
+      "name": "default_value",
+      "type": "text"
+    },
+    {
+      "name": "description",
+      "type": "text"
+    },
+    {
+      "name": "tags",
+      "type": "json"
+    },
+    {
+      "name": "max_length",
+      "type": "integer"
+    },
+    {
+      "name": "is_pluralized",
+      "type": "boolean",
+      "defaultValue": false
+    },
+    {
+      "name": "screenshot_url",
+      "type": "text"
+    }
+  ]
+}

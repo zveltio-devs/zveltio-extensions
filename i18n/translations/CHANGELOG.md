@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.0.0 (2026-11-02)
+
+- feat!: the register is the `i18n_locales`, `i18n_settings`, `i18n_keys`, `i18n_translations`, `i18n_approvals` and `i18n_glossary` collections, declared in `schema/collections/` and created and owned by the engine; no SQL migrations
+- feat!: the hand-written `/ext/i18n/translations` routes are gone — locales, keys, translations, the glossary and the default locale are read and written through `/api/data/<collection>`; approving is the `approve` action
+- feat!: the public `GET /public/:locale` lookup is gone; a site reads `/api/data/i18n_translations?expand=key_id,locale_id` under the rules the operator grants (an anonymous read rule for a public site); the fallback to a key's `default_value` is the reader's
+- feat!: the admin-only gate is gone; who may do what is the engine's rules on these collections, so members get the engine's default access to them (read, create, update) unless the operator narrows it
+- feat!: the default locale is the one row of `i18n_settings` (unique by construction), not a flag on each locale that two writers could both set
+- feat!: approving writes a row of `i18n_approvals` (ADR 0015) with the value approved and the translation's last writer, so the operator can keep anyone from approving their own wording with the row rule `translation_author neq user_id` (ADR 0016); a translation is approved while its latest approval (`/api/data/i18n_approvals?translation_id[eq]=<id>&sort=created_at&order=desc&limit=1`) has its value; a translation no user wrote has no author, and the row rule then refuses its approval (fail closed); its approvals go when it is deleted; `approved_by`/`approved_at` on the translation are gone
+- feat!: `/stats/coverage`, `/stats/missing/:locale`, the unused import-jobs and translation-memory tables and the `char_count` column are gone
+- 1.x rows (`zvd_locales`, `zvd_translation_*` tables) are not carried over
+- requires engine 3.0.0-beta.96
+
 ## 1.0.11 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)
