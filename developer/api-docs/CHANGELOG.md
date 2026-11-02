@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.0.0 (2026-11-02)
+
+- feat!: changelogs and documentation pages are the collections `apidoc_changelogs` and `apidoc_pages`, declared in `schema/collections/` and created and owned by the engine; no SQL migrations; the 1.x tables (`zvd_api_changelogs`, `zvd_api_custom_docs`, `zvd_api_access_tokens`, `zvd_api_docs_config`) are no longer created, their rows are not carried over, and the tables are left in place. New names because a declared collection cannot take a `zvd_` table that already exists
+- feat!: who may read or write them is the engine's rules; both declare `defaultGrants: false`, so administrators keep the writes they had in 1.x and nobody else reads or writes them until the operator grants it. 1.x let anonymous visitors read published entries; the data API needs a session or an API key
+- feat!: the extension's own routes are gone: `GET/POST /changelogs`, `PATCH/DELETE /changelogs/:id`, `POST /changelogs/:id/publish`, `GET/POST /custom-docs`, `PATCH/DELETE /custom-docs/:id`, `/tokens`, `/visibility`, `/openapi.json` and `/postman`. Use `/api/data/apidoc_changelogs` and `/api/data/apidoc_pages`. Publishing from Studio sets `is_published` only; `published_at` is a date field set in the form (1.x stamped the time on publish)
+- fix!: the OpenAPI spec is built in the browser from `GET /api/data`, so it lists only the collections and fields the visitor may read. 1.x built it on the server from every collection's definition, so any signed-in member read the names and fields of collections the data API hid from them. The public/private switch is gone with it: the page offers the Postman collection as a download once the spec is built, and a visitor without a session sees a sign-in note instead. Updates are documented as `PATCH` (partial), as Studio sends them; `decimal` is a number, `tags` an array of strings, `json` untyped
+- feat!: API access tokens are removed: nothing ever accepted them. Members issue API keys from the engine (ADR 0010)
+- fix: the Swagger UI assets carry Subresource Integrity hashes; the page no longer points at `/api/docs/openapi.json`, a path the engine does not serve
+- chore: the legacy `database` permission label is dropped
+
 ## 1.0.7 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)

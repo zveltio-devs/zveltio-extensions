@@ -1,0 +1,39 @@
+{
+  "name": "apidoc_changelogs",
+  "defaultGrants": false,
+  "fields": [
+    {
+      "name": "version",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "title",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "changes",
+      "type": "textarea",
+      "required": true
+    },
+    {
+      "name": "breaking_changes",
+      "type": "textarea"
+    },
+    {
+      "name": "migration_guide",
+      "type": "textarea"
+    },
+    {
+      "name": "is_published",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": false
+    },
+    {
+      "name": "published_at",
+      "type": "date"
+    }
+  ]
+}
