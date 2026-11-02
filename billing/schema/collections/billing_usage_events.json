@@ -1,0 +1,26 @@
+{
+  "name": "billing_usage_events",
+  "defaultGrants": false,
+  "fields": [
+    {
+      "name": "event_type",
+      "type": "text",
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "collection",
+      "type": "text"
+    },
+    {
+      "name": "quantity",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 1
+    },
+    {
+      "name": "metadata",
+      "type": "json"
+    }
+  ]
+}

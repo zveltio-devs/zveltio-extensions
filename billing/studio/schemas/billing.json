@@ -8,8 +8,8 @@
       "id": "plans",
       "label": "billing.ui.available_plans",
       "icon": "CreditCard",
-      "dataSource": "/ext/billing/plans",
-      "dataPath": "plans",
+      "dataSource": "/api/data/billing_plans?sort=price_cents&order=asc&limit=500",
+      "dataPath": "records",
       "layout": "cards",
       "card": {
         "title": "name",
@@ -17,13 +17,26 @@
         "subtitle": "price_cents"
       },
       "columns": [
-        { "key": "name", "label": "common.col.name" },
-        { "key": "price_cents", "label": "common.col.price" },
-        { "key": "interval", "label": "billing.col.interval" },
-        { "key": "stripe_price_id", "label": "billing.col.stripePrice", "type": "mono" }
+        {
+          "key": "name",
+          "label": "common.col.name"
+        },
+        {
+          "key": "price_cents",
+          "label": "common.col.price"
+        },
+        {
+          "key": "interval",
+          "label": "billing.col.interval"
+        },
+        {
+          "key": "stripe_price_id",
+          "label": "billing.col.stripePrice",
+          "type": "mono"
+        }
       ],
       "form": {
-        "endpoint": "/ext/billing/plans",
+        "endpoint": "/api/data/billing_plans",
         "fields": [
           {
             "name": "name",
@@ -38,8 +51,14 @@
             "colSpan": 1,
             "default": "month",
             "options": [
-              { "value": "month", "label": "billing.interval.month" },
-              { "value": "year", "label": "billing.interval.year" }
+              {
+                "value": "month",
+                "label": "billing.interval.month"
+              },
+              {
+                "value": "year",
+                "label": "billing.interval.year"
+              }
             ]
           },
           {
@@ -62,20 +81,37 @@
             "type": "json",
             "mono": true,
             "rows": 4,
-            "colSpan": 2,
-            "default": "{}"
+            "colSpan": 2
           }
         ]
-      }
+      },
+      "rowActions": [
+        {
+          "id": "delete",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "DELETE",
+          "endpoint": "/api/data/billing_plans/{id}",
+          "confirm": "ext.confirmDelete"
+        }
+      ]
     },
     {
       "id": "subscriptions",
       "label": "billing.tab.subscription",
       "icon": "Receipt",
-      "dataSource": "/ext/billing/subscriptions",
-      "dataPath": "subscriptions",
+      "dataSource": "/api/data/billing_subscriptions?expand=plan_id&sort=created_at&order=desc&limit=500",
+      "dataPath": "records",
       "columns": [
-        { "key": "plan_name", "label": "billing.col.plan" },
+        {
+          "key": "plan_id_expanded.name",
+          "label": "billing.col.plan"
+        },
+        {
+          "key": "stripe_subscription_id",
+          "label": "billing.col.stripeSubscription",
+          "type": "mono"
+        },
         {
           "key": "status",
           "label": "common.col.status",
@@ -84,25 +120,56 @@
             "colors": {
               "active": "badge-success",
               "past_due": "badge-warning",
-              "canceled": "badge-error"
+              "canceled": "badge-error",
+              "trialing": "badge-info",
+              "unpaid": "badge-error",
+              "incomplete": "badge-ghost",
+              "incomplete_expired": "badge-ghost",
+              "paused": "badge-ghost"
             }
           }
         },
-        { "key": "price_cents", "label": "common.col.price" },
-        { "key": "current_period_start", "label": "billing.col.periodStart", "type": "date" },
-        { "key": "current_period_end", "label": "billing.col.periodEnd", "type": "date" }
+        {
+          "key": "plan_id_expanded.price_cents",
+          "label": "common.col.price"
+        },
+        {
+          "key": "current_period_start",
+          "label": "billing.col.periodStart",
+          "type": "date"
+        },
+        {
+          "key": "current_period_end",
+          "label": "billing.col.periodEnd",
+          "type": "date"
+        }
       ]
     },
     {
       "id": "usage",
       "label": "billing.tab.usage",
       "icon": "BarChart2",
-      "dataSource": "/ext/billing/usage",
-      "dataPath": "usage",
+      "dataSource": "/api/data/billing_usage_events?sort=created_at&order=desc&limit=500",
+      "dataPath": "records",
       "columns": [
-        { "key": "event_type", "label": "billing.col.metric", "type": "mono" },
-        { "key": "day", "label": "common.col.date", "type": "date" },
-        { "key": "total", "label": "common.col.total" }
+        {
+          "key": "event_type",
+          "label": "billing.col.metric",
+          "type": "mono"
+        },
+        {
+          "key": "collection",
+          "label": "billing.col.collection"
+        },
+        {
+          "key": "quantity",
+          "label": "billing.col.quantity"
+        },
+        {
+          "key": "created_at",
+          "label": "common.col.date",
+          "type": "date"
+        }
       ]
     }
   ]

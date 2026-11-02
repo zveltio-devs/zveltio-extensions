@@ -1,0 +1,62 @@
+{
+  "name": "billing_subscriptions",
+  "defaultGrants": false,
+  "fields": [
+    {
+      "name": "stripe_subscription_id",
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    {
+      "name": "plan_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "billing_plans"
+      }
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "options": {
+        "values": [
+          "incomplete",
+          "incomplete_expired",
+          "trialing",
+          "active",
+          "past_due",
+          "canceled",
+          "unpaid",
+          "paused"
+        ]
+      },
+      "required": true,
+      "defaultValue": "active"
+    },
+    {
+      "name": "current_period_start",
+      "type": "datetime"
+    },
+    {
+      "name": "current_period_end",
+      "type": "datetime"
+    },
+    {
+      "name": "last_event_at",
+      "type": "datetime"
+    }
+  ],
+  "relations": [
+    {
+      "name": "billing_subscriptions_plan_id",
+      "type": "m2o",
+      "field": "plan_id",
+      "target": "billing_plans",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}
