@@ -1,0 +1,71 @@
+{
+  "name": "gdpr_processing_activities",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "purpose",
+      "type": "textarea",
+      "required": true
+    },
+    {
+      "name": "legal_basis",
+      "type": "enum",
+      "options": {
+        "values": [
+          "consent",
+          "contract",
+          "legal_obligation",
+          "vital_interests",
+          "public_task",
+          "legitimate_interests"
+        ]
+      },
+      "required": true
+    },
+    {
+      "name": "data_categories",
+      "type": "tags"
+    },
+    {
+      "name": "data_subjects",
+      "type": "tags"
+    },
+    {
+      "name": "third_party_recipients",
+      "type": "tags"
+    },
+    {
+      "name": "retention_period_days",
+      "type": "integer"
+    },
+    {
+      "name": "technical_measures",
+      "type": "textarea"
+    },
+    {
+      "name": "organizational_measures",
+      "type": "textarea"
+    },
+    {
+      "name": "dpia_required",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": false
+    },
+    {
+      "name": "dpia_completed_at",
+      "type": "date"
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true,
+      "indexed": true
+    }
+  ]
+}

@@ -1,22 +1,20 @@
 import type { ZveltioExtension } from '@zveltio/sdk/extension';
-import { join } from 'path';
-import { gdprRoutes } from './routes.js';
+import { gdprActions } from './actions.js';
+import { selfServiceRoutes } from './self-service.js';
 
+// The register is collections this extension declares in `schema/collections/`
+// (manifest `collections`); the engine creates them, owns their rules and serves
+// them through the data API. What is left in code is the actions, and the data
+// subject's export and erasure, which act on the caller's account through the engine.
 const extension: ZveltioExtension = {
   name: 'compliance/gdpr',
   category: 'compliance',
-  // S3-01: sub-app mounted at /ext/compliance/gdpr by the engine.
   mountStrategy: 'subapp',
 
-  getMigrations() {
-    return [
-      join(import.meta.dir, 'migrations/001_initial.sql'),
-      join(import.meta.dir, 'migrations/002_tenant_rls.sql'),
-    ];
-  },
+  actions: gdprActions,
 
   async register(app, ctx) {
-    app.route('/', gdprRoutes(ctx));
+    app.route('/', selfServiceRoutes(ctx));
   },
 };
 

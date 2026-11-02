@@ -3,12 +3,12 @@
   "displayName": "GDPR Compliance",
   "category": "compliance",
   "description": "Data export and right to erasure (GDPR Art. 15, 17)",
-  "version": "1.1.1",
-  "zveltioMinVersion": "3.0.0-beta.78",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.96",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-gdpr",
   "permissions": [
-    "database",
+    "data:write",
     "auth:users"
   ],
   "i18nPrefixes": [
@@ -36,8 +36,162 @@
     "bundled": true,
     "bundlePeers": false
   },
+  "collections": [
+    "gdpr_processing_activities",
+    "gdpr_consent_records",
+    "gdpr_subject_requests",
+    "gdpr_request_decisions",
+    "gdpr_breaches"
+  ],
+  "actions": [
+    {
+      "name": "giveConsent",
+      "permission": {
+        "resource": "gdpr_consent_records",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "purpose",
+          "granted"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "purpose": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "granted": {
+            "type": "boolean"
+          },
+          "processing_activity_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "reads": [],
+      "writes": [
+        "gdpr_consent_records"
+      ]
+    },
+    {
+      "name": "withdrawConsent",
+      "permission": {
+        "resource": "gdpr_consent_records",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "gdpr_consent_records"
+      ],
+      "writes": [
+        "gdpr_consent_records"
+      ]
+    },
+    {
+      "name": "submitRequest",
+      "permission": {
+        "resource": "gdpr_subject_requests",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "request_type"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "request_type": {
+            "type": "string",
+            "enum": [
+              "access",
+              "erasure",
+              "portability",
+              "rectification",
+              "restriction",
+              "objection"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 5000
+          }
+        }
+      },
+      "reads": [],
+      "writes": [
+        "gdpr_subject_requests"
+      ]
+    },
+    {
+      "name": "setRequestStatus",
+      "permission": {
+        "resource": "gdpr_request_decisions",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "status"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "in_progress",
+              "completed",
+              "rejected",
+              "withdrawn"
+            ]
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 5000
+          }
+        }
+      },
+      "reads": [
+        "gdpr_subject_requests"
+      ],
+      "writes": [
+        "gdpr_subject_requests",
+        "gdpr_request_decisions"
+      ]
+    }
+  ],
   "integrity": {
-    "engineSha256": "56cc885242ca1418ed1a527801ea3f124ca38b83a88f8408156f590e65a31375",
-    "sourceSha256": "60c56a500efd0a3d1a9be9ae44734e31db685a5c035d8429976863d5ee8b70c2"
+    "engineSha256": "1b939e428840a43ab11db42e4c7fcf4f20599001962098bf9ac9b813407198a5",
+    "sourceSha256": "125748242f465b854675ee752c6391fecdff1d3cde6728d3f0b632ebc72244b4",
+    "schemaSha256": "fd458486f82319373a16a6e8007e2d8c8245c50ece17d646e5a3dccfdf948935"
   }
 }

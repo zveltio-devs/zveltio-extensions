@@ -44,10 +44,16 @@ const ROOT = process.argv[2] ?? process.cwd();
 /**
  * Extensions exempt from the requirement, with the reason.
  *
- * Empty on purpose. An entry here is a decision someone has to defend in
+ * Short on purpose. An entry here is a decision someone has to defend in
  * review, which is the only thing that keeps a list like this short.
  */
-const ALLOWLIST: Record<string, string> = {};
+const ALLOWLIST: Record<string, string> = {
+  // Its one write route, `DELETE /delete-my-account`, erases the caller's own
+  // account after a password re-check. Art. 17 is the data subject's right, not
+  // a grant, and the subject is the session's user: there is no permission for
+  // the route to ask. Everything else it writes goes through actions.
+  'compliance/gdpr': 'self-service erasure of the caller’s own account (Art. 17)',
+};
 
 /** Any helper that represents an authorization decision. */
 const AUTHORIZATION = [

@@ -1,0 +1,50 @@
+{
+  "name": "gdpr_subject_requests",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "request_type",
+      "type": "enum",
+      "options": {
+        "values": [
+          "access",
+          "erasure",
+          "portability",
+          "rectification",
+          "restriction",
+          "objection"
+        ]
+      },
+      "required": true
+    },
+    {
+      "name": "description",
+      "type": "textarea"
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "options": {
+        "values": [
+          "pending",
+          "in_progress",
+          "completed",
+          "rejected",
+          "withdrawn"
+        ]
+      },
+      "required": true,
+      "defaultValue": "pending",
+      "indexed": true
+    },
+    {
+      "name": "due_date",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "completed_at",
+      "type": "datetime"
+    }
+  ]
+}
