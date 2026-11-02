@@ -1,0 +1,87 @@
+{
+  "name": "trace_items",
+  "fields": [
+    {
+      "name": "code",
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "type",
+      "type": "enum",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "values": [
+          "raw",
+          "semi",
+          "finished"
+        ]
+      }
+    },
+    {
+      "name": "category",
+      "type": "text"
+    },
+    {
+      "name": "default_unit",
+      "type": "enum",
+      "required": true,
+      "options": {
+        "values": [
+          "kg",
+          "g",
+          "l",
+          "ml",
+          "buc",
+          "cutie",
+          "sac",
+          "palet"
+        ]
+      }
+    },
+    {
+      "name": "allergens",
+      "type": "json",
+      "defaultValue": []
+    },
+    {
+      "name": "shelf_life_days",
+      "type": "integer"
+    },
+    {
+      "name": "storage_conditions",
+      "type": "textarea"
+    },
+    {
+      "name": "gtin",
+      "type": "text",
+      "indexed": true
+    },
+    {
+      "name": "min_stock_alert",
+      "type": "decimal"
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "defaultValue": true
+    }
+  ],
+  "validation": [
+    {
+      "field": "min_stock_alert",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "A stock alert is not negative."
+    }
+  ]
+}

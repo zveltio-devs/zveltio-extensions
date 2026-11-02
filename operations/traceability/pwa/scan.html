@@ -133,7 +133,20 @@
 
 <script src="html5-qrcode.min.js"></script>
 <script>
-  const API = '/ext/operations/traceability';
+  // Everything goes through this extension's actions and the data API, as the
+  // signed-in user: the page holds no data and decides nothing.
+  const ACTIONS = '/ext/operations/traceability/actions/';
+
+  async function call(url, init) {
+    const res = await fetch(url, { credentials: 'include', ...init });
+    if (res.status === 401) { goLogin(); throw new Error(''); }
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.detail || body.title || body.error || t.error);
+    return body;
+  }
+  const action = async (name, input) =>
+    (await call(ACTIONS + name, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) })).result;
+  const records = async (collection, query) => (await call(`/api/data/${collection}?${query}`)).records || [];
   const STRINGS = {
     en: {
       brandConsume: 'Scan · Consume',
@@ -239,21 +252,25 @@
     return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
   }
 
+  let scanning = false;
   async function onScan(lotId) {
-    if (currentLot) return;
+    // The camera reports the same code ~10 times a second: one lookup at a time.
+    if (currentLot || scanning) return;
+    scanning = true;
     setStatus(t.checking);
     try {
-      const res = await fetch(`${API}/scan/lot/${encodeURIComponent(lotId)}`, { credentials: 'include' });
-      if (res.status === 401) { goLogin(); return; }
-      const lot = await res.json();
-      if (!res.ok) { showError(lot.error || t.lotUnavailable); return; }
+      let lot;
+      try { lot = await action('scanLot', { lot_id: lotId }); }
+      catch (e) { if (e.message) showError(e.message || t.lotUnavailable); return; }
       currentLot = { id: lotId, ...lot };
       showLotCard(lot);
       if (navigator.vibrate) navigator.vibrate(200);
       if (mode === 'consume') await loadOrders();
-      if (mode === 'dispatch') await loadPendingDispatch(lotId);
+      if (mode === 'dispatch' && !(await loadPendingDispatch(lotId))) document.getElementById('dispatch-section').style.display = 'none';
     } catch (e) {
       showError(t.networkError + e.message);
+    } finally {
+      scanning = false;
     }
   }
 
@@ -284,25 +301,23 @@
   }
 
   async function loadOrders() {
-    const res = await fetch(`${API}/production?status=in_progress&limit=50`, { credentials: 'include' });
-    if (res.status === 401) { goLogin(); return; }
-    const data = await res.json();
+    const orders = await records('trace_production_orders', 'status[eq]=in_progress&expand=output_lot_id&sort=created_at&order=desc&limit=50');
     const sel = document.getElementById('order-select');
     sel.innerHTML = `<option value="">${t.selectOrder}</option>`;
-    (data.data || []).forEach((o) => {
+    orders.forEach((o) => {
       const opt = document.createElement('option');
       opt.value = o.id;
-      opt.textContent = `${o.order_number} — ${o.output_item_name || '?'}`;
+      opt.textContent = `${o.order_number} — ${(o.output_lot_id_expanded || {}).lot_number || '?'}`;
       sel.appendChild(opt);
     });
   }
 
+  // False when the lookup failed: confirming then would dispatch directly and
+  // leave the invoice's pending dispatch to take the same stock again later.
   async function loadPendingDispatch(lotId) {
     pendingDispatch = null;
     try {
-      const res = await fetch(`${API}/dispatches?status=pending&lot_id=${encodeURIComponent(lotId)}`, { credentials: 'include' });
-      const data = await res.json();
-      const pd = (data.data || [])[0];
+      const pd = (await records('trace_dispatches', `status[eq]=pending&lot_id[eq]=${encodeURIComponent(lotId)}&limit=1`))[0];
       if (pd) {
         pendingDispatch = pd;
         document.getElementById('pd-customer').textContent = pd.customer_name || '?';
@@ -315,7 +330,11 @@
       } else {
         document.getElementById('pending-dispatch-info').style.display = 'none';
       }
-    } catch { /* ignore */ }
+      return true;
+    } catch (e) {
+      if (e.message) showError(e.message);
+      return false;
+    }
   }
 
   async function confirmConsume() {
@@ -324,18 +343,10 @@
     if (!qty || qty <= 0) { showError(t.enterQty); return; }
     if (!orderId) { showError(t.selectOrderErr); return; }
     try {
-      const res = await fetch(`${API}/scan/consume`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lot_id: currentLot.id, quantity_used: qty, production_order_id: orderId }),
-      });
-      if (res.status === 401) { goLogin(); return; }
-      const data = await res.json();
-      if (!res.ok) { showError(data.error || t.error); return; }
+      await action('consumeLot', { lot_id: currentLot.id, quantity_used: qty, production_order_id: orderId });
       if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
       showSuccess(t.consumeOk(qty, currentLot.unit, currentLot.item_name));
-    } catch (e) { showError(t.error + ': ' + e.message); }
+    } catch (e) { if (e.message) showError(e.message); }
   }
 
   async function confirmDispatch() {
@@ -345,34 +356,19 @@
     if (!qty || qty <= 0) { showError(t.enterQty); return; }
     if (!customer) { showError(t.enterCustomer); return; }
     try {
-      let res;
       if (pendingDispatch) {
-        res = await fetch(`${API}/dispatches/${pendingDispatch.id}/confirm`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ quantity_dispatched: qty }),
-        });
+        await action('confirmDispatch', { id: pendingDispatch.id, quantity_dispatched: qty });
       } else {
-        res = await fetch(`${API}/dispatches/direct`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            lot_id: currentLot.id,
-            quantity_dispatched: qty,
-            unit: currentLot.unit,
-            customer_name: customer,
-            invoice_number: invoice || undefined,
-          }),
+        await action('directDispatch', {
+          lot_id: currentLot.id,
+          quantity_dispatched: qty,
+          customer_name: customer,
+          invoice_number: invoice || undefined,
         });
       }
-      if (res.status === 401) { goLogin(); return; }
-      const data = await res.json();
-      if (!res.ok) { showError(data.error || t.error); return; }
       if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
       showSuccess(t.dispatchOk(qty, currentLot.unit, customer));
-    } catch (e) { showError(t.error + ': ' + e.message); }
+    } catch (e) { if (e.message) showError(e.message); }
   }
 
   function resetScan() {
@@ -404,16 +400,25 @@
 
   document.getElementById('btn-consume').onclick = () => setMode('consume');
   document.getElementById('btn-dispatch').onclick = () => setMode('dispatch');
-  document.getElementById('btn-confirm-consume').onclick = confirmConsume;
-  document.getElementById('btn-confirm-dispatch').onclick = confirmDispatch;
+  // A double tap must not consume or dispatch twice: the button is off while its call runs.
+  const once = (id, fn) => {
+    const btn = document.getElementById(id);
+    btn.onclick = async () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      try { await fn(); } finally { btn.disabled = false; }
+    };
+  };
+  once('btn-confirm-consume', confirmConsume);
+  once('btn-confirm-dispatch', confirmDispatch);
   document.getElementById('btn-reset').onclick = resetScan;
   document.getElementById('btn-scan-again').onclick = resetScan;
 
   window.addEventListener('DOMContentLoaded', async () => {
     applyI18n();
     document.getElementById('header-title').textContent = t.brandConsume;
-    const authCheck = await fetch(`${API}/me`, { credentials: 'include' });
-    if (authCheck.status === 401) { goLogin(); return; }
+    const session = await fetch('/api/auth/get-session', { credentials: 'include' }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    if (!session) { goLogin(); return; }
     scanner = new Html5QrcodeScanner('reader', { fps: 10, qrbox: { width: 260, height: 260 }, aspectRatio: 1 }, false);
     scanner.render((decodedText) => {
       if (isUUID(decodedText) && !currentLot) onScan(decodedText);

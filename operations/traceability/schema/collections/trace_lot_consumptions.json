@@ -1,0 +1,68 @@
+{
+  "name": "trace_lot_consumptions",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "production_order_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "trace_production_orders"
+      }
+    },
+    {
+      "name": "lot_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "trace_lots"
+      }
+    },
+    {
+      "name": "quantity_used",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "unit",
+      "type": "enum",
+      "required": true,
+      "options": {
+        "values": [
+          "kg",
+          "g",
+          "l",
+          "ml",
+          "buc",
+          "cutie",
+          "sac",
+          "palet"
+        ]
+      }
+    }
+  ],
+  "relations": [
+    {
+      "name": "trace_lot_consumptions_production_order_id",
+      "type": "m2o",
+      "field": "production_order_id",
+      "target": "trace_production_orders",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "trace_lot_consumptions_lot_id",
+      "type": "m2o",
+      "field": "lot_id",
+      "target": "trace_lots",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

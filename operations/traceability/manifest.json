@@ -3,12 +3,12 @@
   "displayName": "Trasabilitate Alimentară",
   "category": "operations",
   "description": "Trasabilitate alimentară conformă Reg. CE 178/2002 (Art. 18) și cerințelor ANSVSA România — recepție loturi, scanare QR, arbore bidirecțional, simulator recall.",
-  "version": "1.5.7",
-  "zveltioMinVersion": "1.0.0",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.96",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-traceability",
   "permissions": [
-    "database"
+    "data:write"
   ],
   "i18nPrefixes": [
     "operations.traceability"
@@ -16,7 +16,7 @@
   "dependencies": [
     {
       "name": "finance/invoicing",
-      "minVersion": "1.0.0"
+      "minVersion": "2.3.0"
     }
   ],
   "peerDependencies": {
@@ -59,8 +59,915 @@
     "bundled": true,
     "bundlePeers": true
   },
+  "collections": [
+    "trace_suppliers",
+    "trace_items",
+    "trace_locations",
+    "trace_lots",
+    "trace_lot_decisions",
+    "trace_recipes",
+    "trace_recipe_items",
+    "trace_production_orders",
+    "trace_haccp_checks",
+    "trace_lot_consumptions",
+    "trace_movements",
+    "trace_recalls",
+    "trace_dispatches"
+  ],
+  "actions": [
+    {
+      "name": "receiveLot",
+      "permission": {
+        "resource": "trace_lots",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "item_id",
+          "quantity_initial",
+          "unit"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "item_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lot_type": {
+            "type": "string",
+            "enum": [
+              "inbound",
+              "internal",
+              "outbound"
+            ]
+          },
+          "quantity_initial": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "kg",
+              "g",
+              "l",
+              "ml",
+              "buc",
+              "cutie",
+              "sac",
+              "palet"
+            ]
+          },
+          "supplier_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "supplier_lot_ref": {
+            "type": "string"
+          },
+          "best_before_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "production_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "reception_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "invoice_ref": {
+            "type": "string"
+          },
+          "location_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "location_notes": {
+            "type": "string"
+          },
+          "sscc": {
+            "type": "string",
+            "maxLength": 18
+          },
+          "gtin_scanned": {
+            "type": "string",
+            "maxLength": 14
+          },
+          "notes": {
+            "type": "string"
+          },
+          "gs1_scan": {
+            "type": "string",
+            "maxLength": 512
+          }
+        }
+      },
+      "reads": [],
+      "writes": [
+        "trace_lots",
+        "trace_movements"
+      ]
+    },
+    {
+      "name": "releaseLot",
+      "permission": {
+        "resource": "trace_lot_decisions",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      },
+      "reads": [
+        "trace_lots"
+      ],
+      "writes": [
+        "trace_lots",
+        "trace_lot_decisions"
+      ]
+    },
+    {
+      "name": "setLotStatus",
+      "permission": {
+        "resource": "trace_lot_decisions",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "status"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "quarantine",
+              "available",
+              "exhausted",
+              "recalled",
+              "returned"
+            ]
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      },
+      "reads": [
+        "trace_lots"
+      ],
+      "writes": [
+        "trace_lots",
+        "trace_lot_decisions"
+      ]
+    },
+    {
+      "name": "expiringLots",
+      "permission": {
+        "resource": "trace_lots",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [],
+        "additionalProperties": false,
+        "properties": {
+          "days": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3650
+          }
+        }
+      },
+      "reads": [
+        "trace_lots",
+        "trace_items",
+        "trace_locations"
+      ],
+      "writes": []
+    },
+    {
+      "name": "lowStock",
+      "permission": {
+        "resource": "trace_items",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [],
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "reads": [
+        "trace_items",
+        "trace_lots"
+      ],
+      "writes": []
+    },
+    {
+      "name": "createProductionOrder",
+      "permission": {
+        "resource": "trace_production_orders",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "output_item_id",
+          "planned_quantity",
+          "unit"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "output_item_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "planned_quantity": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "kg",
+              "g",
+              "l",
+              "ml",
+              "buc",
+              "cutie",
+              "sac",
+              "palet"
+            ]
+          },
+          "recipe_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      },
+      "reads": [],
+      "writes": [
+        "trace_lots",
+        "trace_production_orders"
+      ]
+    },
+    {
+      "name": "startProduction",
+      "permission": {
+        "resource": "trace_production_orders",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "trace_production_orders"
+      ],
+      "writes": [
+        "trace_production_orders"
+      ]
+    },
+    {
+      "name": "consumeLot",
+      "permission": {
+        "resource": "trace_lot_consumptions",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "production_order_id",
+          "lot_id",
+          "quantity_used"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "production_order_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quantity_used": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        }
+      },
+      "reads": [
+        "trace_production_orders",
+        "trace_lots"
+      ],
+      "writes": [
+        "trace_lots",
+        "trace_lot_consumptions",
+        "trace_movements"
+      ]
+    },
+    {
+      "name": "recordHaccp",
+      "permission": {
+        "resource": "trace_haccp_checks",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "production_order_id",
+          "ccp",
+          "value",
+          "unit",
+          "ok"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "production_order_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ccp": {
+            "type": "string",
+            "minLength": 1
+          },
+          "value": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "limit_min": {
+            "type": "number"
+          },
+          "limit_max": {
+            "type": "number"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "reads": [
+        "trace_production_orders"
+      ],
+      "writes": [
+        "trace_haccp_checks"
+      ]
+    },
+    {
+      "name": "completeProduction",
+      "permission": {
+        "resource": "trace_production_orders",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "actual_quantity"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "actual_quantity": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "haccp_checks": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "required": [
+                "ccp",
+                "value",
+                "unit",
+                "ok"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "ccp": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "value": {
+                  "type": "number"
+                },
+                "unit": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "limit_min": {
+                  "type": "number"
+                },
+                "limit_max": {
+                  "type": "number"
+                },
+                "ok": {
+                  "type": "boolean"
+                },
+                "checked_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            }
+          }
+        }
+      },
+      "reads": [
+        "trace_production_orders",
+        "trace_lots"
+      ],
+      "writes": [
+        "trace_production_orders",
+        "trace_lots",
+        "trace_movements",
+        "trace_haccp_checks"
+      ]
+    },
+    {
+      "name": "simulateRecall",
+      "permission": {
+        "resource": "trace_lots",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "lot_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "lot_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "trace_lots",
+        "trace_items",
+        "trace_production_orders",
+        "trace_lot_consumptions",
+        "trace_movements"
+      ],
+      "writes": []
+    },
+    {
+      "name": "traceUpstream",
+      "permission": {
+        "resource": "trace_lots",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "lot_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "lot_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "trace_lots",
+        "trace_items",
+        "trace_suppliers",
+        "trace_production_orders",
+        "trace_lot_consumptions"
+      ],
+      "writes": []
+    },
+    {
+      "name": "initiateRecall",
+      "permission": {
+        "resource": "trace_recalls",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "lot_id",
+          "reason",
+          "scope"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "lot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 10
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "internal",
+              "market_withdrawal",
+              "consumer_recall"
+            ]
+          }
+        }
+      },
+      "reads": [
+        "trace_lots",
+        "trace_items",
+        "trace_production_orders",
+        "trace_lot_consumptions",
+        "trace_movements"
+      ],
+      "writes": [
+        "trace_lots",
+        "trace_recalls"
+      ]
+    },
+    {
+      "name": "resolveRecall",
+      "permission": {
+        "resource": "trace_recalls",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "resolution_notes"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "resolution_notes": {
+            "type": "string",
+            "minLength": 5
+          }
+        }
+      },
+      "reads": [
+        "trace_recalls"
+      ],
+      "writes": [
+        "trace_recalls"
+      ]
+    },
+    {
+      "name": "confirmDispatch",
+      "permission": {
+        "resource": "trace_dispatches",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "quantity_dispatched"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quantity_dispatched": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      },
+      "reads": [
+        "trace_dispatches",
+        "trace_lots"
+      ],
+      "writes": [
+        "trace_dispatches",
+        "trace_lots",
+        "trace_movements"
+      ]
+    },
+    {
+      "name": "assignDispatchLot",
+      "permission": {
+        "resource": "trace_dispatches",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "lot_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lot_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "trace_dispatches",
+        "trace_lots"
+      ],
+      "writes": [
+        "trace_dispatches"
+      ]
+    },
+    {
+      "name": "cancelDispatch",
+      "permission": {
+        "resource": "trace_dispatches",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      },
+      "reads": [
+        "trace_dispatches"
+      ],
+      "writes": [
+        "trace_dispatches"
+      ]
+    },
+    {
+      "name": "directDispatch",
+      "permission": {
+        "resource": "trace_dispatches",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "lot_id",
+          "quantity_dispatched",
+          "customer_name"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "lot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quantity_dispatched": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "customer_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "customer_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "invoice_number": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      },
+      "reads": [
+        "trace_lots"
+      ],
+      "writes": [
+        "trace_dispatches",
+        "trace_lots",
+        "trace_movements"
+      ]
+    },
+    {
+      "name": "importInvoice",
+      "permission": {
+        "resource": "trace_dispatches",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "invoice_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "invoice_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "invoices",
+        "invoice_lines",
+        "trace_lots",
+        "trace_dispatches"
+      ],
+      "writes": [
+        "trace_dispatches"
+      ]
+    },
+    {
+      "name": "labels",
+      "permission": {
+        "resource": "trace_lots",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "lot_ids"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "lot_ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 50,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
+      "reads": [
+        "trace_lots",
+        "trace_items",
+        "trace_suppliers",
+        "trace_locations"
+      ],
+      "writes": []
+    },
+    {
+      "name": "scanLot",
+      "permission": {
+        "resource": "trace_lots",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "lot_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "lot_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "trace_lots",
+        "trace_items",
+        "trace_suppliers",
+        "trace_locations"
+      ],
+      "writes": []
+    },
+    {
+      "name": "parseGs1",
+      "permission": {
+        "resource": "trace_lots",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "raw"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "raw": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          }
+        }
+      },
+      "reads": [],
+      "writes": []
+    },
+    {
+      "name": "report",
+      "permission": {
+        "resource": "trace_lots",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "ansvsa",
+              "receptions",
+              "consumptions",
+              "stock",
+              "haccp"
+            ]
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          }
+        }
+      },
+      "reads": [
+        "trace_lots",
+        "trace_items",
+        "trace_suppliers",
+        "trace_locations",
+        "trace_movements",
+        "trace_lot_consumptions",
+        "trace_production_orders",
+        "trace_haccp_checks"
+      ],
+      "writes": []
+    }
+  ],
   "integrity": {
-    "engineSha256": "7b3f4f61222fb7b38d5a2c9633b0f660e1db54099332000f68adb4e01eb66b03",
-    "sourceSha256": "34e6fd609a52149322e13b6151c44d1bcbfd091a222f215a56c1f6f30b854cb4"
+    "engineSha256": "adee9cd643c1446858e9084024aba286d8c0f72f8abbaef70625343620808534",
+    "sourceSha256": "20cd074a121066e22c8ed188d6b01124d29d6a860b256a384b4dadc7a8a39048",
+    "schemaSha256": "e02c2b6855559ae5799fb72f3369aa10f518ca78fc0152df28d69b98f9d7028d"
   }
 }

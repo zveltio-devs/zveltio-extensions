@@ -1,0 +1,86 @@
+{
+  "name": "trace_recipe_items",
+  "fields": [
+    {
+      "name": "recipe_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "trace_recipes"
+      }
+    },
+    {
+      "name": "item_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "trace_items"
+      }
+    },
+    {
+      "name": "quantity_per_unit",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "unit",
+      "type": "enum",
+      "required": true,
+      "options": {
+        "values": [
+          "kg",
+          "g",
+          "l",
+          "ml",
+          "buc",
+          "cutie",
+          "sac",
+          "palet"
+        ]
+      }
+    },
+    {
+      "name": "is_critical_allergen",
+      "type": "boolean",
+      "defaultValue": false
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    }
+  ],
+  "relations": [
+    {
+      "name": "trace_recipe_items_recipe_id",
+      "type": "m2o",
+      "field": "recipe_id",
+      "target": "trace_recipes",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "trace_recipe_items_item_id",
+      "type": "m2o",
+      "field": "item_id",
+      "target": "trace_items",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "quantity_per_unit",
+      "rule": "min",
+      "config": {
+        "value": 1e-06
+      },
+      "message": "An ingredient takes a positive quantity."
+    }
+  ]
+}

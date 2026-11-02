@@ -1,0 +1,59 @@
+{
+  "name": "trace_lot_decisions",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "lot_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "trace_lots"
+      }
+    },
+    {
+      "name": "from_status",
+      "type": "enum",
+      "required": true,
+      "options": {
+        "values": [
+          "quarantine",
+          "available",
+          "exhausted",
+          "recalled",
+          "returned"
+        ]
+      }
+    },
+    {
+      "name": "to_status",
+      "type": "enum",
+      "required": true,
+      "options": {
+        "values": [
+          "quarantine",
+          "available",
+          "exhausted",
+          "recalled",
+          "returned"
+        ]
+      }
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    }
+  ],
+  "relations": [
+    {
+      "name": "trace_lot_decisions_lot_id",
+      "type": "m2o",
+      "field": "lot_id",
+      "target": "trace_lots",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

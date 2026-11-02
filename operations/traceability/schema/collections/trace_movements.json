@@ -1,0 +1,124 @@
+{
+  "name": "trace_movements",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "lot_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "trace_lots"
+      }
+    },
+    {
+      "name": "type",
+      "type": "enum",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "values": [
+          "reception",
+          "consumption",
+          "dispatch",
+          "waste",
+          "return",
+          "transfer",
+          "adjustment"
+        ]
+      }
+    },
+    {
+      "name": "quantity",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "unit",
+      "type": "enum",
+      "required": true,
+      "options": {
+        "values": [
+          "kg",
+          "g",
+          "l",
+          "ml",
+          "buc",
+          "cutie",
+          "sac",
+          "palet"
+        ]
+      }
+    },
+    {
+      "name": "reference_type",
+      "type": "text"
+    },
+    {
+      "name": "reference_id",
+      "type": "uuid",
+      "indexed": true
+    },
+    {
+      "name": "reference_number",
+      "type": "text"
+    },
+    {
+      "name": "from_location_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "trace_locations"
+      }
+    },
+    {
+      "name": "to_location_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "trace_locations"
+      }
+    },
+    {
+      "name": "customer_id",
+      "type": "uuid",
+      "indexed": true
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    }
+  ],
+  "relations": [
+    {
+      "name": "trace_movements_lot_id",
+      "type": "m2o",
+      "field": "lot_id",
+      "target": "trace_lots",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "trace_movements_from_location_id",
+      "type": "m2o",
+      "field": "from_location_id",
+      "target": "trace_locations",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "trace_movements_to_location_id",
+      "type": "m2o",
+      "field": "to_location_id",
+      "target": "trace_locations",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

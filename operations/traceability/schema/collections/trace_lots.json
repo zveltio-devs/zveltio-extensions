@@ -1,0 +1,171 @@
+{
+  "name": "trace_lots",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "item_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "trace_items"
+      }
+    },
+    {
+      "name": "lot_type",
+      "type": "enum",
+      "required": true,
+      "options": {
+        "values": [
+          "inbound",
+          "internal",
+          "outbound"
+        ]
+      }
+    },
+    {
+      "name": "lot_number",
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "values": [
+          "quarantine",
+          "available",
+          "exhausted",
+          "recalled",
+          "returned"
+        ]
+      }
+    },
+    {
+      "name": "quantity_initial",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "quantity_remaining",
+      "type": "decimal",
+      "required": true
+    },
+    {
+      "name": "unit",
+      "type": "enum",
+      "required": true,
+      "options": {
+        "values": [
+          "kg",
+          "g",
+          "l",
+          "ml",
+          "buc",
+          "cutie",
+          "sac",
+          "palet"
+        ]
+      }
+    },
+    {
+      "name": "supplier_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "trace_suppliers"
+      }
+    },
+    {
+      "name": "supplier_lot_ref",
+      "type": "text"
+    },
+    {
+      "name": "best_before_date",
+      "type": "date",
+      "indexed": true
+    },
+    {
+      "name": "production_date",
+      "type": "date"
+    },
+    {
+      "name": "reception_date",
+      "type": "date",
+      "indexed": true
+    },
+    {
+      "name": "invoice_ref",
+      "type": "text"
+    },
+    {
+      "name": "location_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "trace_locations"
+      }
+    },
+    {
+      "name": "location_notes",
+      "type": "text"
+    },
+    {
+      "name": "sscc",
+      "type": "text"
+    },
+    {
+      "name": "gtin_scanned",
+      "type": "text"
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    }
+  ],
+  "relations": [
+    {
+      "name": "trace_lots_item_id",
+      "type": "m2o",
+      "field": "item_id",
+      "target": "trace_items",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "trace_lots_supplier_id",
+      "type": "m2o",
+      "field": "supplier_id",
+      "target": "trace_suppliers",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "trace_lots_location_id",
+      "type": "m2o",
+      "field": "location_id",
+      "target": "trace_locations",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "quantity_remaining",
+      "rule": "min",
+      "config": {
+        "value": 0
+      },
+      "message": "A lot never holds less than nothing."
+    }
+  ]
+}

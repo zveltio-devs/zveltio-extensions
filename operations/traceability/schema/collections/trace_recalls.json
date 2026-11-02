@@ -1,0 +1,74 @@
+{
+  "name": "trace_recalls",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "lot_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "trace_lots"
+      }
+    },
+    {
+      "name": "scope",
+      "type": "enum",
+      "required": true,
+      "options": {
+        "values": [
+          "internal",
+          "market_withdrawal",
+          "consumer_recall"
+        ]
+      }
+    },
+    {
+      "name": "reason",
+      "type": "textarea",
+      "required": true
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "values": [
+          "active",
+          "resolved",
+          "cancelled"
+        ]
+      }
+    },
+    {
+      "name": "resolved_at",
+      "type": "datetime"
+    },
+    {
+      "name": "resolution_notes",
+      "type": "textarea"
+    },
+    {
+      "name": "affected_downstream_lots",
+      "type": "json",
+      "defaultValue": []
+    },
+    {
+      "name": "notification_sent_at",
+      "type": "datetime"
+    }
+  ],
+  "relations": [
+    {
+      "name": "trace_recalls_lot_id",
+      "type": "m2o",
+      "field": "lot_id",
+      "target": "trace_lots",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

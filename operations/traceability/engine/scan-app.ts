@@ -1,19 +1,14 @@
 /**
- * Floor scanner PWA — static assets under /app (no session required for HTML;
- * API calls still go through the authed /scan/* routes).
+ * Floor scanner PWA — static assets under /app. The page holds no data: it
+ * reads and writes through the data API and this extension's actions, as the
+ * signed-in user, like Studio.
  */
 import { Hono } from 'hono';
 import { join } from 'path';
 import { existsSync } from 'fs';
 
-/** Source: engine/routes → ../../pwa. Packed: engine/index.js → ../pwa. */
-function pwaDir(): string {
-  const candidates = [join(import.meta.dir, '../../pwa'), join(import.meta.dir, '../pwa')];
-  for (const dir of candidates) {
-    if (existsSync(join(dir, 'scan.html'))) return dir;
-  }
-  return candidates[0];
-}
+/** Source engine/scan-app.ts and packed engine/index.js both sit beside ../pwa. */
+const pwaDir = () => join(import.meta.dir, '../pwa');
 
 function fileResponse(name: string, contentType: string): Response {
   const path = join(pwaDir(), name);
@@ -42,6 +37,7 @@ export function scanAppRouter(): Hono {
     fileResponse('manifest.webmanifest', 'application/manifest+json'),
   );
   app.get('/icon.svg', () => fileResponse('icon.svg', 'image/svg+xml'));
+  app.get('/tools.html', () => fileResponse('tools.html', 'text/html; charset=utf-8'));
 
   return app;
 }
