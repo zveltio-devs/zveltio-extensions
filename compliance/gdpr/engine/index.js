@@ -1631,9 +1631,10 @@ function selfServiceRoutes(ctx) {
     }
     const userId = user.id;
     const erasureId = crypto.randomUUID();
+    let deleted = false;
     try {
       await ctx.db.transaction().execute(async (trx) => {
-        await ctx.internals.deleteUser(trx, userId, {
+        deleted = await ctx.internals.deleteUser(trx, userId, {
           actor: "self",
           reason: "gdpr.erasure",
           metadata: { erasure_id: erasureId }
@@ -1647,6 +1648,8 @@ function selfServiceRoutes(ctx) {
         detail: err instanceof Error ? err.message : String(err)
       }, status);
     }
+    if (!deleted)
+      return c.json({ error: "Account not found. Nothing was erased." }, 404);
     await ctx.internals.audit({
       type: "gdpr.account_deleted",
       resourceId: userId,

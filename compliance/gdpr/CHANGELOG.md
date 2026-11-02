@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.1 (2026-11-02)
+
+- fix: an erasure whose account the engine did not find answered `complete: true` and recorded `gdpr.account_deleted`; it now answers 404 and records nothing
+- fix: a retention period below one day and a negative affected-records estimate are refused (validation rules), as 1.x refused them
+- feat: Studio moves a request to in progress (`Start`), and fulfils or rejects it from pending or in progress
+- docs: an erasure keeps a request's `description` and a decision's `notes` as written; whoever handles the erasure reviews them
+- chore: the extension-authorization allowlist exempts `engine/self-service.ts` alone, not the whole extension
+
 ## 2.0.0 (2026-11-02)
 
 - feat!: the register is 5 collections declared in `schema/collections/` and created and owned by the engine (`gdpr_processing_activities` and `gdpr_breaches` as plain edits; `gdpr_consent_records`, `gdpr_subject_requests`, `gdpr_request_decisions` written only by the actions); no SQL migrations

@@ -79,18 +79,21 @@ export function selfServiceRoutes(ctx: ExtensionContext): Hono {
     // `account`, `twoFactor` and the notifications go with it (ON DELETE
     // CASCADE). This extension's records name the subject only by the engine's
     // `created_by`, which the delete sets to NULL: a consent or a request stays
-    // as an anonymous record of what happened.
+    // as a record of what happened with no link to the subject. Free text the
+    // subject or a handler wrote (a request's `description`, a decision's
+    // `notes`) is kept as written; whoever handles the erasure reviews it.
     //
     // The erasure is recorded once it happened (`ctx.internals.audit`): the
     // `user.deleted` row the host writes names it by `erasure_id`, and so does
     // `gdpr.account_deleted`. The subject's id is the resource — the user row is
     // gone by then.
     const erasureId = crypto.randomUUID();
+    let deleted = false;
     try {
       await (ctx.db as any).transaction().execute(async (trx: any) => {
         // The actor is the subject, who no longer exists, so the audit row
         // names the erasure instead.
-        await ctx.internals.deleteUser(trx, userId, {
+        deleted = await ctx.internals.deleteUser(trx, userId, {
           actor: 'self',
           reason: 'gdpr.erasure',
           metadata: { erasure_id: erasureId },
@@ -112,6 +115,9 @@ export function selfServiceRoutes(ctx: ExtensionContext): Hono {
         detail: err instanceof Error ? err.message : String(err),
       }, status);
     }
+
+    // No row to delete: nothing was erased, so nothing is recorded as erased.
+    if (!deleted) return c.json({ error: 'Account not found. Nothing was erased.' }, 404);
 
     // The account is gone whatever happens here; the host's `user.deleted` row
     // already records it. A failed write of this second record is logged.

@@ -44,6 +44,21 @@
       ],
       "rowActions": [
         {
+          "id": "start",
+          "label": "compliance.gdpr.btn.start",
+          "icon": "Play",
+          "method": "POST",
+          "endpoint": "/ext/compliance/gdpr/actions/setRequestStatus",
+          "body": {
+            "id": "{id}",
+            "status": "in_progress"
+          },
+          "visibleWhen": {
+            "field": "status",
+            "equals": "pending"
+          }
+        },
+        {
           "id": "fulfill",
           "label": "compliance.gdpr.btn.fulfill",
           "method": "POST",
@@ -54,7 +69,10 @@
           },
           "visibleWhen": {
             "field": "status",
-            "equals": "pending"
+            "in": [
+              "pending",
+              "in_progress"
+            ]
           }
         },
         {
@@ -69,7 +87,10 @@
           },
           "visibleWhen": {
             "field": "status",
-            "equals": "pending"
+            "in": [
+              "pending",
+              "in_progress"
+            ]
           }
         }
       ]

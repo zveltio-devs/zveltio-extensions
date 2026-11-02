@@ -1,7 +1,5 @@
 {
   "sites": [
-    "auth/ldap/engine/routes.ts\t${JSON.stringify({ provider: 'ldap', username, user_agent: userAgent })}::jsonb,",
-    "auth/ldap/engine/routes.ts\t${JSON.stringify({ provider: 'ldap', username, user_agent: userAgent, error: err?.message })}::jsonb,",
     "communications/mail/engine/lib/compose.ts\t${toJson(data.attachments)}::jsonb, NOW()",
     "communications/mail/engine/lib/compose.ts\t${toJson(data.to)}::jsonb, ${toJson(data.cc)}::jsonb, ${toJson(data.bcc)}::jsonb,",
     "communications/mail/engine/lib/compose.ts\tattachments = ${toJson(data.attachments)}::jsonb,",
@@ -14,15 +12,9 @@
     "communications/mail/engine/routes.ts\t${JSON.stringify(data.actions)}::jsonb, ${data.is_active}, ${data.sort_order}, ${sieveScript})",
     "communications/mail/engine/routes.ts\t${JSON.stringify(data.to.map((e: string) => ({ address: e })))}::jsonb,",
     "communications/mail/engine/routes.ts\tVALUES (${accountId}, ${data.name}, ${JSON.stringify(data.conditions)}::jsonb,",
-    "compliance/gdpr/engine/routes.ts\tVALUES ('gdpr.account_deleted', ${userId}, 'user', ${JSON.stringify({ gdpr: true, requested_at: new Date().toISOString() })}::jsonb, NOW())",
     "content/document-templates/engine/routes.ts\t${data.html_body}, ${JSON.stringify(data.variables)}::jsonb, ${JSON.stringify(data.pdf_options)}::jsonb,",
     "developer/graphql/engine/routes.ts\t${body.variables_schema ? JSON.stringify(body.variables_schema) : null}::jsonb,",
     "developer/graphql/engine/routes.ts\t${variables ? JSON.stringify(variables) : null}::jsonb,",
-    "developer/validation/engine/routes.ts\t${JSON.stringify(errors)}::jsonb, ${user.id})",
-    "finance/invoicing/engine/routes.ts\t${JSON.stringify(vatBreakdown)}::jsonb, ${d.vat_regime}, ${d.vat_exemption_reason ?? null},",
-    "finance/subscriptions/engine/routes.ts\t${trialEnd ? 'trialing' : 'active'}, ${JSON.stringify(d.notes ? { notes: d.notes } : {})}::jsonb, ${user.id})",
-    "integrations/api-connector/engine/routes.ts\tauth_config = COALESCE(${d.auth_config ? JSON.stringify(d.auth_config) : null}::jsonb, auth_config),",
-    "integrations/api-connector/engine/routes.ts\tdefault_headers = COALESCE(${d.default_headers ? JSON.stringify(d.default_headers) : null}::jsonb, default_headers),",
-    "workflow/checklists/engine/routes.ts\t${JSON.stringify({ earned, possible, pass_threshold: threshold, items: breakdown })}::jsonb"
+    "developer/validation/engine/routes.ts\t${JSON.stringify(errors)}::jsonb, ${user.id})"
   ]
 }
