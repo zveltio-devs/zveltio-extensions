@@ -30,6 +30,10 @@
           "cancel_at_period_end"
         ]
       }
+    },
+    {
+      "name": "author",
+      "type": "text"
     }
   ],
   "relations": [

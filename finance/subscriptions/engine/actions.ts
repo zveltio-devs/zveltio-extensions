@@ -13,7 +13,9 @@ import {
 // wrote. Who may do what is the engine's rules on these collections. Marking an
 // invoice paid and cancelling a subscriber write a row of
 // `subscription_settlements` and are gated on that collection, so the operator
-// can let one role bill and another settle (ADR 0015).
+// can let one role bill and another settle (ADR 0015). A settlement names who
+// wrote the invoice or subscriber it settles (`author`), so the row rule
+// `author neq user_id` keeps anyone from settling their own (ADR 0016).
 
 type Host = Parameters<ExtensionAction>[1];
 type Row = Record<string, unknown>;
@@ -202,6 +204,7 @@ const cancel: ExtensionAction = async (input, host) => {
 	await host.collections.insert(T, {
 		subscriber_id: d.id,
 		kind: d.at_period_end ? "cancel_at_period_end" : "cancelled",
+		author: s.created_by,
 	});
 	return updated;
 };
@@ -330,7 +333,12 @@ const markInvoicePaid: ExtensionAction = async (input, host) => {
 		{ status: "paid", paid_at: new Date().toISOString() },
 		{ expect: { status: ["open"] } },
 	);
-	await host.collections.insert(T, { subscriber_id: inv.subscriber_id, invoice_id: d.id, kind: "invoice_paid" });
+	await host.collections.insert(T, {
+		subscriber_id: inv.subscriber_id,
+		invoice_id: d.id,
+		kind: "invoice_paid",
+		author: inv.created_by,
+	});
 	const open = await all(host, I, { subscriber_id: inv.subscriber_id, status: "open" });
 	if (open.length > 0) return paid;
 	const s = await get(host, S, String(inv.subscriber_id), "subscriber");

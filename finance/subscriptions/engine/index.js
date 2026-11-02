@@ -155,7 +155,8 @@ var cancel = async (input, host) => {
   });
   await host.collections.insert(T, {
     subscriber_id: d.id,
-    kind: d.at_period_end ? "cancel_at_period_end" : "cancelled"
+    kind: d.at_period_end ? "cancel_at_period_end" : "cancelled",
+    author: s.created_by
   });
   return updated;
 };
@@ -250,7 +251,12 @@ var markInvoicePaid = async (input, host) => {
   const d = input;
   const inv = await openInvoice(host, d.id);
   const paid = await host.collections.update(I, d.id, { status: "paid", paid_at: new Date().toISOString() }, { expect: { status: ["open"] } });
-  await host.collections.insert(T, { subscriber_id: inv.subscriber_id, invoice_id: d.id, kind: "invoice_paid" });
+  await host.collections.insert(T, {
+    subscriber_id: inv.subscriber_id,
+    invoice_id: d.id,
+    kind: "invoice_paid",
+    author: inv.created_by
+  });
   const open = await all(host, I, { subscriber_id: inv.subscriber_id, status: "open" });
   if (open.length > 0)
     return paid;

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.0 (2026-11-02)
+
+- feat: an order decision names the order's author (`order_author`, copied by `approveOrder` and `cancelOrder`). The row rule `procurement_order_decisions: order_author neq user_id` keeps anyone from approving or cancelling an order they created; the refused action rolls back (ADR 0016). With the rule on, an author no longer reads the decision rows of their own orders; the order's status still shows the outcome
+
 ## 2.1.0 (2026-11-01)
 
 - feat: approving or cancelling an order writes a row of the new `procurement_order_decisions` collection (order, decision, reason; the engine stamps who). `approveOrder` and `cancelOrder` are gated on that collection's `execute` instead of `procurement_orders`, so an operator can let one role create orders and another decide them, as `procurement:approve` did in 1.x (ADR 0015)

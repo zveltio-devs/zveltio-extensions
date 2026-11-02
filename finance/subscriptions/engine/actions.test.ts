@@ -41,6 +41,8 @@ function fakeHost() {
 				const row = {
 					...DEFAULTS[c],
 					id: `00000000-0000-0000-0000-${String(++seq).padStart(12, "0")}`,
+					// The engine stamps who wrote a row.
+					created_by: `u_${c}`,
 					...data,
 				};
 				rows(c).push(row);
@@ -162,7 +164,9 @@ describe("invoices", () => {
 		expect(rows("subscribers")[0]).toMatchObject({ status: "cancelled", cancel_at_period_end: false });
 		expect(rows("subscription_invoices")).toHaveLength(0);
 		// Only the decision is a settlement; the cancel that billing carries out is not.
-		expect(rows("subscription_settlements").map((x) => [x.subscriber_id, x.kind])).toEqual([[s.id, "cancel_at_period_end"]]);
+		expect(rows("subscription_settlements").map((x) => [x.subscriber_id, x.kind, x.author])).toEqual([
+			[s.id, "cancel_at_period_end", "u_subscribers"],
+		]);
 		const t = await run("subscribe", {
 			plan_id: s.plan_id,
 			name: "Later",
@@ -192,10 +196,11 @@ describe("invoices", () => {
 		await run("markInvoicePaid", { id: later.id });
 		expect(rows("subscribers")[0]).toMatchObject({ status: "active", dunning_count: 0 });
 		await refusal(run("markInvoicePaid", { id: inv.id }), "invoice_not_open");
-		// Each payment is a row of the collection markInvoicePaid is gated on.
-		expect(rows("subscription_settlements").map((x) => [x.invoice_id, x.kind])).toEqual([
-			[inv.id, "invoice_paid"],
-			[later.id, "invoice_paid"],
+		// Each payment is a row of the collection markInvoicePaid is gated on, and
+		// names who issued the invoice, so a row rule can keep them from settling it.
+		expect(rows("subscription_settlements").map((x) => [x.invoice_id, x.kind, x.author])).toEqual([
+			[inv.id, "invoice_paid", "u_subscription_invoices"],
+			[later.id, "invoice_paid", "u_subscription_invoices"],
 		]);
 	});
 });
