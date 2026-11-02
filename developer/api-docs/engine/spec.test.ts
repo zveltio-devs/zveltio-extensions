@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { apiDocsRoutes } from './routes.js';
+import { PAGE } from './page.js';
 import { buildPostman, buildSpec } from './spec.js';
 
 const readable = [
@@ -29,8 +29,7 @@ describe('developer/api-docs spec', () => {
   });
 
   it('serialises into a page that still runs', async () => {
-    const html = await (await apiDocsRoutes().request('/')).text();
-    const script = html.split('<script>')[1]!.split('window.onload')[0]!;
+    const script = PAGE.split('<script>')[1]!.split('window.onload')[0]!;
     // The page's own copies, not the imports: proves toString() kept them self-contained.
     const page = new Function(`${script} return { buildSpec, buildPostman };`)();
     const spec = page.buildSpec(readable, 'https://x.test');

@@ -1591,7 +1591,7 @@ function buildPostman(spec) {
   };
 }
 
-// engine/routes.ts
+// engine/page.ts
 var PAGE = `<!DOCTYPE html>
 <html>
 <head>
@@ -1634,6 +1634,8 @@ var PAGE = `<!DOCTYPE html>
 </script>
 </body>
 </html>`;
+
+// engine/routes.ts
 function apiDocsRoutes() {
   const router = new Hono2;
   router.get("/", (c) => c.html(PAGE));
