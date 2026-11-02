@@ -113,7 +113,7 @@ var deleteDraft = async (input, host) => {
 var approveOrder = async (input, host) => {
   const { id } = input;
   const order = await move(host, O, id, ["draft"], { status: "approved", approved_at: new Date().toISOString() }, "order_not_draft", "Only a draft order is approved.");
-  await host.collections.insert(D, { order_id: id, decision: "approved" });
+  await host.collections.insert(D, { order_id: id, decision: "approved", order_author: order.created_by });
   return order;
 };
 var receiveOrder = async (input, host) => {
@@ -123,7 +123,7 @@ var receiveOrder = async (input, host) => {
 var cancelOrder = async (input, host) => {
   const { id, reason } = input;
   const order = await move(host, O, id, ["draft", "approved"], { status: "cancelled", cancellation_reason: reason, cancelled_at: new Date().toISOString() }, "order_not_cancellable", "Only a draft or approved order is cancelled.");
-  await host.collections.insert(D, { order_id: id, decision: "cancelled", reason });
+  await host.collections.insert(D, { order_id: id, decision: "cancelled", reason, order_author: order.created_by });
   return order;
 };
 var createReceptionNote = async (input, host) => {

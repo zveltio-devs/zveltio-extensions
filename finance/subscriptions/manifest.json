@@ -3,7 +3,7 @@
   "displayName": "Subscriptions",
   "category": "finance",
   "description": "Recurring billing plans, subscribers, metered usage, invoices and dunning",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "zveltioMinVersion": "3.0.0-beta.93",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-subscriptions",
@@ -328,8 +328,8 @@
     }
   ],
   "integrity": {
-    "engineSha256": "8527c62e7b21f9f8f90ca724ab49034da8e3c2fcd6d75ba8eedb7013cad4699c",
-    "sourceSha256": "0dc6e23cd7eb6279572726fbad78907d7a554808a94efbd04abf59095fbf4de0",
-    "schemaSha256": "fef753faef2d06c4d58f12b765570d4f250424301190e2360a0371c282fae9e7"
+    "engineSha256": "e86c27ac31d0909b176ec50991e0a51ed380dcba6a068f4bb8bb246da923af62",
+    "sourceSha256": "da5745ed5a11abc53655e0fbc0e0436b4246efe1625cacc87734a43d5c61a6d9",
+    "schemaSha256": "9c9a792020dda5d8bfeffb123571bf3bb988142e9ed96e309f7989a9fa2458dd"
   }
 }

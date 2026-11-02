@@ -34,7 +34,8 @@ function fakeHost() {
         return { records: out.slice(from, from + lim).map((r) => ({ ...r })) };
       },
       insert: async (c: string, data: Row) => {
-        const row = { id: `00000000-0000-0000-0000-${String(++seq).padStart(12, '0')}`, ...data };
+        // The engine stamps who wrote a row.
+        const row = { id: `00000000-0000-0000-0000-${String(++seq).padStart(12, '0')}`, created_by: 'u_author', ...data };
         rows(c).push(row);
         return { ...row };
       },
@@ -117,10 +118,11 @@ describe('compliance/ro/procurement actions', () => {
     await refusal(run('cancelOrder', { id: o.id, reason: 'x' }, host), 'order_not_cancellable');
     const c = await run('cancelOrder', { id: (await order()).id, reason: 'buget' }, host);
     expect(c).toMatchObject({ status: 'cancelled', cancellation_reason: 'buget' });
-    // Each decision is a row of the collection both actions are gated on.
-    expect(rows('procurement_order_decisions').map((d) => [d.order_id, d.decision, d.reason])).toEqual([
-      [o.id, 'approved', undefined],
-      [c.id, 'cancelled', 'buget'],
+    // Each decision is a row of the collection both actions are gated on, and
+    // names the order's author, so a row rule can keep them from deciding it.
+    expect(rows('procurement_order_decisions').map((d) => [d.order_id, d.decision, d.reason, d.order_author])).toEqual([
+      [o.id, 'approved', undefined, 'u_author'],
+      [c.id, 'cancelled', 'buget', 'u_author'],
     ]);
     await refusal(run('approveOrder', { id: '00000000-0000-0000-0000-999999999999' }, host), 'order_not_found');
   });

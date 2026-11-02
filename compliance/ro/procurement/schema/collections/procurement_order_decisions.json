@@ -4,7 +4,8 @@
   "fields": [
     { "name": "order_id", "type": "m2o", "required": true, "options": { "related_collection": "procurement_orders" } },
     { "name": "decision", "type": "enum", "required": true, "options": { "values": ["approved", "cancelled"] } },
-    { "name": "reason", "type": "textarea" }
+    { "name": "reason", "type": "textarea" },
+    { "name": "order_author", "type": "text" }
   ],
   "indexes": [{ "fields": ["order_id", "decision"], "unique": true }],
   "relations": [

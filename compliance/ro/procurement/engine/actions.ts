@@ -12,7 +12,9 @@ import { ActionRefusal, type ExtensionAction, todayIn } from '@zveltio/sdk/exten
 // cancel an order is the engine's rules on these collections, not this file's:
 // approving and cancelling write a row of `procurement_order_decisions` and are
 // gated on that collection, so the operator can let one role buy and another
-// decide (ADR 0015).
+// decide (ADR 0015). A decision names the order's author (`order_author`), so
+// the row rule `order_author neq user_id` keeps anyone from deciding their own
+// order (ADR 0016).
 
 type Host = Parameters<ExtensionAction>[1];
 type Row = Record<string, unknown>;
@@ -116,7 +118,7 @@ const deleteDraft: ExtensionAction = async (input, host) => {
 const approveOrder: ExtensionAction = async (input, host) => {
   const { id } = input as { id: string };
   const order = await move(host, O, id, ['draft'], { status: 'approved', approved_at: new Date().toISOString() }, 'order_not_draft', 'Only a draft order is approved.');
-  await host.collections.insert(D, { order_id: id, decision: 'approved' });
+  await host.collections.insert(D, { order_id: id, decision: 'approved', order_author: order.created_by });
   return order;
 };
 
@@ -136,7 +138,7 @@ const cancelOrder: ExtensionAction = async (input, host) => {
     'order_not_cancellable',
     'Only a draft or approved order is cancelled.',
   );
-  await host.collections.insert(D, { order_id: id, decision: 'cancelled', reason });
+  await host.collections.insert(D, { order_id: id, decision: 'cancelled', reason, order_author: order.created_by });
   return order;
 };
 
