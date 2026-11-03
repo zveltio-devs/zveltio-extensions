@@ -6,8 +6,8 @@
   "resources": [
     {
       "id": "logs",
-      "dataSource": "/ext/data/import/jobs",
-      "dataPath": "jobs",
+      "dataSource": "/api/data/data_import_jobs?sort=created_at&order=desc&limit=500",
+      "dataPath": "records",
       "columns": [
         {
           "key": "created_at",
@@ -15,7 +15,7 @@
           "type": "date"
         },
         {
-          "key": "collection",
+          "key": "target_collection",
           "label": "common.col.collection"
         },
         {
@@ -27,25 +27,17 @@
           }
         },
         {
-          "key": "rows_imported",
+          "key": "imported_rows",
           "label": "data.import.col.rows"
         },
         {
-          "key": "error_count",
-          "label": "data.import.col.errors"
+          "key": "filename",
+          "label": "common.col.file"
         },
         {
-          "key": "status",
-          "label": "common.col.status",
-          "type": "badge",
-          "badge": {
-            "colors": {
-              "completed": "badge-success",
-              "failed": "badge-error",
-              "running": "badge-warning",
-              "pending": "badge-warning"
-            }
-          }
+          "key": "rolled_back_at",
+          "label": "data.import.col.rolledBack",
+          "type": "date"
         }
       ],
       "form": {
@@ -97,19 +89,24 @@
             ]
           },
           {
-            "name": "upsert_on",
-            "label": "data.import.label.upsertHtml",
+            "name": "delimiter",
+            "label": "data.import.label.delimiter",
+            "default": ",",
             "mono": true,
             "colSpan": 1
-          },
-          {
-            "name": "create_missing_columns",
-            "label": "data.import.ui.create_missing_columns_automatically",
-            "type": "boolean",
-            "colSpan": 2
           }
         ]
-      }
+      },
+      "rowActions": [
+        {
+          "id": "rollback",
+          "label": "data.import.action.rollback",
+          "icon": "Undo2",
+          "method": "POST",
+          "endpoint": "/ext/data/import/jobs/{id}/rollback",
+          "confirm": "data.import.confirm.rollback"
+        }
+      ]
     }
   ]
 }

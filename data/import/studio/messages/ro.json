@@ -1,21 +1,20 @@
 {
   "data.import.action.import": "Importă",
-  "data.import.col.errors": "Erori",
+  "data.import.action.rollback": "Anulează importul",
   "data.import.col.format": "Format",
+  "data.import.col.rolledBack": "Anulat",
   "data.import.col.rows": "Rânduri",
   "data.import.col.time": "Timp",
+  "data.import.confirm.rollback": "Ștergi toate înregistrările create de acest import?",
   "data.import.dropHint": "Trage CSV / JSON / NDJSON sau click pentru browse",
   "data.import.empty": "Niciun import încă.",
-  "data.import.errorsHint": "{n} erori — vezi jurnal",
   "data.import.form.collection": "Colecție țintă",
   "data.import.form.title": "Importă date",
+  "data.import.label.delimiter": "Separator CSV",
   "data.import.label.format": "Format",
-  "data.import.label.upsertHtml": "Upsert pe câmp (opțional, ex. email)",
   "data.import.new": "Import nou",
   "data.import.selectPlaceholder": "— Selectează —",
   "data.import.subtitle": "Import collection data from CSV or JSON files with column mapping and background processing",
   "data.import.title": "Import de date",
-  "data.import.toast.imported": "S-au importat {n} rânduri",
-  "data.import.ui.create_missing_columns_automatically": "Creează automat coloanele lipsă",
-  "data.import.upsertHint": "Upsert pe câmp (opțional, ex. email)"
+  "data.import.toast.imported": "S-au importat {n} rânduri"
 }

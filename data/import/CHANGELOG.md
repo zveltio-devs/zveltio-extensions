@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.0.0 (2026-11-03)
+
+- feat!: imports read and write through the data API as the importing user (`ctx.internals.createRecord`): a row lands only where the caller may create one, with the target collection's validation, column rules, hooks, revisions and webhooks. The 1.x admin-only gate and the `import` permission resource are gone; who may import into a collection is who may create in it and in `data_import_jobs` (and read `data_import_profiles` to use a profile)
+- feat!: an import is all or nothing and runs in the request: rows the data API refuses with 422 are reported together (up to 100) and any other refusal stops at that row; either way the request's transaction is rolled back and no row is kept. 1.x answered 202 and kept the rows that passed. `?dry_run=true` runs the whole import and rolls it back
+- feat!: job log and profiles are the declared collections `data_import_jobs` and `data_import_profiles`, created and owned by the engine and served by the data API; no SQL migrations. The 1.x tables `zv_import_logs`, `zvd_import_mappings`, `zvd_import_profiles` and `zvd_import_rollbacks` are no longer written or read, their rows are not carried over, and the tables are left in place. A failed import leaves no job row
+- feat!: the hand-written routes `GET /stats`, `/profiles`, `GET /jobs`, `GET /jobs/:id` and `GET /jobs/:id/rollback` are dropped (the data API serves both collections). `POST /jobs/:id/rollback` deletes the job's records as the caller within 7 days and stamps `rolled_back_at`
+- feat!: a profile's `mappings` is one object `{ "<source column>": "<target field>" }`, each target once, and a profile applies only to its own `target_collection`; the never-applied `delimiter`, `on_duplicate`, `encoding` and `has_header` settings, and the page's `upsert_on` / `create_missing_columns` inputs, are dropped
+- fix: `.ndjson` / `.jsonl` files (and a raw body sent as `application/x-ndjson` or with `?format=ndjson`) are parsed as NDJSON (1.x parsed them as CSV); a malformed file, a row that is not an object or a malformed mapping answers 400 instead of 500 or an empty record; a blank cell becomes null in CSV only, so a JSON `""` stays a string
+- chore: the legacy `database` permission label is dropped
+
 ## 1.0.12 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)

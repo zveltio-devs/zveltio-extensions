@@ -67,6 +67,10 @@ const AUTHORIZATION = [
   /\bisGodUser\s*\(/,
   /\bisTenantAdmin\s*\(/,
   /\bhasCapability\s*\(/,
+  // A write through the data API as the caller (`ctx.internals.createRecord`
+  // and its siblings) is authorized by the engine's own rules for that caller:
+  // the wave model, where an extension carries no authorization of its own.
+  /\b(?:createRecord|updateRecord|deleteRecord)\s*\(/,
 ];
 
 /** A route that changes state. GET/HEAD alone never trip this gate. */

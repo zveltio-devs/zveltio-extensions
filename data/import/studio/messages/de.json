@@ -1,21 +1,20 @@
 {
   "data.import.action.import": "Importieren",
-  "data.import.col.errors": "Fehler",
+  "data.import.action.rollback": "Rückgängig machen",
   "data.import.col.format": "Format",
+  "data.import.col.rolledBack": "Zurückgesetzt",
   "data.import.col.rows": "Zeilen",
   "data.import.col.time": "Zeit",
+  "data.import.confirm.rollback": "Alle von diesem Import erstellten Datensätze löschen?",
   "data.import.dropHint": "CSV-/JSON-/NDJSON-Datei ziehen oder zum Durchsuchen klicken",
   "data.import.empty": "Noch keine Importe.",
-  "data.import.errorsHint": "{n} errors — see job log",
   "data.import.form.collection": "Zielsammlung",
   "data.import.form.title": "Daten importieren",
+  "data.import.label.delimiter": "CSV-Trennzeichen",
   "data.import.label.format": "Format",
-  "data.import.label.upsertHtml": "Upsert für Feld (optional, z. B. E-Mail)",
   "data.import.new": "Neuer Import",
   "data.import.selectPlaceholder": "— Auswählen —",
   "data.import.subtitle": "Importieren Sie Sammlungsdaten aus CSV- oder JSON-Dateien mit Spaltenzuordnung und Hintergrundverarbeitung",
   "data.import.title": "Datenimport",
-  "data.import.toast.imported": "{n} Zeilen importiert",
-  "data.import.ui.create_missing_columns_automatically": "Fehlende Spalten automatisch erstellen",
-  "data.import.upsertHint": "Upsert für Feld (optional, z. B. E-Mail)"
+  "data.import.toast.imported": "{n} Zeilen importiert"
 }
