@@ -30,8 +30,8 @@ export { default as CollectionList } from './CollectionList.svelte';
 export { default as Popup } from './Popup.svelte';
 export { ICONS, ICON_NAMES, type IconName } from './icons.js';
 export { motionAttrs, MOTION_TYPES, type MotionType } from './motion.js';
-export { loadPage, loadMenus, type PagePayload, type MenuItem } from './load.js';
-export { listUrl, filterJson } from './query.js';
+export { loadPage, loadMenus, loadSite, type PagePayload, type MenuItem, type NavItem } from './load.js';
+export { listUrl, filterJson, useDataFetch } from './query.js';
 export { BLOCK_TYPES, LEGACY_BLOCK_TYPES, ALL_BLOCK_TYPES, type BlockType } from './block-types.js';
 
 // Superseded by BlockRenderer — kept for compatibility.

@@ -15,7 +15,7 @@
   import type { Snippet } from 'svelte';
 
   import { onMount } from 'svelte';
-  import { listUrl } from './query.js';
+  import { fetchRows, listUrl } from './query.js';
 
   type Row = Record<string, any>;
 
@@ -57,7 +57,7 @@
     loading = true;
     error = '';
     try {
-      const res = await fetch(url, { credentials: 'include' });
+      const res = await fetchRows(url);
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         error = json.error ?? `HTTP ${res.status}`;

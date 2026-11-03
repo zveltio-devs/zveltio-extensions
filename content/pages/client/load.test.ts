@@ -1,21 +1,23 @@
 import { describe, expect, test } from 'bun:test';
-import { loadMenus, loadPage } from './load.js';
+import { loadMenus, loadPage, loadSite } from './load.js';
 import { filterJson, listUrl } from './query.js';
 
-/** A data API double: `collection -> rows`, filtered by equality on scalar filter values. */
+/** A data API double: `collection -> rows`, filtered by equality (a scalar, or an `eq` operator). */
 function api(data: Record<string, Record<string, unknown>[]>, status = 200): typeof fetch {
   return (async (input: string) => {
     const url = new URL(input, 'http://x');
     const collection = url.pathname.split('/').pop() as string;
     const filter = JSON.parse(url.searchParams.get('filter') ?? '{}');
     const records = (data[collection] ?? []).filter((r) =>
-      Object.entries(filter).every(([k, v]) => typeof v === 'object' || r[k] === v),
+      Object.entries(filter).every(([k, v]) =>
+        v && typeof v === 'object' ? !('eq' in v) || r[k] === (v as { eq: unknown }).eq : r[k] === v,
+      ),
     );
     return new Response(JSON.stringify(status === 200 ? { records } : { error: 'Forbidden' }), { status });
   }) as unknown as typeof fetch;
 }
 
-const site = { id: 's1', name: 'Shop', site_name: 'The Shop', slug: 'shop' };
+const site = { id: 's1', name: 'Shop', site_name: 'The Shop', slug: 'shop', is_active: true };
 const pub = (over: Record<string, unknown>) => ({
   id: 'p', page_id: 'pg', site_id: 's1', kind: 'page', slug: 'about', title: 'About', is_homepage: false,
   content: { blocks: [{ type: 'text' }] }, ...over,
@@ -76,4 +78,34 @@ test('loadMenus reads main and footer, empty when unreadable', async () => {
   const f = api({ page_menus: [{ menu_key: 'main', items: [{ label: 'Home', href: '/' }] }] });
   expect(await loadMenus(f)).toEqual({ main: [{ label: 'Home', href: '/' }], footer: [] });
   expect(await loadMenus(api({}, 403))).toEqual({ main: [], footer: [] });
+});
+
+test('loadSite nests published pages under their parent, and is null for an unreadable site', async () => {
+  const f = api({
+    page_sites: [site],
+    page_publications: [
+      pub({ page_id: 'a', slug: 'docs', title: 'Docs', sort_order: 0 }),
+      pub({ page_id: 'b', slug: 'docs/start', title: 'Start', parent_slug: 'docs', sort_order: 1 }),
+      pub({ page_id: 'c', slug: 'promo', kind: 'popup' }),
+    ],
+  });
+  const out = await loadSite(f, 'shop');
+  expect(out?.site.id).toBe('s1');
+  expect(out?.nav.map((n) => [n.slug, n.children.map((c) => c.slug)])).toEqual([['docs', ['docs/start']]]);
+  expect(await loadSite(api({ page_sites: [] }), 'shop')).toBeNull();
+});
+
+test("a record page's key joins the author's filter on the same field, and a site switched off is not drawn", async () => {
+  const seen: string[] = [];
+  const base = api({
+    page_publications: [pub({ slug: 'p', content: { record_collection: 'products', record_field: 'sku',
+      record_filter: [{ field: 'sku', op: 'neq', value: 'HIDDEN' }], blocks: [] } })],
+    page_sites: [site],
+    products: [{ sku: 'A1' }],
+  });
+  const f = (async (u: string, i?: RequestInit) => (seen.push(u), base(u, i))) as typeof fetch;
+  await loadPage(f, 'p', { recordKey: 'A1' });
+  const products = new URL(seen.find((u) => u.includes('/products')) as string, 'http://x');
+  expect(JSON.parse(products.searchParams.get('filter') as string)).toEqual({ sku: { neq: 'HIDDEN', eq: 'A1' } });
+  expect(await loadPage(api({ page_publications: [pub({})], page_sites: [{ ...site, is_active: false }] }), 'about')).toBeNull();
 });

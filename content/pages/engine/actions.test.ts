@@ -33,8 +33,7 @@ function fakeHost(seed: Record<string, Row[]>) {
 
 const page = {
   id: 'p1', site_id: 's1', parent_id: 'p0', slug: 'about', title: 'About', kind: 'page', layout: 'default',
-  locale: 'ro', is_homepage: false, is_noindex: false, include_in_sitemap: true, change_freq: 'weekly',
-  priority: 0.5, sort_order: 2, meta: {}, popup_config: {}, record_filter: [],
+  locale: 'ro', is_homepage: false, is_noindex: false, sort_order: 2, meta: {}, popup_config: {}, record_filter: [],
   blocks: [{ id: 'b1', type: 'richtext', content: { html: '<p>hi</p><script>alert(1)</script>' } }],
 };
 

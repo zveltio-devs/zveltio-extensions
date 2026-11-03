@@ -127,45 +127,10 @@
       "defaultValue": false
     },
     {
-      "name": "is_active",
-      "type": "boolean",
-      "required": true,
-      "defaultValue": true
-    },
-    {
       "name": "sort_order",
       "type": "integer",
       "required": true,
       "defaultValue": 0
-    },
-    {
-      "name": "include_in_sitemap",
-      "type": "boolean",
-      "required": true,
-      "defaultValue": true
-    },
-    {
-      "name": "change_freq",
-      "type": "enum",
-      "options": {
-        "values": [
-          "always",
-          "hourly",
-          "daily",
-          "weekly",
-          "monthly",
-          "yearly",
-          "never"
-        ]
-      },
-      "required": true,
-      "defaultValue": "weekly"
-    },
-    {
-      "name": "priority",
-      "type": "decimal",
-      "required": true,
-      "defaultValue": 0.5
     }
   ],
   "relations": [

@@ -4062,7 +4062,7 @@ var require_document = __commonJS(function(exports, module) {
   Document.default = Document;
 });
 
-// /zveltio-extension/node_modules/postcss/node_modules/nanoid/non-secure/index.cjs
+// /zveltio-extension/node_modules/nanoid/non-secure/index.cjs
 var require_non_secure = __commonJS(function(exports, module) {
   var urlAlphabet = "useandom-26T198340PX75pxJACKVERYMINDBUSHWOLF_GQZbfghjklqvwyzrict";
   var customAlphabet = (alphabet, defaultSize = 21) => {
@@ -10437,9 +10437,6 @@ var publish = async (input, host) => {
     parent_slug: parent?.slug ?? null,
     is_homepage: page.is_homepage,
     is_noindex: page.is_noindex,
-    include_in_sitemap: page.include_in_sitemap,
-    change_freq: page.change_freq,
-    priority: page.priority,
     sort_order: page.sort_order,
     content,
     published_at: new Date().toISOString()
@@ -10458,7 +10455,11 @@ var restoreRevision = async (input, host) => {
     meta: c.meta ?? {},
     ...c.layout ? { layout: c.layout } : {},
     description: c.description ?? null,
+    ...c.locale ? { locale: c.locale } : {},
     popup_config: c.popup_config ?? {},
+    record_collection: c.record_collection ?? null,
+    record_field: c.record_field ?? null,
+    record_filter: c.record_filter ?? [],
     meta_title: c.meta_title ?? null,
     meta_description: c.meta_description ?? null,
     og_image: c.og_image ?? null
@@ -10466,73 +10467,14 @@ var restoreRevision = async (input, host) => {
 };
 var pagesActions = { publish, restoreRevision };
 
-// engine/public-seo.ts
-function escapeXml(value) {
-  return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
-}
-function baseUrl(c) {
-  const proto = c.req.header("x-forwarded-proto") || "https";
-  const host = c.req.header("host") || "example.com";
-  return `${proto}://${host}`;
-}
-function sitemapXml(base, rows) {
-  const urls = rows.map((p) => {
-    const path = p.is_homepage ? "" : p.slug;
-    const lastmod = new Date(p.published_at).toISOString().split("T")[0];
-    return `
-  <url>
-    <loc>${escapeXml(`${base}/${path}`)}</loc>
-    <lastmod>${escapeXml(lastmod)}</lastmod>
-    <changefreq>${escapeXml(p.change_freq || "weekly")}</changefreq>
-    <priority>${escapeXml(p.priority ?? 0.5)}</priority>
-  </url>`;
-  }).join("");
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls}
-</urlset>`;
-}
-function registerPublicSeoRoutes(ctx) {
-  ctx.registerPublicRoute({
-    method: "GET",
-    path: "/sitemap.xml",
-    handler: async (c) => {
-      const answer = await ctx.internals.listRecords(c, "page_publications", {
-        filter: { kind: "page", is_noindex: false, include_in_sitemap: true },
-        limit: 500,
-        sort: "slug",
-        count: "none"
-      });
-      const rows = answer.status === 200 ? answer.body.records ?? [] : [];
-      c.header("Content-Type", "application/xml");
-      return c.body(sitemapXml(baseUrl(c), rows));
-    }
-  });
-  ctx.registerPublicRoute({
-    method: "GET",
-    path: "/robots.txt",
-    handler: (c) => {
-      c.header("Content-Type", "text/plain");
-      return c.body(`User-agent: *
-Allow: /
-Disallow: /admin
-Disallow: /api/
-Disallow: /ext/
-
-Sitemap: ${baseUrl(c)}/sitemap.xml
-`);
-    }
-  });
-}
-
 // engine/index.ts
 var extension = {
   name: "content/pages",
   category: "content",
   mountStrategy: "subapp",
   actions: pagesActions,
-  async register(app, ctx) {
+  async register(app) {
     app.get("/vocabulary", (c) => c.json({ icons: ICON_NAMES, motion: MOTION_TYPES }));
-    registerPublicSeoRoutes(ctx);
   }
 };
 var engine_default = extension;

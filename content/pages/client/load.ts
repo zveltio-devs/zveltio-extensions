@@ -11,7 +11,7 @@
  * otherwise). Returns `null` for anything the visitor may not read or that does
  * not exist — the two are the same answer to a visitor.
  */
-import { filterJson } from './query.js';
+import { NAME, filterJson } from './query.js';
 
 type Fetch = typeof fetch;
 // biome-ignore lint/suspicious/noExplicitAny: data API rows are untyped JSON
@@ -20,12 +20,22 @@ type Row = Record<string, any>;
 export type PagePayload = {
   page: Row;
   record: Row | null;
-  site: { name: string; logo_url: string | null; primary_color: string | null; custom_css: string | null } | null;
+  site: { name: string; logo_url: string | null; primary_color: string | null; custom_css: string | null };
   blocks: unknown[];
   popups: { id: string; title: string; config: Row; blocks: unknown[] }[];
 };
 
-export type MenuItem = { label: string; href: string; children?: MenuItem[] };
+export type MenuItem = { label: string; slug?: string; url?: string; external?: boolean };
+
+export type NavItem = {
+  id: string;
+  title: string;
+  slug: string;
+  icon: string | null;
+  sort_order: number;
+  is_homepage: boolean;
+  children: NavItem[];
+};
 
 async function rows(f: Fetch, collection: string, filter: Row, extra = ''): Promise<Row[]> {
   const res = await f(`/api/data/${collection}?filter=${encodeURIComponent(JSON.stringify(filter))}${extra}`, {
@@ -39,7 +49,7 @@ async function rows(f: Fetch, collection: string, filter: Row, extra = ''): Prom
 /** The id of the site named by `siteSlug`, `undefined` when none is named, `null` when it is not readable. */
 async function siteId(f: Fetch, siteSlug?: string): Promise<string | null | undefined> {
   if (!siteSlug) return undefined;
-  return (await rows(f, 'page_sites', { slug: siteSlug }, '&limit=1'))[0]?.id ?? null;
+  return (await rows(f, 'page_sites', { slug: siteSlug, is_active: true }, '&limit=1'))[0]?.id ?? null;
 }
 
 /**
@@ -65,16 +75,20 @@ export async function loadPage(
 
   let record: Row | null = null;
   if (content.record_collection) {
-    if (!opts.recordKey) return null;
+    const field = content.record_field || 'slug';
+    if (!opts.recordKey || !NAME.test(content.record_collection) || !NAME.test(field)) return null;
+    // The key joins the author's own conditions on the field; it never replaces them.
     const filter = JSON.parse(filterJson(content.record_filter) ?? '{}');
-    filter[content.record_field || 'slug'] = opts.recordKey;
+    filter[field] = { ...filter[field], eq: opts.recordKey };
     record = (await rows(f, content.record_collection, filter, '&limit=1'))[0] ?? null;
     if (!record) return null;
   } else if (opts.recordKey) {
     return null;
   }
 
-  const [siteRow] = await rows(f, 'page_sites', { id: pub.site_id }, '&limit=1');
+  // A site switched off is not drawn; the visitor needs `read` on `page_sites` too.
+  const [siteRow] = await rows(f, 'page_sites', { id: pub.site_id, is_active: true }, '&limit=1');
+  if (!siteRow) return null;
   const popups = (await rows(f, 'page_publications', { site_id: pub.site_id, kind: 'popup' }, '&limit=50'))
     .map((p) => ({ id: p.id, title: p.title, config: p.content?.popup_config ?? {}, blocks: p.content?.blocks ?? [] }))
     .filter((p) => {
@@ -89,22 +103,19 @@ export async function loadPage(
       slug: pub.slug,
       is_homepage: pub.is_homepage === true,
       description: content.description ?? null,
-      meta_title: content.meta_title ?? null,
-      meta_description: content.meta_description ?? null,
-      og_image: content.og_image ?? null,
-      is_noindex: pub.is_noindex === true,
+      meta_title: content.meta_title ?? content.meta?.title ?? pub.title,
+      meta_description: content.meta_description ?? content.meta?.description ?? null,
+      og_image: content.og_image ?? content.meta?.og_image ?? null,
+      noindex: pub.is_noindex === true,
       locale: content.locale ?? null,
-      meta: content.meta ?? {},
     },
     record,
-    site: siteRow
-      ? {
-          name: siteRow.site_name ?? siteRow.name,
-          logo_url: siteRow.site_logo_url ?? null,
-          primary_color: siteRow.primary_color ?? null,
-          custom_css: siteRow.custom_css ?? null,
-        }
-      : null,
+    site: {
+      name: siteRow.site_name ?? siteRow.name,
+      logo_url: siteRow.site_logo_url ?? null,
+      primary_color: siteRow.primary_color ?? null,
+      custom_css: siteRow.custom_css ?? null,
+    },
     blocks: Array.isArray(content.blocks) ? content.blocks : [],
     popups,
   };
@@ -118,4 +129,30 @@ export async function loadMenus(f: Fetch): Promise<{ main: MenuItem[]; footer: M
     return Array.isArray(v) ? (v as MenuItem[]) : [];
   };
   return { main: items('main'), footer: items('footer') };
+}
+
+/**
+ * A site's row and its navigation: the published pages of the site, in
+ * `sort_order`, children under their parent. `null` when the site is missing
+ * or not readable.
+ */
+export async function loadSite(f: Fetch, siteSlug: string): Promise<{ site: Row; nav: NavItem[] } | null> {
+  const [site] = await rows(f, 'page_sites', { slug: siteSlug, is_active: true }, '&limit=1');
+  if (!site) return null;
+  const pubs = await rows(f, 'page_publications', { site_id: site.id, kind: 'page' }, '&limit=500&sort=sort_order&order=asc');
+  const item = (p: Row): NavItem => ({
+    id: p.page_id,
+    title: p.title,
+    slug: p.slug,
+    icon: p.icon ?? null,
+    sort_order: p.sort_order ?? 0,
+    is_homepage: p.is_homepage === true,
+    children: [],
+  });
+  const slugs = new Set(pubs.map((p) => p.slug));
+  const nav = pubs.filter((p) => !p.parent_slug || !slugs.has(p.parent_slug)).map(item);
+  for (const top of nav) {
+    top.children = pubs.filter((p) => p.parent_slug === top.slug).map(item);
+  }
+  return { site, nav };
 }

@@ -51,14 +51,10 @@
     "bundled": true,
     "bundlePeers": false
   },
-  "globalRoutes": [
-    "/sitemap.xml",
-    "/robots.txt"
-  ],
   "integrity": {
-    "engineSha256": "124419dde9152aae89681fef236831dc64272c071ae4e6296deef1b9bdc351ec",
-    "sourceSha256": "b257e87f121fe84dc51bc5b0e24348fc3fcced1059e901feaf247e0efb57240a",
-    "schemaSha256": "8ae5a803620688b8a567a2d65c7e21e39d5cf004a547a3be6fcd912e99fd8da2"
+    "engineSha256": "53f6d39f318cc4eaa6b006435b2fdee9bc974cf5d1502f7d0ac58258c37c5ae5",
+    "sourceSha256": "f6c37a32287c881f77cdc7217dfa7c106b4bc04268209518bb105bffbb4e2dab",
+    "schemaSha256": "962d955615bf4644d9d733fff32661eca9b832975fda3656f8cbf4e1583775cb"
   },
   "collections": [
     "page_sites",

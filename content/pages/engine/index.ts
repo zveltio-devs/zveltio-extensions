@@ -2,7 +2,6 @@ import type { ZveltioExtension } from '@zveltio/sdk/extension';
 import { ICON_NAMES } from '../client/icons.js';
 import { MOTION_TYPES } from '../client/motion.js';
 import { pagesActions } from './actions.js';
-import { registerPublicSeoRoutes } from './public-seo.js';
 
 /**
  * Pages — pages made of blocks, grouped into sites.
@@ -21,11 +20,10 @@ const extension: ZveltioExtension = {
 
   actions: pagesActions,
 
-  async register(app, ctx) {
+  async register(app) {
     // The vocabularies the editor picks from. A Studio page cannot import
     // outside `studio/src/`, so the engine, which can, hands the lists over.
     app.get('/vocabulary', (c) => c.json({ icons: ICON_NAMES, motion: MOTION_TYPES }));
-    registerPublicSeoRoutes(ctx);
   },
 };
 

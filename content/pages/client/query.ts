@@ -10,14 +10,14 @@
 
 export type BlockFilter = { field: string; op: string; value?: unknown };
 
-const NAME = /^[a-z_][a-z0-9_]*$/;
+export const NAME = /^[a-z_][a-z0-9_]*$/;
 /** Operators that take no value: the data API reads `true` as "apply it". */
 const UNARY = new Set(['null', 'not_null', 'is_null', 'is_not_null']);
 
 /** `[{field, op, value}]` as the data API's `filter` JSON, or `null` when there are none. */
 export function filterJson(filters: unknown): string | null {
   if (!Array.isArray(filters)) return null;
-  const out: Record<string, Record<string, unknown>> = {};
+  const out: Record<string, Record<string, unknown>> = Object.create(null);
   for (const f of filters as BlockFilter[]) {
     if (!f || typeof f.field !== 'string' || !NAME.test(f.field) || typeof f.op !== 'string') continue;
     out[f.field] = { ...out[f.field], [f.op]: UNARY.has(f.op) ? true : f.value };
@@ -40,4 +40,20 @@ export function listUrl(content: Record<string, unknown>, page = 1): string | nu
   const filter = filterJson(content.filters);
   if (filter) q.set('filter', filter);
   return `/api/data/${collection}?${q}`;
+}
+
+let dataFetch: typeof fetch = (input, init) => fetch(input, { credentials: 'include', ...init });
+
+/**
+ * The `fetch` data blocks read with: by default the browser's, same origin,
+ * with the session cookie. A host whose engine is elsewhere, or that must send
+ * a tenant header, hands its own over once.
+ */
+export function useDataFetch(f: typeof fetch): void {
+  dataFetch = f;
+}
+
+/** Fetch a data block's window with the host's `fetch`. */
+export function fetchRows(url: string): Promise<Response> {
+  return dataFetch(url);
 }
