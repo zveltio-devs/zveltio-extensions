@@ -1,0 +1,50 @@
+{
+  "name": "content_draft_snapshots",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "draft_id",
+      "type": "m2o",
+      "options": {
+        "related_collection": "content_drafts"
+      },
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "version",
+      "type": "integer",
+      "required": true
+    },
+    {
+      "name": "snapshot_data",
+      "type": "json",
+      "required": true
+    },
+    {
+      "name": "description",
+      "type": "text"
+    }
+  ],
+  "indexes": [
+    {
+      "fields": [
+        "draft_id",
+        "version"
+      ],
+      "unique": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "content_draft_snapshots_draft_id",
+      "type": "m2o",
+      "field": "draft_id",
+      "target": "content_drafts",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

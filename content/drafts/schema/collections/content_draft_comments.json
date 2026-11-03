@@ -1,0 +1,52 @@
+{
+  "name": "content_draft_comments",
+  "fields": [
+    {
+      "name": "draft_id",
+      "type": "m2o",
+      "options": {
+        "related_collection": "content_drafts"
+      },
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "field_path",
+      "type": "text"
+    },
+    {
+      "name": "comment",
+      "type": "textarea",
+      "required": true
+    },
+    {
+      "name": "type",
+      "type": "enum",
+      "options": {
+        "values": [
+          "suggestion",
+          "required",
+          "info"
+        ]
+      },
+      "required": true,
+      "defaultValue": "suggestion"
+    },
+    {
+      "name": "resolved_at",
+      "type": "datetime"
+    }
+  ],
+  "relations": [
+    {
+      "name": "content_draft_comments_draft_id",
+      "type": "m2o",
+      "field": "draft_id",
+      "target": "content_drafts",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

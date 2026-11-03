@@ -2,13 +2,19 @@
   "name": "content/drafts",
   "displayName": "Content Drafts",
   "category": "content",
-  "description": "Draft/publish workflow for content collections",
-  "version": "1.0.9",
-  "zveltioMinVersion": "1.0.0",
+  "description": "Draft, review and publish workflow for content collections, through the data API as the publishing user",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.99",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-drafts",
   "permissions": [
-    "database"
+    "data:write"
+  ],
+  "collections": [
+    "content_drafts",
+    "content_draft_decisions",
+    "content_draft_comments",
+    "content_draft_snapshots"
   ],
   "i18nPrefixes": [
     "content.drafts"
@@ -36,7 +42,80 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "a580e428135808247e22a3b43120c122d5109a6d090f82d9ab1239055d04572a",
-    "sourceSha256": "e427c2bd6b277139615ed04494dab53d2d302ae3948f4696ef058a9408b98f9e"
-  }
+    "engineSha256": "dd2b2645592f1f1ca1f5381d8d51fe32f3ab5e642f02370401d7e8affac1a796",
+    "sourceSha256": "00b2815abd9bc9d5f32f9a2c7f72714f71943d782fe8b6fb0a74b7e3d80f1c18",
+    "schemaSha256": "423425777eeb0d0b3fb9df14ab0383a59a4c70d55b0990e7f688d59c764fc63b"
+  },
+  "actions": [
+    {
+      "name": "reviewDraft",
+      "permission": {
+        "resource": "content_draft_decisions",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "decision"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "rejected"
+            ]
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 5000
+          }
+        }
+      },
+      "reads": [
+        "content_drafts"
+      ],
+      "writes": [
+        "content_drafts",
+        "content_draft_decisions"
+      ]
+    },
+    {
+      "name": "snapshotDraft",
+      "permission": {
+        "resource": "content_draft_snapshots",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500
+          }
+        }
+      },
+      "reads": [
+        "content_drafts",
+        "content_draft_snapshots"
+      ],
+      "writes": [
+        "content_draft_snapshots"
+      ]
+    }
+  ]
 }

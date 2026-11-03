@@ -1,7 +1,10 @@
 {
+  "content.drafts.btn.approve": "Aprobar",
   "content.drafts.btn.publish": "Publicar",
+  "content.drafts.btn.reject": "Rechazar",
   "content.drafts.col.author": "Autor",
   "content.drafts.col.record": "Registro",
+  "content.drafts.col.review": "Revisión",
   "content.drafts.col.updated": "Actualizado",
   "content.drafts.confirmDiscard": "¿Descartar el borrador?",
   "content.drafts.empty": "Aún no hay datos.",

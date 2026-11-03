@@ -1,0 +1,55 @@
+{
+  "name": "content_drafts",
+  "defaultGrants": false,
+  "fields": [
+    {
+      "name": "target_collection",
+      "type": "text",
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "record_id",
+      "type": "uuid",
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "draft_data",
+      "type": "json",
+      "required": true
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    },
+    {
+      "name": "scheduled_at",
+      "type": "datetime",
+      "indexed": true
+    },
+    {
+      "name": "review_status",
+      "type": "enum",
+      "options": {
+        "values": [
+          "draft",
+          "approved",
+          "rejected"
+        ]
+      },
+      "required": true,
+      "defaultValue": "draft",
+      "writtenBy": "actions"
+    },
+    {
+      "name": "approved_data",
+      "type": "json",
+      "writtenBy": "actions"
+    },
+    {
+      "name": "published_at",
+      "type": "datetime"
+    }
+  ]
+}

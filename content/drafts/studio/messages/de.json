@@ -1,7 +1,10 @@
 {
+  "content.drafts.btn.approve": "Genehmigen",
   "content.drafts.btn.publish": "Veröffentlichen",
+  "content.drafts.btn.reject": "Ablehnen",
   "content.drafts.col.author": "Autor",
   "content.drafts.col.record": "Datensatz",
+  "content.drafts.col.review": "Prüfung",
   "content.drafts.col.updated": "Aktualisiert",
   "content.drafts.confirmDiscard": "Entwurf verwerfen?",
   "content.drafts.empty": "Noch keine Daten.",

@@ -5,13 +5,44 @@
   "resources": [
     {
       "id": "drafts",
-      "dataSource": "/ext/content/drafts",
-      "dataPath": "drafts",
+      "dataSource": "/api/data/content_drafts?sort=updated_at&order=desc&limit=500&filter=%7B%22published_at%22%3A%7B%22null%22%3Atrue%7D%7D",
+      "dataPath": "records",
       "columns": [
-        { "key": "collection", "label": "common.col.collection", "type": "badge", "badge": { "colors": {} } },
-        { "key": "record_id", "label": "content.drafts.col.record", "type": "mono" },
-        { "key": "author_name", "label": "content.drafts.col.author" },
-        { "key": "updated_at", "label": "content.drafts.col.updated", "type": "date" }
+        {
+          "key": "target_collection",
+          "label": "common.col.collection",
+          "type": "badge",
+          "badge": {
+            "colors": {}
+          }
+        },
+        {
+          "key": "record_id",
+          "label": "content.drafts.col.record",
+          "type": "mono"
+        },
+        {
+          "key": "review_status",
+          "label": "content.drafts.col.review",
+          "type": "badge",
+          "badge": {
+            "colors": {
+              "draft": "badge-ghost",
+              "approved": "badge-success",
+              "rejected": "badge-error"
+            }
+          }
+        },
+        {
+          "key": "created_by",
+          "label": "content.drafts.col.author",
+          "type": "mono"
+        },
+        {
+          "key": "updated_at",
+          "label": "content.drafts.col.updated",
+          "type": "date"
+        }
       ],
       "rowActions": [
         {
@@ -23,11 +54,33 @@
           "endpoint": "/ext/content/drafts/{id}/publish"
         },
         {
+          "id": "approve",
+          "label": "content.drafts.btn.approve",
+          "icon": "Check",
+          "method": "POST",
+          "endpoint": "/ext/content/drafts/actions/reviewDraft",
+          "body": {
+            "id": "{id}",
+            "decision": "approved"
+          }
+        },
+        {
+          "id": "reject",
+          "label": "content.drafts.btn.reject",
+          "icon": "X",
+          "method": "POST",
+          "endpoint": "/ext/content/drafts/actions/reviewDraft",
+          "body": {
+            "id": "{id}",
+            "decision": "rejected"
+          }
+        },
+        {
           "id": "discard",
           "label": "common.discard",
           "variant": "text-error",
           "method": "DELETE",
-          "endpoint": "/ext/content/drafts/{id}",
+          "endpoint": "/api/data/content_drafts/{id}",
           "confirm": "content.drafts.confirmDiscard"
         }
       ]
