@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.0 (2026-11-03)
+
+- feat: `/sitemap.xml` and `/robots.txt` are back as public routes. The sitemap lists the published, indexable pages of the active sites (`?site=<slug>` names one) that the anonymous visitor may read: it reads through `ctx.internals.listRecords`, which in a public route reads as the tenant's `public` role (ADR 0020), so the operator's grants and row rules on `page_sites` and `page_publications` decide what is listed; until `public` may read them it answers the data API's refusal. Needs 3.0.0-beta.99
+
 ## 2.0.1 (2026-11-03)
 
 - fix: the data-block filter hint said a filter on a column the collection does not have is ignored; the data API refuses it (400) and the block shows the error

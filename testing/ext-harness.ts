@@ -625,6 +625,15 @@ async function makeCtx(
         engineAssertNonMetadataUrl(url, label),
       assertPublicUrl: (url: string) => engineAssertPublicUrl(url),
       validatePublicUrl: (url: string) => engineValidatePublicUrl(url),
+      // ── Data API reads: the answer of a tenant nobody has granted ────────
+      //
+      // The harness mounts no data API, so these answer what a fresh tenant
+      // answers a caller without a grant: 403. That is exactly a public route's
+      // reader (`public`, ADR 0020) on a fresh install, and the deny-by-default
+      // direction for any other caller — never rows. A route's own tests give it
+      // a fake `listRecords` to prove what it does with rows.
+      readRecord: async () => ({ status: 403, body: { title: 'Forbidden' } }),
+      listRecords: async () => ({ status: 403, body: { title: 'Forbidden' } }),
       encryptSecret: async (plaintext: string, o?: { keyring?: string }) =>
         harnessEncrypt(plaintext, o?.keyring ?? 'field'),
       decryptSecret: async (value: string, o?: { keyring?: string }) =>
