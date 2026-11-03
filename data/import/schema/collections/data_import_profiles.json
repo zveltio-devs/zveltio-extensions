@@ -1,0 +1,23 @@
+{
+  "name": "data_import_profiles",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "target_collection",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "mappings",
+      "type": "json"
+    },
+    {
+      "name": "description",
+      "type": "textarea"
+    }
+  ]
+}

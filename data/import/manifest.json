@@ -2,13 +2,17 @@
   "name": "data/import",
   "displayName": "Data Import",
   "category": "data",
-  "description": "Import collection data from CSV or JSON files with column mapping and background processing",
-  "version": "1.0.12",
-  "zveltioMinVersion": "3.0.0-beta.86",
+  "description": "Import collection data from CSV, JSON or NDJSON files through the data API, as the importing user",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.99",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-import",
   "permissions": [
-    "database"
+    "data:write"
+  ],
+  "collections": [
+    "data_import_jobs",
+    "data_import_profiles"
   ],
   "i18nPrefixes": [
     "data.import"
@@ -36,10 +40,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "de674820ef395350cd068e25616f914d58297aa9b35035a727c7146068b36afe",
-    "sourceSha256": "07a6a9e4d547ead9ae286b4eaeec26303d2aad4b89007d7dda1a9c26b74ccdcc"
-  },
-  "resources": [
-    "import"
-  ]
+    "engineSha256": "076539d511af1df75d5400490da7073d650365378165d52fa733c37c12e9484d",
+    "sourceSha256": "4c7b0ceda9b06c84817cb7f0b473afd343aac3c7fc97f08314b983e03c5c1517",
+    "schemaSha256": "0060c4c59b859f1e6599f9ab40060e0f682f642c50b9c8e736e6924792327fb8"
+  }
 }

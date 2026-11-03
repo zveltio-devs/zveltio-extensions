@@ -1,21 +1,20 @@
 {
   "data.import.action.import": "Importuj",
-  "data.import.col.errors": "Błędy",
+  "data.import.action.rollback": "Wycofaj",
   "data.import.col.format": "Format",
+  "data.import.col.rolledBack": "Wycofano",
   "data.import.col.rows": "Wiersze",
   "data.import.col.time": "Czas",
+  "data.import.confirm.rollback": "Usunąć wszystkie rekordy utworzone przez ten import?",
   "data.import.dropHint": "Drag a CSV / JSON / NDJSON file, or click to browse",
   "data.import.empty": "Brak importów.",
-  "data.import.errorsHint": "{n} errors — see job log",
   "data.import.form.collection": "Kolekcja docelowa",
   "data.import.form.title": "Importuj dane",
+  "data.import.label.delimiter": "Separator CSV",
   "data.import.label.format": "Format",
-  "data.import.label.upsertHtml": "Upsert on field (optional, e.g. email)",
   "data.import.new": "Nowy import",
   "data.import.selectPlaceholder": "— Select —",
   "data.import.subtitle": "Import collection data from CSV or JSON files with column mapping and background processing",
   "data.import.title": "Import danych",
-  "data.import.toast.imported": "Zaimportowano {n} wierszy",
-  "data.import.ui.create_missing_columns_automatically": "Automatycznie twórz brakujące kolumny",
-  "data.import.upsertHint": "Upsert on field (optional, e.g. email)"
+  "data.import.toast.imported": "Zaimportowano {n} wierszy"
 }

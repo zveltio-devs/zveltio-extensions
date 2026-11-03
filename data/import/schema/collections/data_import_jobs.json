@@ -1,0 +1,40 @@
+{
+  "name": "data_import_jobs",
+  "fields": [
+    {
+      "name": "target_collection",
+      "type": "text",
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "format",
+      "type": "enum",
+      "options": {
+        "values": [
+          "csv",
+          "json",
+          "ndjson"
+        ]
+      },
+      "required": true
+    },
+    {
+      "name": "filename",
+      "type": "text"
+    },
+    {
+      "name": "imported_rows",
+      "type": "integer",
+      "required": true
+    },
+    {
+      "name": "record_ids",
+      "type": "json"
+    },
+    {
+      "name": "rolled_back_at",
+      "type": "datetime"
+    }
+  ]
+}
