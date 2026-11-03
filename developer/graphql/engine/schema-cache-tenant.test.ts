@@ -10,9 +10,8 @@
 // collections rather than the first tenant's.
 //
 // Runs against the packed bundle. No real Postgres needed — `DDLManager` is
-// faked directly (each tenant sees its own fixed collection list) and the two
-// tables `getRelations`/`getFieldPolicies` query are queried through a fake
-// db that answers with no rows, so `TEST_DATABASE_URL` is not required.
+// faked directly (each tenant sees its own fixed collection list) and the db is
+// a fake that answers with no rows, so `TEST_DATABASE_URL` is not required.
 import { beforeAll, describe, expect, it } from 'bun:test';
 import { join } from 'node:path';
 
@@ -28,31 +27,19 @@ const COLLECTIONS: Record<string, Any[]> = {
 };
 
 let currentTenant = 'tenant-a';
-let dbBroken = false;
 let app: Any;
 
-// Only reached by `getRelations`/`getFieldPolicies`'s raw `sql\`...\`.execute(db)`
-// calls. Kysely's DummyDriver answers every query with no rows: no relations,
-// no field policies. (A db that throws no longer works: an unreadable policy
-// table now fails the request instead of building a schema with none.)
+// Kysely's DummyDriver answers every query with no rows.
 async function fakeDb() {
   const k = (await import(
     join(import.meta.dir, '..', '..', '..', 'node_modules', 'kysely', 'dist', 'index.js')
   )) as Any;
-  const real = new k.Kysely({
+  return new k.Kysely({
     dialect: {
       createAdapter: () => new k.PostgresAdapter(),
       createDriver: () => new k.DummyDriver(),
       createIntrospector: (db: Any) => new k.PostgresIntrospector(db),
       createQueryCompiler: () => new k.PostgresQueryCompiler(),
-    },
-  });
-  // `dbBroken` stands in for a policy table the request cannot read.
-  return new Proxy(real, {
-    get(t, p) {
-      if (dbBroken) throw new Error('relation "zvd_graphql_field_policies" does not exist');
-      const v = Reflect.get(t, p);
-      return typeof v === 'function' ? v.bind(t) : v;
     },
   });
 }
@@ -116,22 +103,5 @@ describe('developer/graphql — the schema cache is keyed per tenant', () => {
     const names = await queryFieldNames();
     expect(names).toContain('list_widgets_a');
     expect(names).not.toContain('list_gadgets_b');
-  });
-
-  // Fails closed: unreadable field policies must not build a schema in which
-  // every field is readable (the read used to fall back to "no policies").
-  it('a tenant whose field policies cannot be read gets no schema', async () => {
-    currentTenant = 'tenant-c';
-    dbBroken = true;
-    try {
-      const res = await app.request('/', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ query: '{ __schema { queryType { fields { name } } } }' }),
-      });
-      expect(JSON.stringify(await res.json())).not.toContain('list_secrets_c');
-    } finally {
-      dbBroken = false;
-    }
   });
 });

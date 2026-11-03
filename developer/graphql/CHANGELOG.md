@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.0.0 (2026-11-03)
+
+- feat!: stored queries are the collection `graphql_queries`, declared in `schema/collections/` and created and owned by the engine; no SQL migrations, the 1.x tables `zvd_graphql_persisted_queries`, `zvd_graphql_operation_logs` and `zvd_graphql_field_policies` are no longer created, their rows are not carried over, and the old tables are left in place
+- feat!: field policies are gone; which columns a role reads is the engine's column permissions, which every GraphQL read already applied
+- feat!: a stored query no longer carries `is_public` or `allowed_roles`; running one needs the engine's `read` on `graphql_queries` and its row rules, and the query runs as the caller, under the caller's own permissions. The collection has no default grants: whoever may edit a stored query chooses what its readers execute, so the operator grants it
+- feat!: the operation log, `GET /stats`, `DELETE /logs` and a stored query's `use_count`/`last_used_at` are dropped: each write would run as the system on every operation (`data:system`, one audit row per call)
+- feat!: the hand-written routes `GET`/`POST /persisted`, `DELETE /persisted/:id`, `/logs` and `/field-policies` are dropped; the data API serves `graphql_queries`. `POST /refresh-schema` and the production playground gate on the engine object `admin`
+- chore: the legacy `database` permission label is dropped
+
 ## 1.0.18 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)

@@ -5,24 +5,15 @@
  * and resolves relations from zvd_relations.
  *
  * GET  /api/graphql                        — GraphiQL playground
- * POST /api/graphql                        — Execute query/mutation (auth required, logs operation)
+ * POST /api/graphql                        — Execute query/mutation (auth required)
  * POST /api/graphql/refresh-schema         — Invalidate cached schema (admin only)
- * GET  /api/graphql/persisted              — List persisted queries
- * POST /api/graphql/persisted              — Create persisted query (admin)
- * DELETE /api/graphql/persisted/:id        — Delete persisted query (admin)
- * POST /api/graphql/persisted/:name/execute — Execute persisted query by name (auth)
- * GET  /api/graphql/logs                   — List operation logs (admin)
- * DELETE /api/graphql/logs                 — Clear logs older than 30 days (admin)
- * GET  /api/graphql/stats                  — Operation stats (admin)
- * GET  /api/graphql/field-policies         — List field policies (admin)
- * POST /api/graphql/field-policies         — Create field policy (admin)
- * DELETE /api/graphql/field-policies/:id   — Delete field policy (admin)
+ * POST /api/graphql/persisted/:name/execute — Execute a stored query by name (auth)
+ *
+ * Stored queries are the declared collection `graphql_queries`: the engine
+ * creates it and serves it through the data API, under the operator's rules.
  */
 
 import { Hono } from 'hono';
-import { zValidator } from '@hono/zod-validator';
-import { z } from 'zod';
-import * as crypto from 'crypto';
 import {
   execute,
   parse,
@@ -43,30 +34,11 @@ import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { checkQueryDepth, checkQueryWidth } from './lib/graphql-dataloader.js';
 
-// The OWN tenant (the `tenant_id` column default's expression). Persisted query
-// names and field policies are unique per tenant (migration 003), but the row
-// policy admits the caller's READ REACH — every firm for a god — so a match on
-// name alone ran another firm's query, and a god's schema build merged every
-// firm's policies into the own firm's cached schema (one overwriting another).
+// The OWN tenant (the `tenant_id` column default's expression). Query names are
+// unique per tenant, but the row policy admits the caller's READ REACH — every
+// firm for a god — so a match on name alone ran another firm's query.
 const OWN_TENANT = sql`COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
                                 '00000000-0000-0000-0000-000000000001'::uuid)`;
-// ── Zod schemas ───────────────────────────────────────────────────────────────
-
-const PersistedQueryCreateSchema = z.object({
-  name: z.string().min(1).max(100).regex(/^[a-zA-Z0-9_-]+$/, 'Name must be alphanumeric with underscores/hyphens'),
-  description: z.string().optional(),
-  query: z.string().min(1),
-  variables_schema: z.record(z.string(), z.any()).optional(),
-  is_public: z.boolean().default(false),
-  allowed_roles: z.array(z.string()).default([]),
-});
-
-const FieldPolicyCreateSchema = z.object({
-  collection: z.string().min(1).max(100),
-  field: z.string().min(1).max(100),
-  allowed_roles: z.array(z.string()).default([]),
-  deny_roles: z.array(z.string()).default([]),
-});
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -150,34 +122,6 @@ function mapFieldType(fieldType: string): any {
   return map[fieldType] ?? GraphQLString;
 }
 
-// ── Field policies loader ─────────────────────────────────────────────────────
-//
-// `/field-policies` (admin) writes here; nothing had ever read it back. The
-// Studio tab is titled "Field policies" with a Shield icon and the empty
-// state says "No field policies — all fields readable", which promises the
-// opposite of what shipped: every field of every collection was readable by
-// anyone who passed the collection-level `checkPermission` check, policy row
-// or not. Confirmed by grep — `zvd_graphql_field_policies` had exactly three
-// call sites, all in the CRUD routes below, none in `buildDynamicSchema`.
-
-interface FieldPolicyInfo {
-  collection: string;
-  field: string;
-  allowed_roles: string[];
-  deny_roles: string[];
-}
-
-// No catch: a policy table that cannot be read must fail the request, not
-// build a schema in which every field is readable.
-async function getFieldPolicies(dbh: any): Promise<FieldPolicyInfo[]> {
-  const result = await sql<FieldPolicyInfo>`
-    SELECT collection, field, allowed_roles, deny_roles
-    FROM zvd_graphql_field_policies
-    WHERE tenant_id = ${OWN_TENANT}
-  `.execute(dbh);
-  return result.rows;
-}
-
 // ── Schema builder ────────────────────────────────────────────────────────────
 //
 // IMPORTANT: every resolver below uses the *request-scoped* context
@@ -211,53 +155,6 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
     // and the swallowed refusal built every schema without a single relation.
     relations = (await DDLManager.getRelations(db)) as RelationInfo[];
   } catch { /* no collections yet */ }
-  const fieldPolicies = await getFieldPolicies(db);
-
-  const fieldPolicyMap = new Map<string, { allowed: string[]; deny: string[] }>();
-  for (const p of fieldPolicies) {
-    fieldPolicyMap.set(`${p.collection}.${p.field}`, {
-      allowed: Array.isArray(p.allowed_roles) ? p.allowed_roles : [],
-      deny: Array.isArray(p.deny_roles) ? p.deny_roles : [],
-    });
-  }
-
-  // A policy's roles are checked against the caller, not the row — same
-  // caller for every field/row of one GraphQL operation, so cache both
-  // lookups on the shared `contextValue` object instead of re-querying per
-  // field per row.
-  function cachedIsAdmin(context: any): Promise<boolean> {
-    if (!context.__isAdminPromise) {
-      // `isTenantAdmin`, not the bare `checkPermission(uid, 'admin', '*')`:
-      // the same call with a name (`permissions.ts:905`), and field policies are
-      // per-tenant rows, so the tenant-level meaning is the correct one. The
-      // engine's admin-gate check refuses new sites of the bare spelling.
-      context.__isAdminPromise = ctx.internals.isTenantAdmin(context.user.id);
-    }
-    return context.__isAdminPromise;
-  }
-  function cachedRoles(context: any): Promise<string[]> {
-    if (!context.__rolesPromise) {
-      context.__rolesPromise = ctx.getUserRoles(context.user.id);
-    }
-    return context.__rolesPromise;
-  }
-
-  // A field with a policy resolves to `null` for a caller the policy
-  // excludes, rather than the stored value. Admins always pass — the same
-  // instance-wide override every other admin-gated route in this file
-  // grants. This nulls the VALUE; it does not remove the field from the
-  // schema, which is cached across callers (`SCHEMA_TTL_MS`) and can't
-  // vary per request without discarding that cache.
-  function policyResolver(fieldName: string, policy: { allowed: string[]; deny: string[] }) {
-    return async (parent: any, _args: any, context: any) => {
-      const value = readFieldValue(parent, fieldName);
-      if (await cachedIsAdmin(context)) return value;
-      const roles = await cachedRoles(context);
-      if (policy.deny.length && roles.some((r: string) => policy.deny.includes(r))) return null;
-      if (policy.allowed.length && !roles.some((r: string) => policy.allowed.includes(r))) return null;
-      return value;
-    };
-  }
 
   // ── The read gate ──
   //
@@ -345,12 +242,9 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
       scalarFields[field.name] = { type: mapFieldType(field.type) };
     }
     for (const fieldName of Object.keys(scalarFields)) {
-      const policy = fieldPolicyMap.get(`${col.name}.${fieldName}`);
       scalarFields[fieldName] = {
         type: scalarFields[fieldName].type,
-        resolve: policy
-          ? policyResolver(fieldName, policy)
-          : (parent: any) => readFieldValue(parent, fieldName),
+        resolve: (parent: any) => readFieldValue(parent, fieldName),
       };
     }
 
@@ -598,19 +492,10 @@ const PLAYGROUND_HTML = `<!DOCTYPE html>
   </body>
 </html>`;
 
-// ── Operation type detector ───────────────────────────────────────────────────
-
-function detectOperationType(query: string): 'query' | 'mutation' | 'subscription' {
-  const trimmed = query.trimStart().toLowerCase();
-  if (trimmed.startsWith('mutation')) return 'mutation';
-  if (trimmed.startsWith('subscription')) return 'subscription';
-  return 'query';
-}
-
 // ── Route factory ─────────────────────────────────────────────────────────────
 
 export function graphqlRoutes(ctx: ExtensionContext): Hono {
-  const { db, DDLManager, auth, checkPermission } = ctx;
+  const { db, auth } = ctx;
   // `DataLoaderRegistry`, `checkQueryDepth` and `checkQueryWidth` used to come
   // from `ctx.internals`: the engine carried the batching and the two query
   // guards while this extension carried the GraphQL API they protect. They now
@@ -632,6 +517,15 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
     const admitted = c.get('user');
     if (admitted) return admitted;
     return (await auth.api.getSession({ headers: c.req.raw.headers }))?.user ?? null;
+  }
+
+  // The engine object `admin` (ADR 0002), asked as the tenant admin. A key is
+  // no admin.
+  async function adminCaller(c: any): Promise<any | Response> {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) return c.json({ error: 'Unauthorized' }, 401);
+    if (!(await ctx.internals.isTenantAdmin(session.user.id))) return c.json({ error: 'Admin required' }, 403);
+    return session.user;
   }
 
   // `graphql()`, plus one validation rule for a caller who is not a tenant admin:
@@ -660,9 +554,8 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
       document,
       variableValues,
       operationName,
-      // `__isAdminPromise` is the field-policy resolvers' cache of the same answer.
       // `c` is what a mutation hands `ctx.internals` to write as this caller.
-      contextValue: { c, user, db, tenantTrx, reqDb: db, __isAdminPromise: isAdmin },
+      contextValue: { c, user, db, tenantTrx, reqDb: db },
     });
   }
 
@@ -673,10 +566,8 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
   // In dev/staging it stays open so developers can explore.
   app.get('/', async (c) => {
     if (ctx.config?.isProduction) {
-      const session = await auth.api.getSession({ headers: c.req.raw.headers });
-      if (!session) return c.json({ error: 'Unauthorized' }, 401);
-      const isAdmin = await checkPermission(session.user.id, 'admin', '*');
-      if (!isAdmin) return c.json({ error: 'GraphiQL is admin-only in production' }, 403);
+      const admin = await adminCaller(c);
+      if (admin instanceof Response) return admin;
     }
     return c.html(PLAYGROUND_HTML);
   });
@@ -704,11 +595,6 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
     const widthError = checkQueryWidth(query, 50);
     if (widthError) return c.json({ errors: [{ message: widthError }] }, 400);
 
-    const queryHash = crypto.createHash('sha256').update(query).digest('hex');
-    const opType = detectOperationType(query);
-    const startMs = Date.now();
-    const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
-
     let result: any;
     let errorCount = 0;
 
@@ -722,22 +608,6 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
       result = { errors: [{ message: String(err) }] };
     }
 
-    const durationMs = Date.now() - startMs;
-    const resultStr = JSON.stringify(result);
-    const resultSizeBytes = Buffer.byteLength(resultStr, 'utf8');
-
-    // Fire-and-forget operation log
-    sql`
-      INSERT INTO zvd_graphql_operation_logs
-        (operation_name, operation_type, query_hash, variables,
-         duration_ms, result_size_bytes, error_count, user_id, ip)
-      VALUES
-        (${operationName ?? null}, ${opType}, ${queryHash},
-         ${variables ? JSON.stringify(variables) : null}::jsonb,
-         ${durationMs}, ${resultSizeBytes}, ${errorCount},
-         ${user.id}, ${ip})
-    `.execute(db).catch(() => {});
-
     if (errorCount > 0 && !result.data) {
       return c.json(result, 400);
     }
@@ -746,11 +616,8 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
 
   // ── POST /refresh-schema — admin only ─────────────────────────────────────
   app.post('/refresh-schema', async (c) => {
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (!session) return c.json({ error: 'Unauthorized' }, 401);
-
-    const isAdmin = await checkPermission(session.user.id, 'admin', '*');
-    if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
+    const admin = await adminCaller(c);
+    if (admin instanceof Response) return admin;
 
     // Clears every tenant's entry, not just the caller's: the cache is a
     // shared module-level map (see the comment above `_cachedSchemas`), so an
@@ -763,114 +630,31 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
     return c.json({ success: true, message: 'Schema refreshed' });
   });
 
-  // ── GET /persisted — list persisted queries ───────────────────────────────
-  app.get('/persisted', async (c) => {
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-
-    // Public queries are accessible to anyone; private require auth
-    if (!session) {
-      const rows = await sql<any>`
-        SELECT id, name, description, query, variables_schema,
-               is_public, allowed_roles, use_count, last_used_at, created_at
-        FROM zvd_graphql_persisted_queries
-        WHERE is_public = true
-        ORDER BY name ASC
-      `.execute(db);
-      return c.json({ queries: rows.rows });
-    }
-
-    const rows = await sql<any>`
-      SELECT id, name, description, query, variables_schema,
-             is_public, allowed_roles, use_count, last_used_at, created_at
-      FROM zvd_graphql_persisted_queries
-      ORDER BY name ASC
-    `.execute(db);
-    return c.json({ queries: rows.rows });
-  });
-
-  // ── POST /persisted — create persisted query (admin only) ─────────────────
-  app.post('/persisted', zValidator('json', PersistedQueryCreateSchema), async (c) => {
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (!session) return c.json({ error: 'Unauthorized' }, 401);
-    const isAdmin = await checkPermission(session.user.id, 'admin', '*');
-    if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
-
-    const body = c.req.valid('json');
-    const row = await sql<any>`
-      INSERT INTO zvd_graphql_persisted_queries
-        (name, description, query, variables_schema, is_public, allowed_roles, created_by)
-      VALUES
-        (${body.name}, ${body.description ?? null}, ${body.query},
-         ${body.variables_schema ? JSON.stringify(body.variables_schema) : null}::jsonb,
-         ${body.is_public}, ${body.allowed_roles as any}, ${session.user.id})
-      RETURNING *
-    `.execute(db);
-    return c.json({ query: row.rows[0] }, 201);
-  });
-
-  // ── DELETE /persisted/:id — delete persisted query (admin only) ───────────
-  app.delete('/persisted/:id', async (c) => {
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (!session) return c.json({ error: 'Unauthorized' }, 401);
-    const isAdmin = await checkPermission(session.user.id, 'admin', '*');
-    if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
-
-    const id = c.req.param('id');
-    const res = await (db as any)
-      .deleteFrom('zvd_graphql_persisted_queries')
-      .where('id', '=', id)
-      .executeTakeFirst();
-
-    if ((res?.numDeletedRows ?? 0n) === 0n) return c.json({ error: 'Not found' }, 404);
-    return c.json({ success: true });
-  });
-
   // ── POST /persisted/:name/execute — execute persisted query by name ────────
   app.post('/persisted/:name/execute', async (c) => {
     const user = await caller(c);
     if (!user) return c.json({ errors: [{ message: 'Unauthorized' }] }, 401);
 
     const name = c.req.param('name');
+    // Who may run a stored query is the engine's `read` on `graphql_queries`,
+    // row rules included, as `GET /api/data` asks it. The query then runs as the
+    // caller, under the caller's own permissions, like any query posted to `/`.
+    // The collection has no default grants: whoever may edit a stored query
+    // chooses what its readers execute, mutations included.
+    const [canRead, scope] = await Promise.all([
+      ctx.internals.checkAccess(db, user, 'graphql_queries', 'read'),
+      ctx.internals.readScope('graphql_queries', user, isApiKey(user) ? 'api_key' : 'session'),
+    ]);
+    if (canRead !== true) {
+      return c.json({ errors: [{ message: 'Access denied to this persisted query' }] }, 403);
+    }
     const pqRes = await sql<any>`
-      SELECT * FROM zvd_graphql_persisted_queries WHERE name = ${name} AND tenant_id = ${OWN_TENANT}
+      SELECT * FROM zvd_graphql_queries WHERE name = ${name} AND tenant_id = ${OWN_TENANT}
     `.execute(db);
 
     const pq = pqRes.rows[0];
-    if (!pq) return c.json({ errors: [{ message: 'Persisted query not found' }] }, 404);
-
-    // Check access: public or user role in allowed_roles
-    // Access: public, or the caller holds one of `allowed_roles`, or admin.
-    //
-    // The comment here said "user role in allowed_roles" and the code never
-    // looked at the contents — only at the LENGTH. Two consequences, both wrong
-    // in the permissive direction:
-    //
-    //   * a non-public query with an EMPTY allowed_roles skipped the check
-    //     entirely, so "private, nobody listed" meant "any signed-in user".
-    //     That is the default a query gets when someone marks it private and
-    //     does not fill the list in.
-    //   * the roles that WERE listed decided nothing. A query restricted to
-    //     `finance` was reachable by any admin and refused to finance itself.
-    //
-    // An empty list on a private query now denies: a restriction naming nobody
-    // restricts to nobody. Admin still passes — the instance-wide override the
-    // rest of this file already grants.
-    //
-    // A key holds no role and is no admin, so it runs public queries only. Not
-    // `checkPermission(id, 'admin', '*')`: for a key that reads `$ext:developer/graphql`
-    // with `*`, and admitted it to every private query.
-    if (!pq.is_public) {
-      const allowed: string[] = Array.isArray(pq.allowed_roles) ? pq.allowed_roles : [];
-      // `getUserRoles` is on ctx, NOT ctx.internals — a distinction this repo has
-      // tripped over before, and typecheck is the only thing that catches it.
-      const roles = isApiKey(user) ? [] : await ctx.getUserRoles(user.id);
-      const hasRole = allowed.some((r) => roles.includes(r));
-      if (!hasRole) {
-        const isAdmin = !isApiKey(user) && (await ctx.internals.isTenantAdmin(user.id));
-        if (!isAdmin) {
-          return c.json({ errors: [{ message: 'Access denied to this persisted query' }] }, 403);
-        }
-      }
+    if (!pq || !(await scope.admits(pq))) {
+      return c.json({ errors: [{ message: 'Persisted query not found' }] }, 404);
     }
 
     let variables: Record<string, any> = {};
@@ -889,136 +673,10 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
       const tenantKey = (c.get as any)?.('tenant')?.id ?? 'default';
       const schema = await getSchema(ctx, tenantKey);
       const result = await run(c, user, schema, pq.query, variables);
-
-      // Awaited: `db` is the request transaction, which commits when the
-      // response is returned; a statement still in flight then never lands.
-      await sql`
-        UPDATE zvd_graphql_persisted_queries
-        SET use_count = use_count + 1, last_used_at = NOW(), updated_at = NOW()
-        WHERE name = ${name} AND tenant_id = ${OWN_TENANT}
-      `.execute(db);
-
       return c.json(result);
     } catch (err) {
       return c.json({ errors: [{ message: String(err) }] }, 400);
     }
-  });
-
-  // ── GET /logs — list operation logs (admin only) ──────────────────────────
-  app.get('/logs', async (c) => {
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (!session) return c.json({ error: 'Unauthorized' }, 401);
-    const isAdmin = await checkPermission(session.user.id, 'admin', '*');
-    if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
-
-    const rows = await sql<any>`
-      SELECT id, operation_name, operation_type, query_hash,
-             duration_ms, result_size_bytes, error_count, user_id, ip, created_at
-      FROM zvd_graphql_operation_logs
-      ORDER BY created_at DESC
-      LIMIT 100
-    `.execute(db);
-    return c.json({ logs: rows.rows });
-  });
-
-  // ── DELETE /logs — clear logs older than 30 days (admin only) ────────────
-  app.delete('/logs', async (c) => {
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (!session) return c.json({ error: 'Unauthorized' }, 401);
-    const isAdmin = await checkPermission(session.user.id, 'admin', '*');
-    if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
-
-    const res = await sql<any>`
-      DELETE FROM zvd_graphql_operation_logs
-      WHERE created_at < NOW() - INTERVAL '30 days'
-    `.execute(db);
-    return c.json({ deleted: Number(res.numAffectedRows ?? 0) });
-  });
-
-  // ── GET /stats — operation stats (admin only) ─────────────────────────────
-  app.get('/stats', async (c) => {
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (!session) return c.json({ error: 'Unauthorized' }, 401);
-    const isAdmin = await checkPermission(session.user.id, 'admin', '*');
-    if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
-
-    const [totalsRes, topOpsRes] = await Promise.all([
-      sql<any>`
-        SELECT
-          COUNT(*) FILTER (WHERE operation_type = 'query')::int AS total_queries,
-          COUNT(*) FILTER (WHERE operation_type = 'mutation')::int AS total_mutations,
-          ROUND(AVG(duration_ms))::int AS avg_duration_ms,
-          COUNT(*) FILTER (WHERE error_count > 0)::int AS total_errors
-        FROM zvd_graphql_operation_logs
-      `.execute(db),
-      sql<any>`
-        SELECT operation_name, COUNT(*)::int AS count,
-               ROUND(AVG(duration_ms))::int AS avg_duration_ms
-        FROM zvd_graphql_operation_logs
-        WHERE operation_name IS NOT NULL
-        GROUP BY operation_name
-        ORDER BY count DESC
-        LIMIT 10
-      `.execute(db),
-    ]);
-
-    return c.json({
-      ...totalsRes.rows[0],
-      top_operations: topOpsRes.rows,
-    });
-  });
-
-  // ── GET /field-policies — list field policies (admin only) ────────────────
-  app.get('/field-policies', async (c) => {
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (!session) return c.json({ error: 'Unauthorized' }, 401);
-    const isAdmin = await checkPermission(session.user.id, 'admin', '*');
-    if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
-
-    const rows = await sql<any>`
-      SELECT * FROM zvd_graphql_field_policies ORDER BY collection ASC, field ASC
-    `.execute(db);
-    return c.json({ policies: rows.rows });
-  });
-
-  // ── POST /field-policies — create field policy (admin only) ──────────────
-  app.post('/field-policies', zValidator('json', FieldPolicyCreateSchema), async (c) => {
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (!session) return c.json({ error: 'Unauthorized' }, 401);
-    const isAdmin = await checkPermission(session.user.id, 'admin', '*');
-    if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
-
-    const body = c.req.valid('json');
-    const row = await sql<any>`
-      INSERT INTO zvd_graphql_field_policies
-        (collection, field, allowed_roles, deny_roles, created_by)
-      VALUES
-        (${body.collection}, ${body.field},
-         ${body.allowed_roles as any}, ${body.deny_roles as any},
-         ${session.user.id})
-      ON CONFLICT (tenant_id, collection, field) DO UPDATE
-        SET allowed_roles = EXCLUDED.allowed_roles,
-            deny_roles = EXCLUDED.deny_roles
-      RETURNING *
-    `.execute(db);
-    return c.json({ policy: row.rows[0] }, 201);
-  });
-
-  // ── DELETE /field-policies/:id — delete field policy (admin only) ─────────
-  app.delete('/field-policies/:id', async (c) => {
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (!session) return c.json({ error: 'Unauthorized' }, 401);
-    const isAdmin = await checkPermission(session.user.id, 'admin', '*');
-    if (!isAdmin) return c.json({ error: 'Admin required' }, 403);
-
-    const id = c.req.param('id');
-    const res = await (db as any)
-      .deleteFrom('zvd_graphql_field_policies')
-      .where('id', '=', id)
-      .executeTakeFirst();
-
-    if ((res?.numDeletedRows ?? 0n) === 0n) return c.json({ error: 'Not found' }, 404);
-    return c.json({ success: true });
   });
 
   return app;

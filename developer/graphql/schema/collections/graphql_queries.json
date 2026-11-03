@@ -1,0 +1,25 @@
+{
+  "name": "graphql_queries",
+  "defaultGrants": false,
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    {
+      "name": "description",
+      "type": "text"
+    },
+    {
+      "name": "query",
+      "type": "textarea",
+      "required": true
+    },
+    {
+      "name": "variables_schema",
+      "type": "json"
+    }
+  ]
+}
