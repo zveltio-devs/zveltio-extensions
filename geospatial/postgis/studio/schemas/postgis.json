@@ -2,61 +2,22 @@
   "sduiSchema": 1,
   "title": "geospatial.postgis.title",
   "subtitle": "geospatial.postgis.subtitle",
-  "newLabel": "geospatial.postgis.btn.create",
   "resources": [
     {
-      "id": "geofences",
-      "label": "geospatial.postgis.tab.geofences",
+      "id": "history",
+      "label": "geospatial.postgis.tab.history",
       "icon": "MapPin",
-      "dataSource": "/ext/geospatial/postgis/geofences",
-      "dataPath": "geofences",
+      "dataSource": "/api/data/geo_location_history?sort=created_at&order=desc&limit=500",
+      "dataPath": "records",
+      "search": { "fields": ["entity_type", "entity_id"], "placeholder": "common.search" },
       "columns": [
-        { "key": "name", "label": "common.col.name" },
-        { "key": "description", "label": "common.col.description" },
-        {
-          "key": "is_active",
-          "label": "common.col.status",
-          "type": "boolean"
-        },
-        { "key": "created_at", "label": "common.col.created", "type": "date" }
-      ],
-      "rowActions": [
-        {
-          "id": "delete",
-          "icon": "Trash2",
-          "variant": "text-error",
-          "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/ext/geospatial/postgis/geofences/{id}",
-          "confirm": "geospatial.postgis.confirmDelete"
-        }
-      ],
-      "form": {
-        "endpoint": "/ext/geospatial/postgis/geofences",
-        "fields": [
-          {
-            "name": "name",
-            "label": "common.col.name",
-            "required": true,
-            "colSpan": 2
-          },
-          {
-            "name": "description",
-            "label": "common.col.description",
-            "colSpan": 2
-          },
-          {
-            "name": "coordinates",
-            "label": "geospatial.postgis.ui.coordinates_geojson_polygon_array",
-            "type": "json",
-            "mono": true,
-            "required": true,
-            "rows": 5,
-            "colSpan": 2,
-            "default": "[]"
-          }
-        ]
-      }
+        { "key": "entity_type", "label": "geospatial.postgis.col.entityType" },
+        { "key": "entity_id", "label": "geospatial.postgis.col.entityId" },
+        { "key": "location.lat", "label": "geospatial.postgis.ui.latitude" },
+        { "key": "location.lng", "label": "geospatial.postgis.ui.longitude" },
+        { "key": "source", "label": "geospatial.postgis.col.source" },
+        { "key": "recorded_at", "label": "geospatial.postgis.col.recordedAt", "type": "date" }
+      ]
     }
   ]
 }

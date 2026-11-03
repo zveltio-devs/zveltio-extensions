@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.0.0 (2026-11-03)
+
+- feat!: location history is the collection `geo_location_history`, declared in `schema/collections/` and created and owned by the engine, with a `location` field (`{ "lat", "lng" }`, a native point, ADR 0019); no SQL migrations, `zv_geo_location_history` is no longer created, positions recorded by 1.x are not carried over and the old table is left in place
+- feat!: `POST /location-history` and `GET /location-history/:entityType/:entityId` are gone: write and read positions through `/api/data/geo_location_history` (filter `entity_type`, `entity_id`, `recorded_at`). `recorded_at` is optional and has no default; the engine's `created_at` is the server time. The value checks move to validation rules (accuracy and speed not negative, heading 0 to 360); `lat`/`lng` ranges are the engine's
+- feat!: who may read or write positions is the engine's rules. `defaultGrants: false`: 1.x kept location history behind the `postgis` resource, so members reach it only through a rule the operator adds, and nobody reads anyone's positions by default
+- feat!: `/near`, `/within-bbox` and `/cluster` are gone: ask the data API on any `location` field, `GET /api/data/<collection>?location[near]=lat,lng,radius` (metres) or `location[within]=minLat,minLng,maxLat,maxLng`. Clustering (DBSCAN) has no replacement; results are not sorted by distance
+- feat!: geofences, their rules and their enter/exit events are dropped (`zv_geofences`, `zv_geofence_rules`, `zv_geofence_events` and their routes): polygon containment waits for ADR 0019 tier 2. Crossings are no longer recorded when a position is written
+- feat!: saved routes (`zv_geo_routes`, linestring) and their routes are dropped
+- feat!: the `polygon` and `linestring` field types are no longer contributed and `location` is the engine's own; PostGIS is no longer required (`requires.postgres_extensions`), and the `postgis` resource and the `database` and `field-types` permission labels are dropped
+- feat: the admin page lists location history; spatial explore runs `near` and box queries through the data API on a chosen `location` field; `MapView` reads the engine's `{ lat, lng }` location. `MapPicker`, `LocationField` and `MapView` stay
+
 ## 1.0.9 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)
