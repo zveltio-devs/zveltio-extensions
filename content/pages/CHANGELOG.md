@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.1 (2026-11-03)
+
+- fix: the data-block filter hint said a filter on a column the collection does not have is ignored; the data API refuses it (400) and the block shows the error
+
 ## 2.0.0 (2026-11-03)
 
 - feat!: sites, pages, publications, revisions and menus are collections declared in `schema/collections/`, created and owned by the engine; no SQL migrations, and every hand-written `/ext/content/pages/sites|pages|cms` route is gone — read and write through `/api/data/<collection>`
