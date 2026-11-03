@@ -40,6 +40,12 @@ async function run(): Promise<void> {
     toast.warning('Pick a collection');
     return;
   }
+  // A field name goes into the query key `${field}[op]`; anything but an
+  // identifier would build a different filter than the one asked for.
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(field)) {
+    toast.error('The location field must be a field name (letters, digits, underscore)');
+    return;
+  }
   running = true;
   try {
     const [op, value] =

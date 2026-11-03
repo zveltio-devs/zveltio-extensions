@@ -3,7 +3,7 @@
   "defaultGrants": false,
   "fields": [
     { "name": "entity_type", "type": "text", "required": true },
-    { "name": "entity_id", "type": "text", "required": true },
+    { "name": "entity_id", "type": "text", "required": true, "indexed": true },
     { "name": "location", "type": "location", "required": true },
     { "name": "accuracy_m", "type": "decimal" },
     { "name": "altitude_m", "type": "decimal" },

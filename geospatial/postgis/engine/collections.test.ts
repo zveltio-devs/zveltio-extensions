@@ -91,5 +91,35 @@ d(`${NAME}: declared collections`, () => {
     expect(await ids('location[within]=46,23,47,24')).toEqual(['cluj']);
     // An out-of-range point is refused at write.
     expect((await at(91, 0, 'nowhere')).status).toBe(422);
+
+    const post = (extra: Record<string, unknown>) =>
+      app.request('/api/data/geo_location_history', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ entity_type: 'vehicle', entity_id: 'v', location: { lat: 1, lng: 1 }, ...extra }),
+      });
+    // The validation rules hold.
+    expect((await post({ accuracy_m: -1 })).status).toBe(422);
+    expect((await post({ heading_deg: 361 })).status).toBe(422);
+    // `source` defaults to 'api'; `recorded_at` may be left out.
+    const created = await post({});
+    expect(created.status).toBe(201);
+    const row = (await created.json()) as Record<string, unknown>;
+    const rec = (row.record ?? row.data ?? row) as Record<string, unknown>;
+    expect(rec.source).toBe('api');
+    expect(rec.recorded_at ?? null).toBeNull();
+
+    // defaultGrants false: the boot's default-grant pass skips this collection,
+    // so no role holds a default rule on it and a member with no rule of the
+    // operator's reads nothing.
+    const { createMemberSession } = await import(join(ENGINE, 'testing/app-harness.js'));
+    const { materializeDefaultGrants } = await import(join(ENGINE, 'lib/tenancy/resource-grants.js'));
+    await materializeDefaultGrants(db, COLLECTIONS);
+    const defaults = await sql`
+      SELECT v0 FROM zvd_permissions WHERE ptype = 'p' AND v1 = '*' AND v2 IN (${sql.join(COLLECTIONS)})`.execute(db);
+    expect(defaults.rows).toEqual([]);
+    const member = await createMemberSession(app, db);
+    const denied = await app.request('/api/data/geo_location_history', { headers: { cookie: member.cookie } });
+    expect(denied.status).toBe(403);
   }, 120_000);
 });
