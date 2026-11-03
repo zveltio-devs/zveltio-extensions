@@ -166,6 +166,9 @@ const ENGINE_MEMBERS = [
   // Refuses by throwing (no gate principal, not an instance admin): a stub would be allowed.
   'writeValidationRule',
   'writeValidationRuleGroup',
+  // The data API's read gate: a stub would answer every caller the same.
+  'checkAccess',
+  'readScope',
 ] as const;
 
 /**
@@ -267,16 +270,17 @@ async function engineDb(src: string): Promise<any> {
  * it writes is the one `engineSession` reads back, so an SSO login is proven by
  * the engine accepting its cookie rather than by a stub returning nothing.
  */
-let _engineUsersP: Promise<{ users: any; pool: any; auth: any }> | null = null;
-function engineUsers(): Promise<{ users: any; pool: any; auth: any }> {
+let _engineUsersP: Promise<{ users: any; pool: any; auth: any; restore: () => Promise<void> }> | null = null;
+function engineUsers(): Promise<{ users: any; pool: any; auth: any; restore: () => Promise<void> }> {
   _engineUsersP ??= (async () => {
     const src = join(REPO, '..', 'zveltio', 'packages', 'engine', 'src');
     const { _internalForTests } = (await import(join(src, 'db', 'index.js'))) as any;
     const pool = await engineDb(src);
     // The engine's helpers default to its global pool (`getDb()`) and the tenant
     // manager's, which only the engine's boot sets: provisioning and tenant
-    // entry run there.
-    _internalForTests.swapDbForTests(pool);
+    // entry run there. An engine a suite already booted (`getTestApp`) gets its
+    // own back at teardown, below.
+    const booted = _internalForTests.swapDbForTests(pool);
     const { initPermissions, initTenantManager } = (await import(
       join(src, 'lib', 'tenancy', 'index.js')
     )) as any;
@@ -286,7 +290,21 @@ function engineUsers(): Promise<{ users: any; pool: any; auth: any }> {
     process.env.DATABASE_URL ??= DB_URL;
     const auth = (await import(join(src, 'lib', 'auth.js'))) as any;
     await auth.initAuth(pool);
-    return { users: await import(join(src, 'lib', 'users.js')), pool, auth };
+    return {
+      users: await import(join(src, 'lib', 'users.js')),
+      pool,
+      auth,
+      // Put the booted engine back on its own pool: left on ours, which is
+      // destroyed after this file, the cached `getTestApp` answered every later
+      // file with "driver has already been destroyed".
+      restore: async () => {
+        if (!booted) return;
+        _internalForTests.swapDbForTests(booted);
+        initTenantManager(booted);
+        await initPermissions(booted);
+        await auth.initAuth(booted);
+      },
+    };
   })();
   return _engineUsersP;
 }
@@ -300,7 +318,10 @@ export async function engineSession(setCookie: string): Promise<string | undefin
 afterAll(async () => {
   const p = _engineUsersP;
   _engineUsersP = null;
-  if (p) await (await p).pool.destroy().catch(() => undefined);
+  if (!p) return;
+  const e = await p;
+  await e.restore();
+  await e.pool.destroy().catch(() => undefined);
 });
 
 // One shared pool + Kysely across all test files (bun test = one process).
@@ -721,6 +742,25 @@ async function makeCtx(
 }
 
 /**
+ * The actor `transactionUser` publishes: that user, holding every collection
+ * grant — the engine's `ALL_COLLECTIONS_ACTOR` (testing/app-harness.ts), named
+ * instead of anonymous. Every `transactionUser` today is a god, who holds them
+ * in the product too. A
+ * real request always has an actor, and without one the collection permissions
+ * give an extension's statement on a declared collection no rows. Tests whose
+ * subject IS collection permissions use the engine's real request chain.
+ */
+const allCollectionsActor = (userId: string) => ({
+  userId,
+  email: '',
+  role: '',
+  roles: [] as string[],
+  bypass: false,
+  collectionGrants: '',
+  collectionAll: true,
+});
+
+/**
  * A Hono app whose every request runs as a tenant, as the engine's tenant
  * middleware makes it: on a single-tenant install that is the default tenant.
  *
@@ -732,6 +772,7 @@ async function makeCtx(
  * tenant" the engine's helpers act for — `countMembers`, `addTenantMember` and
  * the rest refuse without one, as they do in the product.
  */
+
 async function tenantApp(tenant?: string, transaction = false, userId?: string): Promise<any> {
   const { Hono } = (await honoP) as any;
   const { runWithDomain, withTenantIsolation, DEFAULT_TENANT_ID } = (await tenancyP) as any;
@@ -746,7 +787,7 @@ async function tenantApp(tenant?: string, transaction = false, userId?: string):
   app.use('*', (c: any, next: () => Promise<void>) => {
     c.set('tenant', { id });
     return transaction
-      ? runWithDomain(id, () => withTenantIsolation(id, () => next(), userId ? { userId } : undefined))
+      ? runWithDomain(id, () => withTenantIsolation(id, () => next(), userId ? { userId, identity: allCollectionsActor(userId) } : undefined))
       : runWithDomain(id, () => next());
   });
   return app;
@@ -826,7 +867,8 @@ export async function mountForTest(
     /**
      * With `transaction`: open it for this user, as the engine's middleware does
      * for a signed-in caller — so the user's READ REACH is published (a god's is
-     * every firm). Without it the transaction sees its own tenant only.
+     * every firm), with every collection grant (`allCollectionsActor`). Without
+     * it the transaction sees its own tenant only.
      */
     transactionUser?: string;
     /** Permissions a non-admin holds, matched exactly by `ctx.checkPermission`. */

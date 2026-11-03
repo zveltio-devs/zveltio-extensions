@@ -9,7 +9,7 @@
 // EVERY collection — a key granted that scope and `read` on A listed B.
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { join } from 'node:path';
-import { applyOwnMigrations } from './test-utils';
+import { applyOwnCollections, dropOwnCollections } from './test-utils';
 
 // biome-ignore lint/suspicious/noExplicitAny: engine modules imported by path, and the packed bundle
 type Any = any;
@@ -82,7 +82,7 @@ d('developer/graphql — API keys get the data API key semantics', () => {
         await Bun.sleep(100);
       }
     }
-    await applyOwnMigrations((q) => sql.raw(q).execute(db));
+    await applyOwnCollections();
     // After the collections: a create refuses a name that already has rules.
     // The issuer holds A and B: since engine 3.0.0-beta.83 a key never exceeds
     // its issuer's rights, so what keeps the key off B below is its own scope.
@@ -91,6 +91,7 @@ d('developer/graphql — API keys get the data API key semantics', () => {
         grants: [
           { collection: A, actions: ['read', 'create', 'update'] },
           { collection: B, actions: ['read', 'create', 'update'] },
+          { collection: 'graphql_queries', actions: ['read'] },
         ],
       })
     ).userId;
@@ -140,7 +141,7 @@ d('developer/graphql — API keys get the data API key semantics', () => {
   afterAll(async () => {
     if (!db) return;
     await sql`DELETE FROM zv_api_keys WHERE name = ${STAMP}`.execute(db).catch(() => undefined);
-    await sql`DELETE FROM zvd_graphql_persisted_queries WHERE name LIKE ${`${STAMP}%`}`.execute(db).catch(() => undefined);
+    await dropOwnCollections();
     await db.deleteFrom('zvd_relations').where('source_collection', '=', A).execute().catch(() => undefined);
     await sql.raw(`DROP TABLE IF EXISTS "${JUNCTION}"`).execute(db).catch(() => undefined);
     await db.deleteFrom('zv_revisions').where('collection', '=', A).execute().catch(() => undefined);
@@ -209,11 +210,7 @@ d('developer/graphql — API keys get the data API key semantics', () => {
   it('keeps the management routes session-only', async () => {
     const key = await makeKey([GQL(['*']), { collection: '*', actions: ['*'] }]);
     for (const [method, path] of [
-      ['GET', '/persisted'],
-      ['POST', '/persisted'],
       ['POST', '/refresh-schema'],
-      ['GET', '/logs'],
-      ['GET', '/field-policies'],
       ['GET', '/'],
     ]) {
       const res = await app.request(`/ext/${NAME}${path}`, { method, headers: { 'X-API-Key': key } });
@@ -222,21 +219,16 @@ d('developer/graphql — API keys get the data API key semantics', () => {
     }
   });
 
-  it('executes a public persisted query with its own scopes, and no private one', async () => {
-    for (const [suffix, isPublic] of [['pub', true], ['priv', false]] as const) {
-      const res = await post(
-        '/persisted',
-        { name: `${STAMP}_${suffix}`, query: `{ list_${A} { label } list_${B} { label } }`, is_public: isPublic, allowed_roles: ['finance'] },
-        { cookie },
-      );
-      expect(res.status).toBe(201);
-    }
-    // `*` on the extension scope is what `checkPermission(id, 'admin', '*')` read as admin.
-    const key = await makeKey([GQL(['*']), { collection: A, actions: ['read'] }]);
-    const pub = (await post(`/persisted/${STAMP}_pub/execute`, {}, { 'X-API-Key': key })).body;
-    expect(labels(pub.data[`list_${A}`])).toContain('a-row');
-    expect(pub.data[`list_${B}`]).toBeNull();
-    expect(messages(pub)).toEqual([`Forbidden: no read permission on "${B}"`]);
-    expect((await post(`/persisted/${STAMP}_priv/execute`, {}, { 'X-API-Key': key })).status).toBe(403);
+  it('runs a stored query with its own scopes, and only with read on graphql_queries', async () => {
+    await sql`INSERT INTO zvd_graphql_queries (name, query)
+              VALUES (${`${STAMP}_q`}, ${`{ list_${A} { label } list_${B} { label } }`})`.execute(db);
+    const key = await makeKey([GQL(['*']), { collection: A, actions: ['read'] }, { collection: 'graphql_queries', actions: ['read'] }]);
+    const res = (await post(`/persisted/${STAMP}_q/execute`, {}, { 'X-API-Key': key })).body;
+    expect(labels(res.data[`list_${A}`])).toContain('a-row');
+    expect(res.data[`list_${B}`]).toBeNull();
+    expect(messages(res)).toEqual([`Forbidden: no read permission on "${B}"`]);
+    // The engine's `read` on the collection decides, not the extension scope.
+    const without = await makeKey([GQL(['*']), { collection: A, actions: ['read'] }]);
+    expect((await post(`/persisted/${STAMP}_q/execute`, {}, { 'X-API-Key': without })).status).toBe(403);
   });
 });
