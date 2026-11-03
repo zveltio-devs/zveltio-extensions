@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.0 (2026-11-03)
+
+- feat!: an export reads through the data API as the exporting user (`ctx.internals.listRecords`, paged by cursor): the caller's grants, row policies, extension alters, entity access and column permissions decide what is exported, the answer `GET /api/data` gives them. The 1.x admin-only gate and the `export` permission resource are gone; who may export a collection is who may read it
+- feat!: `GET /:collection` takes the data API's own `filter` (any operator it accepts, not only equality) and `sort`/`order` (renamed from `sort_field`/`sort_order`); `fields` keeps the named columns of what the data API returned. An export longer than `limit` (default 1000, at most 50000) says so: `truncated: true` in JSON and the header `X-Export-Truncated: true`. The page drops the never-implemented XLSX option A refusal from the data API (403, 404, 400 for a bad filter) is answered as the data API answered it
+- feat!: background export jobs (`POST /jobs`, `GET`/`DELETE /jobs/:id`), the export audit table, `GET /stats` and `GET /audit` are dropped: a job has no request to read as the caller. Each delivered export is recorded in the engine's audit log (`data.export`, with format, row count, fields, filter and whether it was truncated)
+- feat!: saved exports are the declared collection `data_export_templates` (name, target collection, format, fields, row limit), created and owned by the engine and served by the data API; the Studio page lists them with a Download action. The 1.x tables `zvd_export_jobs`, `zvd_export_templates` and `zvd_export_audit_log` are no longer written or read, their rows are not carried over, and the tables are left in place
+- chore: no SQL migrations; the legacy `database` permission label is dropped
+
 ## 1.0.13 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)

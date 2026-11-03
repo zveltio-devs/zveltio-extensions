@@ -5,17 +5,16 @@
   "newLabel": "data.export.ui.export_collection",
   "resources": [
     {
-      "id": "jobs",
-      "dataSource": "/ext/data/export/jobs",
-      "dataPath": "jobs",
+      "id": "templates",
+      "dataSource": "/api/data/data_export_templates?sort=name&order=asc&limit=500",
+      "dataPath": "records",
       "columns": [
         {
-          "key": "created_at",
-          "label": "data.export.col.time",
-          "type": "date"
+          "key": "name",
+          "label": "data.export.col.name"
         },
         {
-          "key": "collection",
+          "key": "target_collection",
           "label": "common.col.collection"
         },
         {
@@ -27,16 +26,12 @@
           }
         },
         {
-          "key": "row_count",
+          "key": "row_limit",
           "label": "data.export.col.rows"
         },
         {
-          "key": "size_bytes",
-          "label": "data.export.col.size"
-        },
-        {
-          "key": "user_id",
-          "label": "data.export.col.user",
+          "key": "fields",
+          "label": "data.export.col.fields",
           "type": "mono"
         }
       ],
@@ -77,10 +72,6 @@
               {
                 "value": "ndjson",
                 "label": "NDJSON"
-              },
-              {
-                "value": "xlsx",
-                "label": "data.export.ui.excel_xlsx"
               }
             ]
           },
@@ -89,17 +80,26 @@
             "label": "data.export.rowLimit",
             "type": "number",
             "colSpan": 1,
-            "default": 0
+            "default": 1000
           },
           {
             "name": "filter",
             "label": "data.export.filterHint",
             "mono": true,
             "colSpan": 2,
-            "placeholder": "status=active"
+            "placeholder": "{\"status\":{\"eq\":\"active\"}}"
           }
         ]
-      }
+      },
+      "rowActions": [
+        {
+          "id": "download",
+          "label": "data.export.btn.download",
+          "icon": "Download",
+          "kind": "open",
+          "endpoint": "/ext/data/export/{target_collection}?format={format}&limit={row_limit}&fields={fields}"
+        }
+      ]
     }
   ]
 }
