@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.1 (2026-11-03)
+
+- fix: the builder's image picker reads the engine's storage (`/api/storage`) and links a file by its `url` or `/files/<storage_path>`; it called `/ext/content/media/files`, which content/media 2.0.0 no longer serves
+
 ## 2.1.0 (2026-11-03)
 
 - feat: `/sitemap.xml` and `/robots.txt` are back as public routes. The sitemap lists the published, indexable pages of the active sites (`?site=<slug>` names one) that the anonymous visitor may read: it reads through `ctx.internals.listRecords`, which in a public route reads as the tenant's `public` role (ADR 0020), so the operator's grants and row rules on `page_sites` and `page_publications` decide what is listed; until `public` may read them it answers the data API's refusal. Needs 3.0.0-beta.99

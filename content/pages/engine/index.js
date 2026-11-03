@@ -3052,9 +3052,29 @@ var require_stringify = __commonJS(function(exports, module) {
       return str;
     return str.replace(STYLE_TAG, "\\3c $2").replace(COMMENT_OPEN, "\\3c $2");
   }
+  function cutEscaped(chunks, css, escaped) {
+    let parts = [];
+    let at = 0;
+    let into = 0;
+    for (let i = 0;i < chunks.length; i += 3) {
+      let from = into;
+      let end = at + chunks[i].length;
+      while (at < end) {
+        if (css[at] === escaped[into]) {
+          at += 1;
+          into += 1;
+        } else {
+          at += 1;
+          into += 4;
+        }
+      }
+      parts.push(escaped.slice(from, into));
+    }
+    return parts;
+  }
 
   class SafeStringifier extends Stringifier {
-    escapeHTML(node, print) {
+    escapeHTML(print) {
       let builder = this.builder;
       let chunks, css;
       this.builder = (str, child, type) => {
@@ -3078,16 +3098,19 @@ var require_stringify = __commonJS(function(exports, module) {
           builder(chunks[i], chunks[i + 1], chunks[i + 2]);
         }
       } else {
-        builder(escaped, node, "start");
+        let parts = cutEscaped(chunks, css, escaped);
+        for (let i = 0;i < chunks.length; i += 3) {
+          builder(parts[i / 3], chunks[i + 1], chunks[i + 2]);
+        }
       }
     }
     root(node) {
       if (node.parent && node.parent.type === "document") {
-        this.escapeHTML(node, () => this.body(node));
+        this.escapeHTML(() => this.body(node));
         if (node.raws.after)
           this.builder(node.raws.after);
       } else {
-        this.escapeHTML(node, () => super.root(node));
+        this.escapeHTML(() => super.root(node));
       }
     }
   }
@@ -3096,7 +3119,7 @@ var require_stringify = __commonJS(function(exports, module) {
     if (node.type === "root" || node.type === "document") {
       str.stringify(node);
     } else {
-      str.escapeHTML(node, () => str.stringify(node));
+      str.escapeHTML(() => str.stringify(node));
     }
   }
   module.exports = stringify;
@@ -3303,7 +3326,7 @@ var require_node = __commonJS(function(exports, module) {
       if (opts.index) {
         pos = this.positionInside(opts.index);
       } else if (opts.word) {
-        let stringRepresentation = inputString.slice(sourceOffset(inputString, this.source.start), sourceOffset(inputString, this.source.end));
+        let stringRepresentation = inputString.slice(sourceOffset(inputString, this.source.start), this.rangeBy().end.offset);
         let index = stringRepresentation.indexOf(opts.word);
         if (index !== -1)
           pos = this.positionInside(index);
@@ -3350,7 +3373,7 @@ var require_node = __commonJS(function(exports, module) {
         offset: start.offset + 1
       };
       if (opts.word) {
-        let stringRepresentation = inputString.slice(sourceOffset(inputString, this.source.start), sourceOffset(inputString, this.source.end));
+        let stringRepresentation = inputString.slice(sourceOffset(inputString, this.source.start), end.offset);
         let index = stringRepresentation.indexOf(opts.word);
         if (index !== -1) {
           start = this.positionInside(index);
@@ -6258,7 +6281,7 @@ var require_input = __commonJS(function(exports, module) {
       if (isAbsolute(from.source)) {
         fromUrl = pathToFileURL(from.source);
       } else {
-        fromUrl = new URL(from.source, this.map.consumer().sourceRoot || pathToFileURL(this.map.mapFile));
+        fromUrl = new URL(from.source, pathToFileURL(this.map.mapFile || resolve(".") + "/"));
       }
       let result = {
         column: from.column + 1,
@@ -7496,6 +7519,7 @@ var require_warning = __commonJS(function(exports, module) {
         return this.node.error(this.text, {
           index: this.index,
           plugin: this.plugin,
+          start: this.start,
           word: this.word
         }).message;
       }
@@ -7743,7 +7767,7 @@ var require_lazy_result = __commonJS(function(exports, module) {
       return this.async().catch(onRejected);
     }
     finally(onFinally) {
-      return this.async().then(onFinally, onFinally);
+      return this.async().finally(onFinally);
     }
     getAsyncError() {
       throw new Error("Use process(css).then(cb) to work with async plugins");
@@ -8177,7 +8201,7 @@ var require_no_work_result = __commonJS(function(exports, module) {
       return this.async().catch(onRejected);
     }
     finally(onFinally) {
-      return this.async().then(onFinally, onFinally);
+      return this.async().finally(onFinally);
     }
     sync() {
       if (this.error)
@@ -8212,7 +8236,7 @@ var require_processor = __commonJS(function(exports, module) {
 
   class Processor {
     constructor(plugins = []) {
-      this.version = "8.5.30";
+      this.version = "8.5.32";
       this.plugins = this.normalize(plugins);
     }
     normalize(plugins) {

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.13 (2026-11-03)
+
+- fix: `/favorites` creates its own table `zv_media_favorites` (migration 005, the content/media 1.x definition); it relied on content/media 1.x creating it, and content/media 2.0.0 no longer does
+
 ## 1.1.12 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)
