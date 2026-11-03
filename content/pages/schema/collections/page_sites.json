@@ -1,0 +1,72 @@
+{
+  "name": "page_sites",
+  "defaultGrants": false,
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "slug",
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    {
+      "name": "description",
+      "type": "textarea"
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": false
+    },
+    {
+      "name": "base_path",
+      "type": "text",
+      "required": true,
+      "defaultValue": "/"
+    },
+    {
+      "name": "site_name",
+      "type": "text"
+    },
+    {
+      "name": "site_logo_url",
+      "type": "url"
+    },
+    {
+      "name": "primary_color",
+      "type": "color"
+    },
+    {
+      "name": "secondary_color",
+      "type": "color"
+    },
+    {
+      "name": "custom_css",
+      "type": "textarea"
+    },
+    {
+      "name": "nav_position",
+      "type": "enum",
+      "options": {
+        "values": [
+          "sidebar",
+          "topbar",
+          "both"
+        ]
+      },
+      "required": true,
+      "defaultValue": "sidebar"
+    },
+    {
+      "name": "show_breadcrumbs",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true
+    }
+  ]
+}

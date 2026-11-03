@@ -1,0 +1,193 @@
+{
+  "name": "pages",
+  "indexes": [
+    {
+      "fields": [
+        "site_id",
+        "slug"
+      ],
+      "unique": true
+    }
+  ],
+  "defaultGrants": false,
+  "fields": [
+    {
+      "name": "site_id",
+      "type": "m2o",
+      "options": {
+        "related_collection": "page_sites"
+      },
+      "indexed": true,
+      "required": true
+    },
+    {
+      "name": "parent_id",
+      "type": "m2o",
+      "options": {
+        "related_collection": "pages"
+      },
+      "indexed": true
+    },
+    {
+      "name": "title",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "slug",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "kind",
+      "type": "enum",
+      "options": {
+        "values": [
+          "page",
+          "popup"
+        ]
+      },
+      "required": true,
+      "defaultValue": "page"
+    },
+    {
+      "name": "description",
+      "type": "textarea"
+    },
+    {
+      "name": "icon",
+      "type": "text"
+    },
+    {
+      "name": "layout",
+      "type": "text",
+      "required": true,
+      "defaultValue": "default"
+    },
+    {
+      "name": "locale",
+      "type": "text",
+      "required": true,
+      "defaultValue": "ro"
+    },
+    {
+      "name": "blocks",
+      "type": "json",
+      "required": true,
+      "defaultValue": []
+    },
+    {
+      "name": "meta",
+      "type": "json",
+      "required": true,
+      "defaultValue": {}
+    },
+    {
+      "name": "popup_config",
+      "type": "json",
+      "required": true,
+      "defaultValue": {}
+    },
+    {
+      "name": "record_collection",
+      "type": "text"
+    },
+    {
+      "name": "record_field",
+      "type": "text"
+    },
+    {
+      "name": "record_filter",
+      "type": "json",
+      "required": true,
+      "defaultValue": []
+    },
+    {
+      "name": "meta_title",
+      "type": "text"
+    },
+    {
+      "name": "meta_description",
+      "type": "textarea"
+    },
+    {
+      "name": "og_image",
+      "type": "url"
+    },
+    {
+      "name": "is_noindex",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": false
+    },
+    {
+      "name": "is_homepage",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": false
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true
+    },
+    {
+      "name": "sort_order",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "include_in_sitemap",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true
+    },
+    {
+      "name": "change_freq",
+      "type": "enum",
+      "options": {
+        "values": [
+          "always",
+          "hourly",
+          "daily",
+          "weekly",
+          "monthly",
+          "yearly",
+          "never"
+        ]
+      },
+      "required": true,
+      "defaultValue": "weekly"
+    },
+    {
+      "name": "priority",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0.5
+    }
+  ],
+  "relations": [
+    {
+      "name": "pages_site_id",
+      "type": "m2o",
+      "field": "site_id",
+      "target": "page_sites",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "pages_parent_id",
+      "type": "m2o",
+      "field": "parent_id",
+      "target": "pages",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

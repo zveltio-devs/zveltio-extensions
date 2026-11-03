@@ -2,26 +2,14 @@
   "name": "content/pages",
   "displayName": "Pages",
   "category": "content",
-  "description": "Pages built from blocks — content or live collection data — grouped into sites. A site is a public website with SEO and a sitemap, or an authenticated portal with its own branding, base path and access roles.",
-  "version": "1.1.15",
-  "zveltioMinVersion": "3.0.0-beta.83",
+  "description": "Pages built from blocks, grouped into sites. Authors edit drafts; publishing writes the sanitized snapshot a public website or a signed-in portal renders, read through the data API under the engine's rules.",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.97",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-pages",
-  "permissions": [
-    "database"
-  ],
+  "permissions": [],
   "i18nPrefixes": [
     "content.pages"
-  ],
-  "resources": [
-    "sites",
-    "pages"
-  ],
-  "publicRoutes": [
-    "/cms",
-    "/cms/*",
-    "/pages/metrics/track",
-    "/pages/*/ab-variants/*/track"
   ],
   "studio": {
     "pages": [
@@ -68,7 +56,72 @@
     "/robots.txt"
   ],
   "integrity": {
-    "engineSha256": "667ebcadc27b86d63de3ede4c2d070d513318411b1402030c3df80df4d35b0ce",
-    "sourceSha256": "ca932dd81023a81382376ed7ea06afb24f4621b0c46ed8c65d143775c77dbe5a"
-  }
+    "engineSha256": "124419dde9152aae89681fef236831dc64272c071ae4e6296deef1b9bdc351ec",
+    "sourceSha256": "b257e87f121fe84dc51bc5b0e24348fc3fcced1059e901feaf247e0efb57240a",
+    "schemaSha256": "8ae5a803620688b8a567a2d65c7e21e39d5cf004a547a3be6fcd912e99fd8da2"
+  },
+  "collections": [
+    "page_sites",
+    "pages",
+    "page_publications",
+    "page_revisions",
+    "page_menus"
+  ],
+  "actions": [
+    {
+      "name": "publish",
+      "permission": {
+        "resource": "page_publications",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "pages",
+        "page_publications"
+      ],
+      "writes": [
+        "page_publications",
+        "page_revisions"
+      ]
+    },
+    {
+      "name": "restoreRevision",
+      "permission": {
+        "resource": "pages",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "page_revisions",
+        "pages"
+      ],
+      "writes": [
+        "pages"
+      ]
+    }
+  ]
 }

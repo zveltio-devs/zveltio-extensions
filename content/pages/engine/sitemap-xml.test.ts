@@ -61,3 +61,14 @@ describe('sitemap XML', () => {
     expect(escapeXml(0.5)).toBe('0.5');
   });
 });
+
+test('the homepage is the site root; other pages are their slug', async () => {
+  const { sitemapXml } = await import('./public-seo.js');
+  const xml = sitemapXml(BASE, [
+    { slug: 'home', is_homepage: true, published_at: '2026-11-03T00:00:00Z' },
+    { slug: 'about', published_at: '2026-11-03T00:00:00Z', priority: 0.8 },
+  ]);
+  expect(xml).toContain(`<loc>${BASE}/</loc>`);
+  expect(xml).toContain(`<loc>${BASE}/about</loc>`);
+  expect(xml).toContain('<priority>0.8</priority>');
+});

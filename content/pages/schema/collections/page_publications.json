@@ -1,0 +1,151 @@
+{
+  "name": "page_publications",
+  "indexes": [
+    {
+      "fields": [
+        "site_id",
+        "slug"
+      ],
+      "unique": true
+    }
+  ],
+  "defaultGrants": false,
+  "fields": [
+    {
+      "name": "page_id",
+      "type": "m2o",
+      "options": {
+        "related_collection": "pages"
+      },
+      "indexed": true,
+      "required": true,
+      "writtenBy": "actions",
+      "unique": true
+    },
+    {
+      "name": "site_id",
+      "type": "m2o",
+      "options": {
+        "related_collection": "page_sites"
+      },
+      "indexed": true,
+      "required": true,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "slug",
+      "type": "text",
+      "required": true,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "kind",
+      "type": "enum",
+      "options": {
+        "values": [
+          "page",
+          "popup"
+        ]
+      },
+      "required": true,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "title",
+      "type": "text",
+      "required": true,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "icon",
+      "type": "text",
+      "writtenBy": "actions"
+    },
+    {
+      "name": "parent_slug",
+      "type": "text",
+      "writtenBy": "actions"
+    },
+    {
+      "name": "is_homepage",
+      "type": "boolean",
+      "required": true,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "is_noindex",
+      "type": "boolean",
+      "required": true,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "include_in_sitemap",
+      "type": "boolean",
+      "required": true,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "change_freq",
+      "type": "enum",
+      "options": {
+        "values": [
+          "always",
+          "hourly",
+          "daily",
+          "weekly",
+          "monthly",
+          "yearly",
+          "never"
+        ]
+      },
+      "required": true,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "priority",
+      "type": "decimal",
+      "required": true,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "sort_order",
+      "type": "integer",
+      "required": true,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "content",
+      "type": "json",
+      "required": true,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "published_at",
+      "type": "datetime",
+      "required": true,
+      "writtenBy": "actions"
+    }
+  ],
+  "relations": [
+    {
+      "name": "page_publications_page_id",
+      "type": "m2o",
+      "field": "page_id",
+      "target": "pages",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "page_publications_site_id",
+      "type": "m2o",
+      "field": "site_id",
+      "target": "page_sites",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}
