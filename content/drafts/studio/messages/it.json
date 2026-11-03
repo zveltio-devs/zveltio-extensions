@@ -1,7 +1,10 @@
 {
+  "content.drafts.btn.approve": "Approva",
   "content.drafts.btn.publish": "Pubblica",
+  "content.drafts.btn.reject": "Rifiuta",
   "content.drafts.col.author": "Autore",
   "content.drafts.col.record": "Record",
+  "content.drafts.col.review": "Revisione",
   "content.drafts.col.updated": "Aggiornato",
   "content.drafts.confirmDiscard": "Scartare la bozza?",
   "content.drafts.empty": "Ancora nessun dato.",

@@ -1,7 +1,10 @@
 {
+  "content.drafts.btn.approve": "Approuver",
   "content.drafts.btn.publish": "Publier",
+  "content.drafts.btn.reject": "Rejeter",
   "content.drafts.col.author": "Auteur",
   "content.drafts.col.record": "Enregistrement",
+  "content.drafts.col.review": "Révision",
   "content.drafts.col.updated": "Mis à jour",
   "content.drafts.confirmDiscard": "Abandonner le brouillon ?",
   "content.drafts.empty": "Aucune donnée pour l'instant.",

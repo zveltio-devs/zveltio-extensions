@@ -1,7 +1,10 @@
 {
+  "content.drafts.btn.approve": "Aprobă",
   "content.drafts.btn.publish": "Publică",
+  "content.drafts.btn.reject": "Respinge",
   "content.drafts.col.author": "Autor",
   "content.drafts.col.record": "Înregistrare",
+  "content.drafts.col.review": "Revizuire",
   "content.drafts.col.updated": "Actualizat",
   "content.drafts.confirmDiscard": "Renunțați la ciornă?",
   "content.drafts.empty": "Niciun date încă.",

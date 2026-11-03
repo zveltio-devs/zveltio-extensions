@@ -1,0 +1,46 @@
+{
+  "name": "content_draft_decisions",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "draft_id",
+      "type": "m2o",
+      "options": {
+        "related_collection": "content_drafts"
+      },
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "decision",
+      "type": "enum",
+      "options": {
+        "values": [
+          "approved",
+          "rejected"
+        ]
+      },
+      "required": true
+    },
+    {
+      "name": "note",
+      "type": "textarea"
+    },
+    {
+      "name": "draft_author",
+      "type": "text"
+    }
+  ],
+  "relations": [
+    {
+      "name": "content_draft_decisions_draft_id",
+      "type": "m2o",
+      "field": "draft_id",
+      "target": "content_drafts",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

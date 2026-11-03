@@ -1,7 +1,10 @@
 {
+  "content.drafts.btn.approve": "Jóváhagyás",
   "content.drafts.btn.publish": "Közzététel",
+  "content.drafts.btn.reject": "Elutasítás",
   "content.drafts.col.author": "Szerző",
   "content.drafts.col.record": "Rekord",
+  "content.drafts.col.review": "Ellenőrzés",
   "content.drafts.col.updated": "Frissítve",
   "content.drafts.confirmDiscard": "Elveti a piszkozatot?",
   "content.drafts.empty": "Még nincsenek adatok.",

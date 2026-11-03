@@ -1,7 +1,10 @@
 {
+  "content.drafts.btn.approve": "Goedkeuren",
   "content.drafts.btn.publish": "Publiceren",
+  "content.drafts.btn.reject": "Afwijzen",
   "content.drafts.col.author": "Auteur",
   "content.drafts.col.record": "Record",
+  "content.drafts.col.review": "Beoordeling",
   "content.drafts.col.updated": "Bijgewerkt",
   "content.drafts.confirmDiscard": "Concept verwijderen?",
   "content.drafts.empty": "Nog geen gegevens.",

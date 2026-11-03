@@ -1,7 +1,10 @@
 {
+  "content.drafts.btn.approve": "Zatwierdź",
   "content.drafts.btn.publish": "Opublikuj",
+  "content.drafts.btn.reject": "Odrzuć",
   "content.drafts.col.author": "Autor",
   "content.drafts.col.record": "Rekord",
+  "content.drafts.col.review": "Przegląd",
   "content.drafts.col.updated": "Zaktualizowano",
   "content.drafts.confirmDiscard": "Odrzucić wersję roboczą?",
   "content.drafts.empty": "Brak danych.",
