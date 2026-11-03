@@ -171,6 +171,43 @@
           "type": "date"
         }
       ]
+    },
+    {
+      "id": "settings",
+      "label": "billing.tab.settings",
+      "icon": "Settings",
+      "dataSource": "/api/data/billing_settings?limit=1",
+      "dataPath": "records",
+      "columns": [
+        {
+          "key": "updated_at",
+          "label": "common.col.date",
+          "type": "date"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "delete",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "DELETE",
+          "endpoint": "/api/data/billing_settings/{id}",
+          "confirm": "ext.confirmDelete"
+        }
+      ],
+      "form": {
+        "endpoint": "/api/data/billing_settings",
+        "fields": [
+          {
+            "name": "stripe_webhook_secret",
+            "label": "billing.form.webhookSecret",
+            "type": "password",
+            "required": true,
+            "mono": true,
+            "colSpan": 2
+          }
+        ]
+      }
     }
   ]
 }

@@ -1,5 +1,6 @@
 {
   "name": "billing_subscriptions",
+  "writtenBy": "actions",
   "defaultGrants": false,
   "fields": [
     {

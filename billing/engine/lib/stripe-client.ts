@@ -1,4 +1,4 @@
-import { sql, type Kysely } from 'kysely';
+import type { JobHost } from '@zveltio/sdk/extension';
 
 /**
  * Stripe webhook tolerance window — events older than this are rejected
@@ -82,7 +82,8 @@ async function verifyStripeSignature(
 export interface StripeEvent {
   id: string;
   type: string;
-  created?: number;
+  /** Seconds since the epoch; orders events per subscription, so it is required. */
+  created: number;
   data: { object: Record<string, any> };
 }
 
@@ -104,6 +105,10 @@ export async function parseWebhook(
   if (!event?.id || !event.type || !obj || typeof obj !== 'object' || Array.isArray(obj)) {
     return { error: 'Event is missing id, type or data.object' };
   }
+  // Without it a retried run would order the event by the time it ran.
+  if (typeof event.created !== 'number' || !Number.isFinite(event.created)) {
+    return { error: 'Event is missing a numeric created' };
+  }
   return { event };
 }
 
@@ -118,72 +123,81 @@ const STATUSES = new Set([
   'paused',
 ]);
 
-const at = (s: unknown) => (typeof s === 'number' ? new Date(s * 1000) : null);
+const SUBSCRIPTIONS = 'billing_subscriptions';
+const PLANS = 'billing_plans';
+
+type Row = Record<string, unknown>;
+
+const at = (s: unknown) => (typeof s === 'number' ? new Date(s * 1000).toISOString() : null);
+
+async function first(host: JobHost, collection: string, filter: Row): Promise<Row | null> {
+  const res = await host.collections.list(collection, { filter, limit: 1, count: 'none' });
+  return ((res.records as Row[]) ?? [])[0] ?? null;
+}
 
 /**
- * Apply one verified event, once. `db` is the request's tenant transaction, so
- * the claim on the event id and the state change commit or roll back together:
- * a change that fails leaves the id unclaimed, and Stripe's retry applies it.
- * False when the event id was already applied.
+ * Stripe does not deliver in order: an event older than the last one applied to
+ * a subscription leaves it alone. The update expects the `last_event_at` it read,
+ * so a concurrent run for the same subscription fails with 409 and its retry
+ * reads again.
  */
-export async function applyStripeEvent(db: Kysely<any>, event: StripeEvent): Promise<boolean> {
-  const claimed = await sql`
-    INSERT INTO zvd_billing_webhook_events (event_id, event_type)
-    VALUES (${event.id}, ${event.type})
-    ON CONFLICT (tenant_id, event_id) DO NOTHING
-    RETURNING id
-  `.execute(db);
-  if (claimed.rows.length === 0) return false;
+const newer = (row: Row, when: string) =>
+  row.last_event_at == null || new Date(row.last_event_at as string) <= new Date(when);
+const unchangedSince = (row: Row) => ({ expect: { last_event_at: [(row.last_event_at as string) ?? null] } });
 
+/**
+ * The `applyEvent` job: one verified event the webhook route stored (and so
+ * enqueued once), applied through the data API as this extension's job — the
+ * only writer `billing_subscriptions` admits (`writtenBy: "actions"`). Re-running
+ * it changes nothing, so a retried run is safe.
+ */
+export async function applyStripeEvent(event: StripeEvent, host: JobHost): Promise<void> {
   const obj = event.data.object;
-  // Stripe does not deliver in order: an event older than the last one applied
-  // to a subscription leaves it alone.
-  const when = at(event.created) ?? new Date();
+  const when = new Date(event.created * 1000).toISOString();
   switch (event.type) {
     case 'customer.subscription.created':
     case 'customer.subscription.updated':
     case 'customer.subscription.deleted': {
       const status = event.type === 'customer.subscription.deleted' ? 'canceled' : String(obj.status);
-      if (typeof obj.id !== 'string' || !STATUSES.has(status)) break;
+      if (typeof obj.id !== 'string' || !STATUSES.has(status)) return;
       // API versions from 2025-03 carry the period on the subscription item.
       const item = obj.items?.data?.[0];
       const start = at(obj.current_period_start ?? item?.current_period_start);
       const end = at(obj.current_period_end ?? item?.current_period_end);
       const price = typeof item?.price?.id === 'string' ? item.price.id : null;
-      await sql`
-        INSERT INTO zvd_billing_subscriptions
-          (stripe_subscription_id, plan_id, status, current_period_start, current_period_end, last_event_at)
-        VALUES (
-          ${obj.id},
-          (SELECT id FROM zvd_billing_plans WHERE stripe_price_id = ${price}),
-          ${status}, ${start}, ${end}, ${when}
-        )
-        ON CONFLICT (tenant_id, stripe_subscription_id) DO UPDATE SET
-          plan_id = COALESCE(EXCLUDED.plan_id, zvd_billing_subscriptions.plan_id),
-          status = EXCLUDED.status,
-          current_period_start = COALESCE(EXCLUDED.current_period_start, zvd_billing_subscriptions.current_period_start),
-          current_period_end = COALESCE(EXCLUDED.current_period_end, zvd_billing_subscriptions.current_period_end),
-          last_event_at = EXCLUDED.last_event_at,
-          updated_at = NOW()
-        WHERE zvd_billing_subscriptions.last_event_at IS NULL
-           OR zvd_billing_subscriptions.last_event_at <= EXCLUDED.last_event_at
-      `.execute(db);
-      break;
+      const plan = price ? await first(host, PLANS, { stripe_price_id: price }) : null;
+      const row = await first(host, SUBSCRIPTIONS, { stripe_subscription_id: obj.id });
+      // Absent fields keep what the row holds.
+      const change: Row = { status, last_event_at: when };
+      if (plan) change.plan_id = plan.id;
+      if (start) change.current_period_start = start;
+      if (end) change.current_period_end = end;
+      if (!row) {
+        // A concurrent run that created it first makes this one fail on the unique
+        // key; its retry finds the row.
+        await host.collections.insert(SUBSCRIPTIONS, { stripe_subscription_id: obj.id, ...change });
+      } else if (newer(row, when)) {
+        await host.collections.update(SUBSCRIPTIONS, row.id as string, change, unchangedSince(row));
+      }
+      return;
     }
 
     case 'invoice.payment_succeeded':
     case 'invoice.payment_failed': {
       // API versions from 2025-03 moved the subscription under `parent`.
       const sub = obj.subscription ?? obj.parent?.subscription_details?.subscription;
-      if (typeof sub !== 'string') break;
+      if (typeof sub !== 'string') return;
+      const row = await first(host, SUBSCRIPTIONS, { stripe_subscription_id: sub });
+      // Stripe can deliver the invoice before the subscription it belongs to:
+      // thrown, so the job retries with backoff until `customer.subscription.*`
+      // has created the row (its event id is already claimed; dropping it would
+      // lose it for good).
+      if (!row) throw new Error(`subscription ${sub} is not recorded yet; retrying ${event.id}`);
+      // An invoice event never revives a canceled subscription.
+      if (row.status === 'canceled' || !newer(row, when)) return;
       const status = event.type === 'invoice.payment_succeeded' ? 'active' : 'past_due';
-      await sql`
-        UPDATE zvd_billing_subscriptions SET status = ${status}, last_event_at = ${when}, updated_at = NOW()
-        WHERE stripe_subscription_id = ${sub} AND status <> 'canceled'
-          AND (last_event_at IS NULL OR last_event_at <= ${when})
-      `.execute(db);
-      break;
+      await host.collections.update(SUBSCRIPTIONS, row.id as string, { status, last_event_at: when }, unchangedSince(row));
+      return;
     }
   }
-  return true;
 }
