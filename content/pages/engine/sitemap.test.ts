@@ -1,7 +1,9 @@
 // The routes over a fake `listRecords`. What `public` may read (grants, row
 // rules) is the engine's, tested there (ADR 0020); this proves what is listed.
 import { describe, expect, it } from 'bun:test';
-import { Hono } from 'hono';
+// tsconfig maps `hono` to the engine's type declarations, and bun follows that
+// mapping at runtime; this repository's own install is the runtime module.
+import { Hono } from '../../../node_modules/hono/dist/index.js';
 import { sitemapRoutes } from './sitemap';
 
 type Row = Record<string, unknown>;
