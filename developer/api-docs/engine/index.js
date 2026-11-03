@@ -1,4 +1,40 @@
 // @bun
+// /zveltio-extension/packages/sdk/src/extension/action-refusal.ts
+var ACTION_REFUSAL = Symbol.for("zveltio.extension.action-refusal");
+// /zveltio-extension/packages/sdk/src/extension/dates.ts
+function todayIn(timeZone, now = new Date) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(now);
+}
+// /zveltio-extension/packages/sdk/src/extension/reserved-paths.ts
+var RESERVED_PATH_SEGMENTS = Object.freeze([
+  "api",
+  "ext",
+  "admin",
+  "app",
+  "auth",
+  "_app",
+  "_server",
+  ".well-known",
+  "robots.txt",
+  "sitemap.xml"
+]);
+// engine/actions.ts
+var C = "apidoc_changelogs";
+async function publish(input, host) {
+  const { id } = input;
+  return host.collections.update(C, id, { is_published: true, published_at: todayIn(host.timezone) }, { expect: { is_published: [false] } });
+}
+async function unpublish(input, host) {
+  const { id } = input;
+  return host.collections.update(C, id, { is_published: false }, { expect: { is_published: [true] } });
+}
+var apiDocsActions = { publish, unpublish };
+
 // /zveltio-extension/node_modules/hono/dist/compose.js
 var compose = (middleware, onError, onNotFound) => {
   return (context, next) => {
@@ -1647,6 +1683,7 @@ var extension = {
   name: "developer/api-docs",
   category: "developer",
   mountStrategy: "subapp",
+  actions: apiDocsActions,
   async register(app) {
     app.route("/", apiDocsRoutes());
   }

@@ -1,6 +1,7 @@
 {
   "developer.api-docs.btn.create": "Utwórz",
   "developer.api-docs.btn.newPage": "Nowa strona",
+  "developer.api-docs.btn.unpublish": "Cofnij publikację",
   "developer.api-docs.col.public": "Publiczny",
   "developer.api-docs.col.updated": "Zaktualizowano",
   "developer.api-docs.empty": "Brak danych.",

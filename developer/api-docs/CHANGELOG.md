@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.1.0 (2026-11-03)
+
+- feat: the actions `publish` and `unpublish` (`POST /ext/developer/api-docs/actions/<name>`, body `{ "id" }`) restore 1.x's publish: `publish` sets `is_published` and stamps `published_at` with today's date in the tenant's time zone; `unpublish` clears `is_published` and keeps the date. Each refuses with 409 an entry already in the state it asks for. Both are gated on `execute` on `apidoc_changelogs`, granted by the operator
+- feat!: `is_published` and `published_at` on `apidoc_changelogs` are written only by those actions (`writtenBy: "actions"`, ADR 0013): a data API write that sets either is refused, so a published entry always carries the day it went public. The Studio form no longer edits the date; the row actions call the actions
+
 ## 2.0.0 (2026-11-02)
 
 - feat!: changelogs and documentation pages are the collections `apidoc_changelogs` and `apidoc_pages`, declared in `schema/collections/` and created and owned by the engine; no SQL migrations; the 1.x tables (`zvd_api_changelogs`, `zvd_api_custom_docs`, `zvd_api_access_tokens`, `zvd_api_docs_config`) are no longer created, their rows are not carried over, and the tables are left in place. New names because a declared collection cannot take a `zvd_` table that already exists

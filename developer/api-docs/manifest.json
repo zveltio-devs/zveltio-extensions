@@ -3,7 +3,7 @@
   "displayName": "API Documentation",
   "category": "developer",
   "description": "Swagger UI over the data API: each visitor sees the collections they may read",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "zveltioMinVersion": "3.0.0-beta.96",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-api-docs",
@@ -34,9 +34,9 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "6f46e1a7697e74b51d0a2715e3dd7154e4cb7f1712bafdc2732aeb9a4aae95ad",
-    "sourceSha256": "8a2489f4e14b2e1c1f09c38e37b8fdf57b4541c95f55bf3f98140f96e9fdceac",
-    "schemaSha256": "a8cab673d0bc4cdd39861c1366bf7fec171e028504460705b89fcf699b3535c6"
+    "engineSha256": "0aef991a9f00231f4bed7d6bf367061e602aebb59a3d6b9183aa084dfcb8ff83",
+    "sourceSha256": "861e550cf3cdf50d0414cdbff283168664595fe49f49275f58c683dc39e26df5",
+    "schemaSha256": "8a140f1880329319eb85985654b4fa48446637f3c731034fa3ffdf49ffdd2c46"
   },
   "publicRoutes": [
     "/"
@@ -44,5 +44,59 @@
   "collections": [
     "apidoc_changelogs",
     "apidoc_pages"
+  ],
+  "actions": [
+    {
+      "name": "publish",
+      "permission": {
+        "resource": "apidoc_changelogs",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "apidoc_changelogs"
+      ],
+      "writes": [
+        "apidoc_changelogs"
+      ]
+    },
+    {
+      "name": "unpublish",
+      "permission": {
+        "resource": "apidoc_changelogs",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "apidoc_changelogs"
+      ],
+      "writes": [
+        "apidoc_changelogs"
+      ]
+    }
   ]
 }

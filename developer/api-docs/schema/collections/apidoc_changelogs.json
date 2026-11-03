@@ -29,11 +29,13 @@
       "name": "is_published",
       "type": "boolean",
       "required": true,
-      "defaultValue": false
+      "defaultValue": false,
+      "writtenBy": "actions"
     },
     {
       "name": "published_at",
-      "type": "date"
+      "type": "date",
+      "writtenBy": "actions"
     }
   ]
 }

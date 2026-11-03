@@ -1,6 +1,7 @@
 {
   "developer.api-docs.btn.create": "Creează",
   "developer.api-docs.btn.newPage": "Pagină nouă",
+  "developer.api-docs.btn.unpublish": "Retrage publicarea",
   "developer.api-docs.col.public": "Public",
   "developer.api-docs.col.updated": "Actualizat",
   "developer.api-docs.empty": "Niciun date încă.",
