@@ -28,7 +28,7 @@ function app(db: Record<string, Row[] | number>) {
 
 const sites = [
   { id: 's1', slug: 'main', is_active: true, base_path: '/' },
-  { id: 's2', slug: 'docs', is_active: true, base_path: '/docs/' },
+  { id: 's2', slug: 'docs', is_active: true, base_path: 'docs/' },
   { id: 's3', slug: 'off', is_active: false, base_path: '/off' },
 ];
 const pubs = [
@@ -72,6 +72,18 @@ describe('sitemap.xml', () => {
     const xml = await (await get(a, '/sitemap.xml')).text();
     expect(xml.match(/<url>/g)?.length).toBe(501);
     expect(calls.filter((c) => c.collection === 'page_publications').length).toBe(2);
+  });
+});
+
+describe('origin', () => {
+  it('ignores X-Forwarded-Host and an odd X-Forwarded-Proto', async () => {
+    const { a } = app({ page_sites: [sites[0]], page_publications: pubs });
+    const headers = { 'x-forwarded-host': 'evil.test', 'x-forwarded-proto': 'javascript' };
+    const xml = await (await a.request('http://cms.test/ext/content/pages/sitemap.xml', { headers })).text();
+    expect(xml).not.toContain('evil');
+    expect(xml).toContain('<loc>http://cms.test/</loc>');
+    const tls = await a.request('http://cms.test/ext/content/pages/sitemap.xml', { headers: { 'x-forwarded-proto': 'https' } });
+    expect(await tls.text()).toContain('<loc>https://cms.test/</loc>');
   });
 });
 

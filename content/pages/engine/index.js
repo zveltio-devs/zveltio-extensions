@@ -10452,7 +10452,7 @@ function escapeXml(value) {
 async function all(list, c, collection, filter) {
   const out = [];
   for (let page = 1;out.length < MAX_URLS; page++) {
-    const { status, body } = await list(c, collection, { filter, limit: PAGE, page, count: "none" });
+    const { status, body } = await list(c, collection, { filter, limit: PAGE, page, sort: "id", order: "asc", count: "none" });
     if (status !== 200)
       return status;
     const records = Array.isArray(body.records) ? body.records : [];
@@ -10463,8 +10463,9 @@ async function all(list, c, collection, filter) {
   return out;
 }
 function origin(c) {
-  const proto = c.req.header("x-forwarded-proto") || new URL(c.req.url).protocol.replace(":", "");
-  return `${proto}://${c.req.header("x-forwarded-host") || c.req.header("host") || new URL(c.req.url).host}`;
+  const url = new URL(c.req.url);
+  const proto = c.req.header("x-forwarded-proto");
+  return `${proto === "https" || proto === "http" ? proto : url.protocol.slice(0, -1)}://${url.host}`;
 }
 function sitemapRoutes(app, ctx) {
   const list = (c, collection, query) => ctx.internals.listRecords(c, collection, query);
@@ -10474,22 +10475,23 @@ function sitemapRoutes(app, ctx) {
     if (typeof sites === "number")
       return c.body(null, sites);
     const base = origin(c);
-    const urls = [];
+    const urls = new Set;
     for (const site of sites) {
       const pubs = await all(list, c, "page_publications", { site_id: site.id, kind: "page", is_noindex: false });
       if (typeof pubs === "number")
         return c.body(null, pubs);
-      const root = `${base}${String(site.base_path ?? "/").replace(/\/+$/, "")}/`;
+      const path = String(site.base_path ?? "/").replace(/^\/*/, "/").replace(/\/+$/, "");
+      const root = `${base}${path}/`;
       for (const p of pubs) {
         const at = new Date(String(p.published_at));
         const lastmod = Number.isNaN(at.getTime()) ? "" : `<lastmod>${at.toISOString().slice(0, 10)}</lastmod>`;
-        urls.push(`  <url><loc>${escapeXml(p.is_homepage ? root : root + encodeURI(String(p.slug)))}</loc>${lastmod}</url>`);
+        urls.add(`  <url><loc>${escapeXml(p.is_homepage ? root : root + encodeURI(String(p.slug)))}</loc>${lastmod}</url>`);
       }
     }
     c.header("Content-Type", "application/xml; charset=utf-8");
     return c.body(`<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${urls.slice(0, MAX_URLS).join(`
+${[...urls].slice(0, MAX_URLS).join(`
 `)}
 </urlset>
 `);
