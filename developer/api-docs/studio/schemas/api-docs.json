@@ -41,14 +41,28 @@
           "id": "publish",
           "label": "common.publish",
           "icon": "Send",
-          "method": "PATCH",
-          "endpoint": "/api/data/apidoc_changelogs/{id}",
+          "method": "POST",
+          "endpoint": "/ext/developer/api-docs/actions/publish",
           "visibleWhen": {
             "field": "is_published",
             "equals": false
           },
           "body": {
-            "is_published": true
+            "id": "{id}"
+          }
+        },
+        {
+          "id": "unpublish",
+          "label": "developer.api-docs.btn.unpublish",
+          "icon": "EyeOff",
+          "method": "POST",
+          "endpoint": "/ext/developer/api-docs/actions/unpublish",
+          "visibleWhen": {
+            "field": "is_published",
+            "equals": true
+          },
+          "body": {
+            "id": "{id}"
           }
         },
         {
@@ -76,12 +90,6 @@
             "name": "title",
             "label": "common.col.title",
             "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "published_at",
-            "label": "common.col.date",
-            "type": "date",
             "colSpan": 1
           },
           {

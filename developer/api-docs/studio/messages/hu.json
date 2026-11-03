@@ -1,6 +1,7 @@
 {
   "developer.api-docs.btn.create": "Létrehozás",
   "developer.api-docs.btn.newPage": "Új oldal",
+  "developer.api-docs.btn.unpublish": "Közzététel visszavonása",
   "developer.api-docs.col.public": "Nyilvános",
   "developer.api-docs.col.updated": "Frissítve",
   "developer.api-docs.empty": "Még nincsenek adatok.",

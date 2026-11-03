@@ -1,6 +1,7 @@
 {
   "developer.api-docs.btn.create": "Aanmaken",
   "developer.api-docs.btn.newPage": "Nieuwe pagina",
+  "developer.api-docs.btn.unpublish": "Publicatie intrekken",
   "developer.api-docs.col.public": "Openbaar",
   "developer.api-docs.col.updated": "Bijgewerkt",
   "developer.api-docs.empty": "Nog geen gegevens.",
