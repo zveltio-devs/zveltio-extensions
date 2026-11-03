@@ -3,6 +3,19 @@
 import { join } from "path";
 // /zveltio-extension/packages/sdk/src/extension/action-refusal.ts
 var ACTION_REFUSAL = Symbol.for("zveltio.extension.action-refusal");
+// /zveltio-extension/packages/sdk/src/extension/reserved-paths.ts
+var RESERVED_PATH_SEGMENTS = Object.freeze([
+  "api",
+  "ext",
+  "admin",
+  "app",
+  "auth",
+  "_app",
+  "_server",
+  ".well-known",
+  "robots.txt",
+  "sitemap.xml"
+]);
 // /zveltio-extension/packages/sdk/src/extension/multipart.ts
 var MULTIPART_REQUIRED = { error: "Expected a multipart/form-data body." };
 async function readMultipart(c) {
@@ -11710,7 +11723,8 @@ var extension = {
       join(import.meta.dir, "migrations/001_initial.sql"),
       join(import.meta.dir, "migrations/002_tenant_rls.sql"),
       join(import.meta.dir, "migrations/003_tenant_scoped_unique_keys.sql"),
-      join(import.meta.dir, "migrations/004_hash_access_log_share_tokens.sql")
+      join(import.meta.dir, "migrations/004_hash_access_log_share_tokens.sql"),
+      join(import.meta.dir, "migrations/005_media_favorites.sql")
     ];
   },
   async register(app, ctx) {
