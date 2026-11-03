@@ -13280,13 +13280,10 @@ function graphqlRoutes(ctx) {
     if (!user)
       return c.json({ errors: [{ message: "Unauthorized" }] }, 401);
     const name = c.req.param("name");
-    const [canRead, scope] = await Promise.all([
-      ctx.internals.checkAccess(db, user, "graphql_queries", "read"),
-      ctx.internals.readScope("graphql_queries", user, isApiKey(user) ? "api_key" : "session")
-    ]);
-    if (canRead !== true) {
+    if (await ctx.internals.checkAccess(db, user, "graphql_queries", "read") !== true) {
       return c.json({ errors: [{ message: "Access denied to this persisted query" }] }, 403);
     }
+    const scope = await ctx.internals.readScope("graphql_queries", user, isApiKey(user) ? "api_key" : "session");
     const pqRes = await sql`
       SELECT * FROM zvd_graphql_queries WHERE name = ${name} AND tenant_id = ${OWN_TENANT}
     `.execute(db);

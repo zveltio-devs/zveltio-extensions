@@ -641,13 +641,10 @@ export function graphqlRoutes(ctx: ExtensionContext): Hono {
     // caller, under the caller's own permissions, like any query posted to `/`.
     // The collection has no default grants: whoever may edit a stored query
     // chooses what its readers execute, mutations included.
-    const [canRead, scope] = await Promise.all([
-      ctx.internals.checkAccess(db, user, 'graphql_queries', 'read'),
-      ctx.internals.readScope('graphql_queries', user, isApiKey(user) ? 'api_key' : 'session'),
-    ]);
-    if (canRead !== true) {
+    if ((await ctx.internals.checkAccess(db, user, 'graphql_queries', 'read')) !== true) {
       return c.json({ errors: [{ message: 'Access denied to this persisted query' }] }, 403);
     }
+    const scope = await ctx.internals.readScope('graphql_queries', user, isApiKey(user) ? 'api_key' : 'session');
     const pqRes = await sql<any>`
       SELECT * FROM zvd_graphql_queries WHERE name = ${name} AND tenant_id = ${OWN_TENANT}
     `.execute(db);

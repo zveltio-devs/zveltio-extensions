@@ -743,7 +743,9 @@ async function makeCtx(
 
 /**
  * The actor `transactionUser` publishes: that user, holding every collection
- * grant, as the engine's `ALL_COLLECTIONS_ACTOR` (testing/app-harness.ts). A
+ * grant — the engine's `ALL_COLLECTIONS_ACTOR` (testing/app-harness.ts), named
+ * instead of anonymous. Every `transactionUser` today is a god, who holds them
+ * in the product too. A
  * real request always has an actor, and without one the collection permissions
  * give an extension's statement on a declared collection no rows. Tests whose
  * subject IS collection permissions use the engine's real request chain.

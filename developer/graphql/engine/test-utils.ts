@@ -1,8 +1,7 @@
 /**
  * Shared helpers for this extension's bespoke tests.
  *
- * `applyOwnCollections` creates the declared collections (`graphql_queries`,
- * `graphql_logs`) through the engine's own load path, for a test file that
+ * `applyOwnCollections` creates the declared collection `graphql_queries` through the engine's own load path, for a test file that
  * builds its own app and so has nothing else that applies them. `bun test`
  * orders files by readdir, not alphabetically, so relying on another file
  * having applied them first is luck. Idempotent; `dropOwnCollections` undoes it.
