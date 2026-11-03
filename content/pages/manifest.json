@@ -3,7 +3,7 @@
   "displayName": "Pages",
   "category": "content",
   "description": "Pages built from blocks, grouped into sites. Authors edit drafts; publishing writes the sanitized snapshot a public website or a signed-in portal renders, read through the data API under the engine's rules.",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "zveltioMinVersion": "3.0.0-beta.99",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-pages",
@@ -56,7 +56,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "580893d93688ec05fcb397c84cdbed6a4eb6c33ca0015f4fbe5e4d076fa3e9bd",
+    "engineSha256": "bd806b5476afc228438412e3eb175eb52f814541f4d14a0389f7458afac9eefc",
     "sourceSha256": "c651af8bbcd7591413d410889499ac422b3fcee740946768c8280e89a52f6c79",
     "schemaSha256": "962d955615bf4644d9d733fff32661eca9b832975fda3656f8cbf4e1583775cb"
   },

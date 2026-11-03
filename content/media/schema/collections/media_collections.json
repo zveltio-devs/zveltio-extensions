@@ -1,0 +1,25 @@
+{
+  "name": "media_collections",
+  "defaultGrants": false,
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "description",
+      "type": "textarea"
+    },
+    {
+      "name": "cover_file_id",
+      "type": "uuid"
+    },
+    {
+      "name": "is_public",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": false
+    }
+  ]
+}

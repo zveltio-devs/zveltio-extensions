@@ -5,67 +5,11 @@
   "newLabel": "common.new",
   "resources": [
     {
-      "id": "folders",
-      "label": "content.media.ui.folders",
-      "icon": "Folder",
-      "dataSource": "/ext/content/media/folders",
-      "dataPath": "folders",
-      "columns": [
-        {
-          "key": "name",
-          "label": "content.media.ui.folder_name"
-        },
-        {
-          "key": "description",
-          "label": "common.col.description"
-        }
-      ],
-      "rowActions": [
-        {
-          "id": "delete",
-          "icon": "Trash2",
-          "variant": "text-error",
-          "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/ext/content/media/folders/{id}",
-          "confirm": "content.media.confirm.deleteFolderMsg"
-        }
-      ],
-      "form": {
-        "endpoint": "/ext/content/media/folders",
-        "fields": [
-          {
-            "name": "name",
-            "label": "content.media.ui.folder_name",
-            "required": true,
-            "colSpan": 2
-          },
-          {
-            "name": "description",
-            "label": "common.col.description",
-            "colSpan": 2
-          },
-          {
-            "name": "parent_id",
-            "label": "common.col.parent",
-            "type": "relation",
-            "colSpan": 2,
-            "relation": {
-              "dataSource": "/ext/content/media/folders",
-              "dataPath": "folders",
-              "valueKey": "id",
-              "labelKey": "name"
-            }
-          }
-        ]
-      }
-    },
-    {
       "id": "tags",
       "label": "content.media.ui.tags",
       "icon": "Tag",
-      "dataSource": "/ext/content/media/tags",
-      "dataPath": "tags",
+      "dataSource": "/api/data/media_tags?sort=name&order=asc&limit=500",
+      "dataPath": "records",
       "columns": [
         {
           "key": "name",
@@ -84,12 +28,12 @@
           "variant": "text-error",
           "label": "common.delete",
           "method": "DELETE",
-          "endpoint": "/ext/content/media/tags/{id}",
+          "endpoint": "/api/data/media_tags/{id}",
           "confirm": "ext.confirmDelete"
         }
       ],
       "form": {
-        "endpoint": "/ext/content/media/tags",
+        "endpoint": "/api/data/media_tags",
         "fields": [
           {
             "name": "name",
@@ -110,8 +54,8 @@
       "id": "collections",
       "label": "content.media.tab.collections",
       "icon": "Images",
-      "dataSource": "/ext/content/media/collections",
-      "dataPath": "collections",
+      "dataSource": "/api/data/media_collections?sort=name&order=asc&limit=500",
+      "dataPath": "records",
       "columns": [
         {
           "key": "name",
@@ -139,12 +83,12 @@
           "variant": "text-error",
           "label": "common.delete",
           "method": "DELETE",
-          "endpoint": "/ext/content/media/collections/{id}",
+          "endpoint": "/api/data/media_collections/{id}",
           "confirm": "ext.confirmDelete"
         }
       ],
       "form": {
-        "endpoint": "/ext/content/media/collections",
+        "endpoint": "/api/data/media_collections",
         "fields": [
           {
             "name": "name",

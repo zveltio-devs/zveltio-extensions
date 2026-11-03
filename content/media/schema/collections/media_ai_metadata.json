@@ -1,0 +1,42 @@
+{
+  "name": "media_ai_metadata",
+  "fields": [
+    {
+      "name": "file_id",
+      "type": "uuid",
+      "required": true,
+      "indexed": true,
+      "unique": true
+    },
+    {
+      "name": "ai_labels",
+      "type": "tags"
+    },
+    {
+      "name": "ai_description",
+      "type": "textarea"
+    },
+    {
+      "name": "dominant_color",
+      "type": "color"
+    },
+    {
+      "name": "ocr_text",
+      "type": "textarea"
+    },
+    {
+      "name": "nsfw_score",
+      "type": "decimal"
+    },
+    {
+      "name": "is_nsfw",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": false
+    },
+    {
+      "name": "analyzed_at",
+      "type": "datetime"
+    }
+  ]
+}

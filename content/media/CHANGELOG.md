@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.0.0 (2026-11-03)
+
+- feat!: files, folders and uploads are the engine's own `/api/storage` (upload with the engine's storage quota, list, folders, signed URLs, transforms, delete). The extension's duplicate routes for them are dropped: `/files`, `/files/:id`, `/upload`, `/folders`, `DELETE /folders/:id` (the engine has no folder delete yet), `PATCH` of a file's title/description/alt text, `/stats` and `/admin/quotas`
+- feat!: what the extension adds is declared collections, created and owned by the engine and served by the data API, each referencing a file by `file_id`: `media_tags` and `media_file_tags` (unique per file and tag), `media_favorites`, `media_collections` and `media_collection_files` (unique per collection and file, ordered by `sort_order`), and `media_ai_metadata` (one row per file). No SQL migrations and no routes. The 1.x tables (`zv_media_favorites`, `zv_media_ai_metadata`, `zv_media_collections`, `zv_media_collection_files`, `zv_media_cdn_invalidations`) are no longer written or read, their rows are not carried over, and the tables are left in place; the engine's `zv_media_tags` / `zv_media_file_tags` are no longer written by this extension
+- feat!: who may tag, favorite or curate is the engine's rules on those collections; the 1.x `media` permission resource and its owner checks in code are gone. `media_favorites`, `media_collections` and `media_collection_files` have no default grants, because 1.x kept a user's favorites and private collections to that user: the operator grants them with a row rule, for example `created_by eq user_id` on favorites and `created_by eq user_id` or `is_public eq true` for reading collections. A `file_id` names a file of the engine's storage, whose own reads stay scoped to the tenant and the file's visibility
+- feat!: what 1.x did around files and no longer happens: tag assignments in the engine's `zv_media_tags` / `zv_media_file_tags` are not carried into `media_tags` / `media_file_tags`; a delete is the engine's, which removes the file instead of moving it to the trash; the file list is the engine's, by folder (root when none), without the 1.x `tag`, `search` and `mime_type` filters or embedded tags; an upload is no longer sent to the `ai` extension for indexing (the optional dependency is dropped); a media collection lists file ids, not file rows, and 1.x's `added_by` is the row's `created_by`
+- feat!: `file_id` and `cover_file_id` are plain ids, not foreign keys to the engine's files: deleting a file leaves its tags, favorites, collection entries and AI metadata in place until they are deleted, and a favorite can be recorded twice (1.x keyed favorites on user and file)
+- feat!: CDN invalidation is dropped: it calls an external provider, which waits for the engine's egress proxy (RFC phase D)
+- feat!: the Studio page manages tags and media collections; files and folders are managed where the engine serves them
+- chore: the legacy `database`, `files` and `storage` permission labels are dropped
+
 ## 1.0.14 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)

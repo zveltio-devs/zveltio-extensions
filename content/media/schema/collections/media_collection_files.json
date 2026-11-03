@@ -1,0 +1,48 @@
+{
+  "name": "media_collection_files",
+  "defaultGrants": false,
+  "fields": [
+    {
+      "name": "collection_id",
+      "type": "m2o",
+      "options": {
+        "related_collection": "media_collections"
+      },
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "file_id",
+      "type": "uuid",
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "sort_order",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0
+    }
+  ],
+  "indexes": [
+    {
+      "fields": [
+        "collection_id",
+        "file_id"
+      ],
+      "unique": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "media_collection_files_collection_id",
+      "type": "m2o",
+      "field": "collection_id",
+      "target": "media_collections",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

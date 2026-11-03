@@ -1,0 +1,41 @@
+{
+  "name": "media_file_tags",
+  "fields": [
+    {
+      "name": "file_id",
+      "type": "uuid",
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "tag_id",
+      "type": "m2o",
+      "options": {
+        "related_collection": "media_tags"
+      },
+      "required": true,
+      "indexed": true
+    }
+  ],
+  "indexes": [
+    {
+      "fields": [
+        "file_id",
+        "tag_id"
+      ],
+      "unique": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "media_file_tags_tag_id",
+      "type": "m2o",
+      "field": "tag_id",
+      "target": "media_tags",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}
