@@ -4873,6 +4873,9 @@ async function parseWebhook(rawBody, signature, secret) {
   if (!event?.id || !event.type || !obj || typeof obj !== "object" || Array.isArray(obj)) {
     return { error: "Event is missing id, type or data.object" };
   }
+  if (typeof event.created !== "number" || !Number.isFinite(event.created)) {
+    return { error: "Event is missing a numeric created" };
+  }
   return { event };
 }
 var STATUSES = new Set([
@@ -4885,64 +4888,60 @@ var STATUSES = new Set([
   "unpaid",
   "paused"
 ]);
-var at = (s) => typeof s === "number" ? new Date(s * 1000) : null;
-async function applyStripeEvent(db, event) {
-  const claimed = await sql`
-    INSERT INTO zvd_billing_webhook_events (event_id, event_type)
-    VALUES (${event.id}, ${event.type})
-    ON CONFLICT (tenant_id, event_id) DO NOTHING
-    RETURNING id
-  `.execute(db);
-  if (claimed.rows.length === 0)
-    return false;
+var SUBSCRIPTIONS = "billing_subscriptions";
+var PLANS = "billing_plans";
+var at = (s) => typeof s === "number" ? new Date(s * 1000).toISOString() : null;
+async function first(host, collection, filter) {
+  const res = await host.collections.list(collection, { filter, limit: 1, count: "none" });
+  return (res.records ?? [])[0] ?? null;
+}
+var newer = (row, when) => row.last_event_at == null || new Date(row.last_event_at) <= new Date(when);
+var unchangedSince = (row) => ({ expect: { last_event_at: [row.last_event_at ?? null] } });
+async function applyStripeEvent(event, host) {
   const obj = event.data.object;
-  const when = at(event.created) ?? new Date;
+  const when = new Date(event.created * 1000).toISOString();
   switch (event.type) {
     case "customer.subscription.created":
     case "customer.subscription.updated":
     case "customer.subscription.deleted": {
       const status = event.type === "customer.subscription.deleted" ? "canceled" : String(obj.status);
       if (typeof obj.id !== "string" || !STATUSES.has(status))
-        break;
+        return;
       const item = obj.items?.data?.[0];
       const start = at(obj.current_period_start ?? item?.current_period_start);
       const end = at(obj.current_period_end ?? item?.current_period_end);
       const price = typeof item?.price?.id === "string" ? item.price.id : null;
-      await sql`
-        INSERT INTO zvd_billing_subscriptions
-          (stripe_subscription_id, plan_id, status, current_period_start, current_period_end, last_event_at)
-        VALUES (
-          ${obj.id},
-          (SELECT id FROM zvd_billing_plans WHERE stripe_price_id = ${price}),
-          ${status}, ${start}, ${end}, ${when}
-        )
-        ON CONFLICT (tenant_id, stripe_subscription_id) DO UPDATE SET
-          plan_id = COALESCE(EXCLUDED.plan_id, zvd_billing_subscriptions.plan_id),
-          status = EXCLUDED.status,
-          current_period_start = COALESCE(EXCLUDED.current_period_start, zvd_billing_subscriptions.current_period_start),
-          current_period_end = COALESCE(EXCLUDED.current_period_end, zvd_billing_subscriptions.current_period_end),
-          last_event_at = EXCLUDED.last_event_at,
-          updated_at = NOW()
-        WHERE zvd_billing_subscriptions.last_event_at IS NULL
-           OR zvd_billing_subscriptions.last_event_at <= EXCLUDED.last_event_at
-      `.execute(db);
-      break;
+      const plan = price ? await first(host, PLANS, { stripe_price_id: price }) : null;
+      const row = await first(host, SUBSCRIPTIONS, { stripe_subscription_id: obj.id });
+      const change = { status, last_event_at: when };
+      if (plan)
+        change.plan_id = plan.id;
+      if (start)
+        change.current_period_start = start;
+      if (end)
+        change.current_period_end = end;
+      if (!row) {
+        await host.collections.insert(SUBSCRIPTIONS, { stripe_subscription_id: obj.id, ...change });
+      } else if (newer(row, when)) {
+        await host.collections.update(SUBSCRIPTIONS, row.id, change, unchangedSince(row));
+      }
+      return;
     }
     case "invoice.payment_succeeded":
     case "invoice.payment_failed": {
       const sub = obj.subscription ?? obj.parent?.subscription_details?.subscription;
       if (typeof sub !== "string")
-        break;
+        return;
+      const row = await first(host, SUBSCRIPTIONS, { stripe_subscription_id: sub });
+      if (!row)
+        throw new Error(`subscription ${sub} is not recorded yet; retrying ${event.id}`);
+      if (row.status === "canceled" || !newer(row, when))
+        return;
       const status = event.type === "invoice.payment_succeeded" ? "active" : "past_due";
-      await sql`
-        UPDATE zvd_billing_subscriptions SET status = ${status}, last_event_at = ${when}, updated_at = NOW()
-        WHERE stripe_subscription_id = ${sub} AND status <> 'canceled'
-          AND (last_event_at IS NULL OR last_event_at <= ${when})
-      `.execute(db);
-      break;
+      await host.collections.update(SUBSCRIPTIONS, row.id, { status, last_event_at: when }, unchangedSince(row));
+      return;
     }
   }
-  return true;
 }
 
 // engine/index.ts
@@ -4950,17 +4949,49 @@ var engine_default = defineExtension(["data:system"], {
   name: "billing",
   category: "billing",
   mountStrategy: "subapp",
+  jobs: {
+    applyEvent: (input, host) => applyStripeEvent(input, host)
+  },
   async register(app, ctx) {
     const routes = new Hono2;
+    async function tenantSecret(tenant) {
+      const row = await ctx.db.selectFrom("zvd_billing_settings").select("stripe_webhook_secret").where("tenant_id", "=", tenant).executeTakeFirst();
+      const stored = row?.stripe_webhook_secret ? String(await ctx.internals.maybeDecrypt(row.stripe_webhook_secret, true)) : "";
+      if (stored.startsWith("enc:")) {
+        console.error("[billing] the tenant webhook secret cannot be decrypted (FIELD_ENCRYPTION_KEY changed?)");
+        return "";
+      }
+      if (stored)
+        return stored;
+      return await ctx.internals.isSingleTenantInstance() ? ctx.config.vars.STRIPE_WEBHOOK_SECRET ?? "" : "";
+    }
     routes.post("/webhook/stripe", async (c) => {
-      const secret = ctx.config.vars.STRIPE_WEBHOOK_SECRET ?? "";
-      if (!secret)
-        return c.json({ error: "Webhook secret not configured" }, 503);
-      const { event, error } = await parseWebhook(await c.req.text(), c.req.header("stripe-signature") ?? "", secret);
-      if (!event)
-        return c.json({ error }, 400);
-      await ctx.internals.asSystem(["billing_webhook_events", "billing_subscriptions", "billing_plans"], () => applyStripeEvent(ctx.db, event), { reason: `stripe ${event.type}` });
-      return c.json({ received: true });
+      const signature = c.req.header("stripe-signature") ?? "";
+      if (!signature)
+        return c.json({ error: "Missing stripe-signature header" }, 400);
+      const raw = await c.req.text();
+      const tenant = ctx.internals.getSingleTenantId();
+      if (!tenant)
+        return c.json({ error: "No tenant" }, 400);
+      const answer = await ctx.internals.asSystem(["billing_settings", "billing_webhook_events"], async () => {
+        const secret = await tenantSecret(tenant);
+        if (!secret)
+          return { status: 503, body: { error: "Webhook secret not configured" } };
+        const { event, error } = await parseWebhook(raw, signature, secret);
+        if (!event)
+          return { status: 400, body: { error } };
+        const claimed = await sql`
+            INSERT INTO zvd_billing_webhook_events (event_id, event_type, payload)
+            VALUES (${event.id}, ${event.type}, (${raw}::text)::jsonb)
+            ON CONFLICT (tenant_id, event_id) DO NOTHING
+            RETURNING id
+          `.execute(ctx.db);
+        if (claimed.rows.length === 0)
+          return { status: 200, body: { received: true, duplicate: true } };
+        await ctx.internals.enqueue(c, "applyEvent", event);
+        return { status: 200, body: { received: true } };
+      }, { reason: "stripe webhook" });
+      return c.json(answer.body, answer.status);
     });
     app.route("/", routes);
   }

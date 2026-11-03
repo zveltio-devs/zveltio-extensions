@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.1.0 (2026-11-03)
+
+- feat: `POST /webhook/stripe` no longer writes subscriptions. It verifies the signature, records the event id with the raw event in `billing_webhook_events` (new field `payload`), and enqueues the `applyEvent` job; the job writes `billing_subscriptions` through the data API (ADR 0018). The claim and the job commit together in the request's transaction: a replayed or retried event finds its id claimed, answers `{"received": true, "duplicate": true}` and queues nothing
+- feat!: `billing_subscriptions` is `writtenBy: "actions"` again: only this extension's job writes it; an administrator's data API write is refused
+- feat!: the webhook secret is per tenant, in the new `billing_settings` collection (one row per tenant, `stripe_webhook_secret` encrypted at rest, so the instance needs `FIELD_ENCRYPTION_KEY`); Studio has a Settings tab for it. The tenant is the request's: the endpoint is `https://<tenant>.<domain>/ext/billing/webhook/stripe`, one Stripe endpoint per tenant. `ZVELTIO_EXT_BILLING_STRIPE_WEBHOOK_SECRET` is read only while the instance has one tenant: on a multi-tenant instance a tenant without its own secret answers 503, and no tenant's endpoint accepts an event signed with another tenant's secret or the environment's
+- fix: an event without a numeric `created` is refused (400): it orders events per subscription, and a retried run would have ordered it by the time it ran; an invoice event that arrives before its subscription fails the run, which retries with backoff until `customer.subscription.*` has created the row, instead of being dropped; a stored secret that cannot be decrypted (`FIELD_ENCRYPTION_KEY` changed) answers 503 and logs, instead of refusing every event as a bad signature
+- the job retries 5 times with backoff; a run that fails them all leaves its event claimed, recorded as `extension.job.executed` with `outcome: failure` — delete the `billing_webhook_events` row and resend the event from Stripe to apply it again
+- requires engine 3.0.0-beta.97
+
 ## 2.0.0 (2026-11-02)
 
 - feat!: plans, subscriptions, usage events and webhook event ids are 4 collections declared in `schema/collections/` and created and owned by the engine (`billing_plans`, `billing_subscriptions`, `billing_usage_events`, `billing_webhook_events`); no SQL migrations

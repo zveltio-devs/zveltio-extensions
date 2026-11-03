@@ -12,6 +12,10 @@
       "name": "event_type",
       "type": "text",
       "required": true
+    },
+    {
+      "name": "payload",
+      "type": "json"
     }
   ]
 }

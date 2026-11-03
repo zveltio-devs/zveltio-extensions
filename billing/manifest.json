@@ -3,8 +3,8 @@
   "displayName": "Billing & Usage",
   "category": "billing",
   "description": "Usage metering and Stripe billing integration",
-  "version": "2.0.0",
-  "zveltioMinVersion": "3.0.0-beta.96",
+  "version": "2.1.0",
+  "zveltioMinVersion": "3.0.0-beta.97",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-billing",
   "permissions": [
@@ -16,8 +16,61 @@
   "publicRoutes": [
     "/webhook/stripe"
   ],
+  "jobs": [
+    {
+      "name": "applyEvent",
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "created",
+          "data"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1
+          },
+          "created": {
+            "type": "integer"
+          },
+          "data": {
+            "type": "object",
+            "required": [
+              "object"
+            ],
+            "properties": {
+              "object": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      },
+      "reads": [
+        "billing_plans",
+        "billing_subscriptions"
+      ],
+      "writes": [
+        "billing_subscriptions"
+      ],
+      "fromPublicRoutes": [
+        "/webhook/stripe"
+      ],
+      "retry": {
+        "limit": 5,
+        "backoff": true
+      }
+    }
+  ],
   "collections": [
     "billing_plans",
+    "billing_settings",
     "billing_subscriptions",
     "billing_webhook_events",
     "billing_usage_events"
@@ -45,8 +98,8 @@
     "studio": true
   },
   "integrity": {
-    "engineSha256": "7360b01398caa41355d2b10676dec11bab63c09248bf9a453be034e2a1a7b816",
-    "sourceSha256": "f2b5c172d7f4e8a03b8a798689d508dab680274742b3d5b28bb770a70bc39f80",
-    "schemaSha256": "44f580a51e844cecf975ebd72f5dd81794eaadd9d3e7b09df0a191ff0bac199f"
+    "engineSha256": "5be798273b3ba5a2913292f9c6ef40091b389b638af31eecf84f986b4ba9bcb5",
+    "sourceSha256": "eea102f3b1b0c2890ef3fb32c2d407d04c165d79b1d8ea1fe10d646924bc5ac1",
+    "schemaSha256": "2289edc0c829f3459fd36ec636d12e217bef73ac87e785abdb1c672ba061dadb"
   }
 }

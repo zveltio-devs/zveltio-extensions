@@ -1,0 +1,23 @@
+{
+  "name": "billing_settings",
+  "defaultGrants": false,
+  "fields": [
+    {
+      "name": "scope",
+      "type": "enum",
+      "required": true,
+      "unique": true,
+      "defaultValue": "tenant",
+      "options": {
+        "values": [
+          "tenant"
+        ]
+      }
+    },
+    {
+      "name": "stripe_webhook_secret",
+      "type": "text",
+      "encrypted": true
+    }
+  ]
+}

@@ -1,13 +1,10 @@
 // The webhook's two halves: a signature check that refuses anything Stripe did
-// not sign, and an apply that writes each event id once. The apply runs on the
-// engine's declared tables (skipped without TEST_DATABASE_URL).
-import { afterAll, describe, expect, it } from 'bun:test';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+// not sign, and the `applyEvent` job over an in-memory data API. What the data
+// API checks (`writtenBy`, `expect`, the unique key) is the engine's; the route,
+// the queue and the real collections are `../webhook.test.ts`.
+import { describe, expect, it } from 'bun:test';
 import { applyStripeEvent, parseWebhook, type StripeEvent } from './stripe-client';
 
-const ENGINE = join(import.meta.dir, '../../../../zveltio/packages/engine/src');
-const EXT_DIR = join(import.meta.dir, '../..');
 const SECRET = 'whsec_test';
 
 async function sign(body: string, t = Math.floor(Date.now() / 1000), secret = SECRET): Promise<string> {
@@ -23,7 +20,7 @@ async function sign(body: string, t = Math.floor(Date.now() / 1000), secret = SE
 }
 
 describe('parseWebhook', () => {
-  const body = JSON.stringify({ id: 'evt_1', type: 'invoice.payment_failed', data: { object: {} } });
+  const body = JSON.stringify({ id: 'evt_1', type: 'invoice.payment_failed', created: 1_700_000_000, data: { object: {} } });
 
   it('accepts what Stripe signed', async () => {
     expect((await parseWebhook(body, await sign(body), SECRET)).event?.id).toBe('evt_1');
@@ -34,23 +31,44 @@ describe('parseWebhook', () => {
     expect((await parseWebhook(body, await sign(body, Math.floor(Date.now() / 1000) - 600), SECRET)).event).toBeUndefined();
     expect((await parseWebhook(`${body} `, await sign(body), SECRET)).event).toBeUndefined();
   });
+
+  it('refuses an event without a numeric created, which orders it', async () => {
+    const bare = JSON.stringify({ id: 'evt_2', type: 'invoice.payment_failed', data: { object: {} } });
+    expect((await parseWebhook(bare, await sign(bare), SECRET)).error).toContain('created');
+  });
 });
 
-const d = process.env.TEST_DATABASE_URL ? describe : describe.skip;
+type Row = Record<string, unknown>;
 
-d('applyStripeEvent', () => {
-  const manifest = JSON.parse(readFileSync(join(EXT_DIR, 'manifest.json'), 'utf8'));
-  const COLLECTIONS: string[] = manifest.collections;
-  let db: any;
-  let sql: any;
+function fakeHost() {
+  const tables: Record<string, Row[]> = {
+    billing_plans: [{ id: 'plan-pro', stripe_price_id: 'price_pro' }],
+    billing_subscriptions: [],
+  };
+  const matches = (r: Row, f: Row) => Object.entries(f).every(([k, v]) => r[k] === v);
+  const host = {
+    timezone: 'UTC',
+    collections: {
+      list: async (c: string, q?: { filter?: Row }) => ({ records: tables[c]!.filter((r) => matches(r, q?.filter ?? {})) }),
+      insert: async (c: string, data: Row) => {
+        const row = { id: `${c}-${tables[c]!.length + 1}`, last_event_at: null, ...data };
+        tables[c]!.push(row);
+        return row;
+      },
+      update: async (c: string, id: string, data: Row, opts?: { expect?: Record<string, unknown[]> }) => {
+        const row = tables[c]!.find((r) => r.id === id)!;
+        for (const [k, vs] of Object.entries(opts?.expect ?? {})) {
+          if (!vs.includes(row[k] ?? null)) throw Object.assign(new Error('changed'), { code: 'precondition_failed' });
+        }
+        return Object.assign(row, data);
+      },
+    },
+  };
+  const status = (id: string) => tables.billing_subscriptions!.find((r) => r.stripe_subscription_id === id)?.status;
+  return { host: host as never, tables, status };
+}
 
-  afterAll(async () => {
-    if (!db) return;
-    const { dropTestCollection } = await import(join(ENGINE, 'testing/app-harness.js'));
-    await sql`DELETE FROM zvd_relations WHERE source_collection IN (${sql.join(COLLECTIONS)})`.execute(db);
-    for (const c of [...COLLECTIONS].reverse()) await dropTestCollection(db, c);
-  });
-
+describe('applyStripeEvent (the applyEvent job)', () => {
   let clock = 1_700_000_000;
   const sub = (type: string, object: Record<string, unknown>, created = ++clock): StripeEvent => ({
     id: `evt_${crypto.randomUUID()}`,
@@ -58,66 +76,67 @@ d('applyStripeEvent', () => {
     created,
     data: { object },
   });
-  const status = async (id: string) =>
-    (await sql`SELECT status FROM zvd_billing_subscriptions WHERE stripe_subscription_id = ${id}`.execute(db)).rows[0]
-      ?.status;
 
-  it('creates the subscription on its plan, moves it, and applies each event once', async () => {
-    ({ sql } = await import(join(ENGINE, '../node_modules/kysely/dist/index.js')));
-    const { getTestApp } = await import(join(ENGINE, 'testing/app-harness.js'));
-    const { applyDeclaredCollections, readDeclaredCollections } = await import(
-      join(ENGINE, 'lib/extensions/declared-collections.js')
-    );
-    ({ db } = await getTestApp());
-    const files = await readDeclaredCollections(manifest.name, EXT_DIR, COLLECTIONS, manifest.integrity?.schemaSha256);
-    await applyDeclaredCollections(db, manifest.name, files, true);
-
-    const plan = await sql`
-      INSERT INTO zvd_billing_plans (name, stripe_price_id, price_cents) VALUES ('Pro', 'price_pro', 4900) RETURNING id
-    `.execute(db);
+  it('creates the subscription on its plan, then moves it', async () => {
+    const { host, tables } = fakeHost();
     const created = sub('customer.subscription.created', {
       id: 'sub_1',
       status: 'trialing',
       items: { data: [{ price: { id: 'price_pro' }, current_period_start: 1_700_000_000, current_period_end: 1_702_592_000 }] },
     });
-    expect(await applyStripeEvent(db, created)).toBe(true);
-    expect(await applyStripeEvent(db, created)).toBe(false);
+    await applyStripeEvent(created, host);
+    // A retried run changes nothing.
+    await applyStripeEvent(created, host);
+    await applyStripeEvent(sub('invoice.payment_failed', { parent: { subscription_details: { subscription: 'sub_1' } } }), host);
 
-    const failed = sub('invoice.payment_failed', { parent: { subscription_details: { subscription: 'sub_1' } } });
-    expect(await applyStripeEvent(db, failed)).toBe(true);
+    expect(tables.billing_subscriptions).toHaveLength(1);
+    expect(tables.billing_subscriptions![0]).toMatchObject({
+      stripe_subscription_id: 'sub_1',
+      plan_id: 'plan-pro',
+      status: 'past_due',
+      current_period_end: new Date(1_702_592_000_000).toISOString(),
+    });
 
-    const row = (
-      await sql`SELECT plan_id, status, current_period_end FROM zvd_billing_subscriptions WHERE stripe_subscription_id = 'sub_1'`.execute(db)
-    ).rows[0];
-    expect(row.plan_id).toBe(plan.rows[0].id);
-    expect(row.status).toBe('past_due');
-    expect(new Date(row.current_period_end).getTime()).toBe(1_702_592_000_000);
-
-    // A replayed `created` must not undo the later payment failure.
-    expect(await applyStripeEvent(db, created)).toBe(false);
-    expect(await status('sub_1')).toBe('past_due');
-  }, 120_000);
-
-  it('ignores an event older than the last one applied, and never revives a canceled one', async () => {
-    const created = sub('customer.subscription.created', { id: 'sub_2', status: 'active' });
-    const stale = sub('customer.subscription.updated', { id: 'sub_2', status: 'past_due' }, created.created! - 10);
-    await applyStripeEvent(db, created);
-    await applyStripeEvent(db, stale);
-    expect(await status('sub_2')).toBe('active');
-
-    await applyStripeEvent(db, sub('customer.subscription.deleted', { id: 'sub_2', status: 'canceled' }));
-    await applyStripeEvent(db, sub('invoice.payment_succeeded', { subscription: 'sub_2' }));
-    expect(await status('sub_2')).toBe('canceled');
+    // A replayed `created` (older) must not undo the later payment failure.
+    await applyStripeEvent(created, host);
+    expect(tables.billing_subscriptions![0]!.status).toBe('past_due');
   });
 
-  it('releases the claim when the change fails, so the retry applies', async () => {
-    const event = sub('customer.subscription.created', { id: 'sub_3', status: 'active' });
-    await expect(
-      db.transaction().execute(async (trx: any) => {
-        await applyStripeEvent(trx, event);
-        throw new Error('change failed');
+  it('ignores an event older than the last one applied, and never revives a canceled one', async () => {
+    const { host, status } = fakeHost();
+    const created = sub('customer.subscription.created', { id: 'sub_2', status: 'active' });
+    await applyStripeEvent(created, host);
+    await applyStripeEvent(sub('customer.subscription.updated', { id: 'sub_2', status: 'past_due' }, created.created - 10), host);
+    expect(status('sub_2')).toBe('active');
+
+    await applyStripeEvent(sub('customer.subscription.deleted', { id: 'sub_2', status: 'canceled' }), host);
+    await applyStripeEvent(sub('invoice.payment_succeeded', { subscription: 'sub_2' }), host);
+    expect(status('sub_2')).toBe('canceled');
+  });
+
+  it('throws for an invoice that arrives before its subscription, so the job retries', async () => {
+    const { host, status } = fakeHost();
+    const failed = sub('invoice.payment_failed', { subscription: 'sub_4' });
+    await expect(applyStripeEvent(failed, host)).rejects.toThrow('not recorded yet');
+    await applyStripeEvent(sub('customer.subscription.created', { id: 'sub_4', status: 'active' }, failed.created - 5), host);
+    // The retry, once the subscription exists, applies it.
+    await applyStripeEvent(failed, host);
+    expect(status('sub_4')).toBe('past_due');
+  });
+
+  it('keeps the plan and period an event does not carry, and skips an unknown status', async () => {
+    const { host, tables } = fakeHost();
+    await applyStripeEvent(
+      sub('customer.subscription.created', {
+        id: 'sub_3',
+        status: 'active',
+        items: { data: [{ price: { id: 'price_pro' }, current_period_end: 1_702_592_000 }] },
       }),
-    ).rejects.toThrow('change failed');
-    expect(await applyStripeEvent(db, event)).toBe(true);
+      host,
+    );
+    await applyStripeEvent(sub('customer.subscription.updated', { id: 'sub_3', status: 'unpaid' }), host);
+    await applyStripeEvent(sub('customer.subscription.updated', { id: 'sub_3', status: 'exploded' }), host);
+    expect(tables.billing_subscriptions![0]).toMatchObject({ plan_id: 'plan-pro', status: 'unpaid' });
+    expect(tables.billing_subscriptions![0]!.current_period_end).toBe(new Date(1_702_592_000_000).toISOString());
   });
 });
