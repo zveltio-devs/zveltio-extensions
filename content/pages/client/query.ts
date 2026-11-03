@@ -42,14 +42,16 @@ export function listUrl(content: Record<string, unknown>, page = 1): string | nu
   return `/api/data/${collection}?${q}`;
 }
 
-let dataFetch: typeof fetch = (input, init) => fetch(input, { credentials: 'include', ...init });
+type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
+
+let dataFetch: Fetch = (url, init) => fetch(url, { credentials: 'include', ...init });
 
 /**
  * The `fetch` data blocks read with: by default the browser's, same origin,
  * with the session cookie. A host whose engine is elsewhere, or that must send
  * a tenant header, hands its own over once.
  */
-export function useDataFetch(f: typeof fetch): void {
+export function useDataFetch(f: Fetch): void {
   dataFetch = f;
 }
 

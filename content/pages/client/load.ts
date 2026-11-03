@@ -13,7 +13,8 @@
  */
 import { NAME, filterJson } from './query.js';
 
-type Fetch = typeof fetch;
+/** Any `fetch` for a path: the browser's, SvelteKit's `load` fetch, or a host wrapper. */
+export type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 // biome-ignore lint/suspicious/noExplicitAny: data API rows are untyped JSON
 type Row = Record<string, any>;
 

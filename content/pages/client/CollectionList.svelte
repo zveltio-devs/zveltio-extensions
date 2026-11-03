@@ -26,6 +26,12 @@
     fields = [] as unknown,
     display_fields = '',
     filters = [] as unknown,
+    /**
+     * A first window a host already has (server-side, or a test): drawn as is,
+     * with no request. Without it the block asks the data API itself.
+     */
+    _data = undefined as Row[] | undefined,
+    _error = '',
     sort_field = '',
     sort_dir = 'desc',
     limit = 20,
@@ -45,11 +51,13 @@
     renderItem = undefined as Snippet<[Row, number]> | undefined,
   } = $props();
 
-  let rows = $state<Row[]>([]);
+  // svelte-ignore state_referenced_locally — the first window only; paging replaces it.
+  let rows = $state<Row[]>(_data ?? []);
   let page = $state(1);
   let pages = $state(1);
   let loading = $state(false);
-  let error = $state('');
+  // svelte-ignore state_referenced_locally
+  let error = $state(_error);
 
   async function load(next: number) {
     const url = listUrl({ collection, filters, sort_field, sort_dir, limit }, next);
@@ -73,7 +81,9 @@
     }
   }
 
-  onMount(() => void load(1));
+  onMount(() => {
+    if (_data === undefined && !_error) void load(1);
+  });
 
   /** Bookkeeping columns nobody asked to see when no field list was given. */
   const NOISE = new Set([
