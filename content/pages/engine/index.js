@@ -3052,29 +3052,9 @@ var require_stringify = __commonJS(function(exports, module) {
       return str;
     return str.replace(STYLE_TAG, "\\3c $2").replace(COMMENT_OPEN, "\\3c $2");
   }
-  function cutEscaped(chunks, css, escaped) {
-    let parts = [];
-    let at = 0;
-    let into = 0;
-    for (let i = 0;i < chunks.length; i += 3) {
-      let from = into;
-      let end = at + chunks[i].length;
-      while (at < end) {
-        if (css[at] === escaped[into]) {
-          at += 1;
-          into += 1;
-        } else {
-          at += 1;
-          into += 4;
-        }
-      }
-      parts.push(escaped.slice(from, into));
-    }
-    return parts;
-  }
 
   class SafeStringifier extends Stringifier {
-    escapeHTML(print) {
+    escapeHTML(node, print) {
       let builder = this.builder;
       let chunks, css;
       this.builder = (str, child, type) => {
@@ -3098,19 +3078,16 @@ var require_stringify = __commonJS(function(exports, module) {
           builder(chunks[i], chunks[i + 1], chunks[i + 2]);
         }
       } else {
-        let parts = cutEscaped(chunks, css, escaped);
-        for (let i = 0;i < chunks.length; i += 3) {
-          builder(parts[i / 3], chunks[i + 1], chunks[i + 2]);
-        }
+        builder(escaped, node, "start");
       }
     }
     root(node) {
       if (node.parent && node.parent.type === "document") {
-        this.escapeHTML(() => this.body(node));
+        this.escapeHTML(node, () => this.body(node));
         if (node.raws.after)
           this.builder(node.raws.after);
       } else {
-        this.escapeHTML(() => super.root(node));
+        this.escapeHTML(node, () => super.root(node));
       }
     }
   }
@@ -3119,7 +3096,7 @@ var require_stringify = __commonJS(function(exports, module) {
     if (node.type === "root" || node.type === "document") {
       str.stringify(node);
     } else {
-      str.escapeHTML(() => str.stringify(node));
+      str.escapeHTML(node, () => str.stringify(node));
     }
   }
   module.exports = stringify;
@@ -3326,7 +3303,7 @@ var require_node = __commonJS(function(exports, module) {
       if (opts.index) {
         pos = this.positionInside(opts.index);
       } else if (opts.word) {
-        let stringRepresentation = inputString.slice(sourceOffset(inputString, this.source.start), this.rangeBy().end.offset);
+        let stringRepresentation = inputString.slice(sourceOffset(inputString, this.source.start), sourceOffset(inputString, this.source.end));
         let index = stringRepresentation.indexOf(opts.word);
         if (index !== -1)
           pos = this.positionInside(index);
@@ -3373,7 +3350,7 @@ var require_node = __commonJS(function(exports, module) {
         offset: start.offset + 1
       };
       if (opts.word) {
-        let stringRepresentation = inputString.slice(sourceOffset(inputString, this.source.start), end.offset);
+        let stringRepresentation = inputString.slice(sourceOffset(inputString, this.source.start), sourceOffset(inputString, this.source.end));
         let index = stringRepresentation.indexOf(opts.word);
         if (index !== -1) {
           start = this.positionInside(index);
@@ -6281,7 +6258,7 @@ var require_input = __commonJS(function(exports, module) {
       if (isAbsolute(from.source)) {
         fromUrl = pathToFileURL(from.source);
       } else {
-        fromUrl = new URL(from.source, pathToFileURL(this.map.mapFile || resolve(".") + "/"));
+        fromUrl = new URL(from.source, this.map.consumer().sourceRoot || pathToFileURL(this.map.mapFile));
       }
       let result = {
         column: from.column + 1,
@@ -7519,7 +7496,6 @@ var require_warning = __commonJS(function(exports, module) {
         return this.node.error(this.text, {
           index: this.index,
           plugin: this.plugin,
-          start: this.start,
           word: this.word
         }).message;
       }
@@ -7767,7 +7743,7 @@ var require_lazy_result = __commonJS(function(exports, module) {
       return this.async().catch(onRejected);
     }
     finally(onFinally) {
-      return this.async().finally(onFinally);
+      return this.async().then(onFinally, onFinally);
     }
     getAsyncError() {
       throw new Error("Use process(css).then(cb) to work with async plugins");
@@ -8201,7 +8177,7 @@ var require_no_work_result = __commonJS(function(exports, module) {
       return this.async().catch(onRejected);
     }
     finally(onFinally) {
-      return this.async().finally(onFinally);
+      return this.async().then(onFinally, onFinally);
     }
     sync() {
       if (this.error)
@@ -8236,7 +8212,7 @@ var require_processor = __commonJS(function(exports, module) {
 
   class Processor {
     constructor(plugins = []) {
-      this.version = "8.5.32";
+      this.version = "8.5.30";
       this.plugins = this.normalize(plugins);
     }
     normalize(plugins) {
@@ -10467,14 +10443,77 @@ var restoreRevision = async (input, host) => {
 };
 var pagesActions = { publish, restoreRevision };
 
+// engine/sitemap.ts
+var PAGE = 500;
+var MAX_URLS = 50000;
+function escapeXml(value) {
+  return String(value).replace(/[<>&'"]/g, (ch) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '"': "&quot;" })[ch]);
+}
+async function all(list, c, collection, filter) {
+  const out = [];
+  for (let page = 1;out.length < MAX_URLS; page++) {
+    const { status, body } = await list(c, collection, { filter, limit: PAGE, page, count: "none" });
+    if (status !== 200)
+      return status;
+    const records = Array.isArray(body.records) ? body.records : [];
+    out.push(...records);
+    if (records.length < PAGE)
+      break;
+  }
+  return out;
+}
+function origin(c) {
+  const proto = c.req.header("x-forwarded-proto") || new URL(c.req.url).protocol.replace(":", "");
+  return `${proto}://${c.req.header("x-forwarded-host") || c.req.header("host") || new URL(c.req.url).host}`;
+}
+function sitemapRoutes(app, ctx) {
+  const list = (c, collection, query) => ctx.internals.listRecords(c, collection, query);
+  app.get("/sitemap.xml", async (c) => {
+    const slug = c.req.query("site");
+    const sites = await all(list, c, "page_sites", slug ? { slug, is_active: true } : { is_active: true });
+    if (typeof sites === "number")
+      return c.body(null, sites);
+    const base = origin(c);
+    const urls = [];
+    for (const site of sites) {
+      const pubs = await all(list, c, "page_publications", { site_id: site.id, kind: "page", is_noindex: false });
+      if (typeof pubs === "number")
+        return c.body(null, pubs);
+      const root = `${base}${String(site.base_path ?? "/").replace(/\/+$/, "")}/`;
+      for (const p of pubs) {
+        const at = new Date(String(p.published_at));
+        const lastmod = Number.isNaN(at.getTime()) ? "" : `<lastmod>${at.toISOString().slice(0, 10)}</lastmod>`;
+        urls.push(`  <url><loc>${escapeXml(p.is_homepage ? root : root + encodeURI(String(p.slug)))}</loc>${lastmod}</url>`);
+      }
+    }
+    c.header("Content-Type", "application/xml; charset=utf-8");
+    return c.body(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls.slice(0, MAX_URLS).join(`
+`)}
+</urlset>
+`);
+  });
+  app.get("/robots.txt", (c) => {
+    const sitemap = new URL(c.req.url);
+    sitemap.pathname = sitemap.pathname.replace(/robots\.txt$/, "sitemap.xml");
+    c.header("Content-Type", "text/plain; charset=utf-8");
+    return c.body(`User-agent: *
+Allow: /
+Sitemap: ${origin(c)}${sitemap.pathname}
+`);
+  });
+}
+
 // engine/index.ts
 var extension = {
   name: "content/pages",
   category: "content",
   mountStrategy: "subapp",
   actions: pagesActions,
-  async register(app) {
+  async register(app, ctx) {
     app.get("/vocabulary", (c) => c.json({ icons: ICON_NAMES, motion: MOTION_TYPES }));
+    sitemapRoutes(app, ctx);
   }
 };
 var engine_default = extension;
