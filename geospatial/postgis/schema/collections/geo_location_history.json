@@ -1,0 +1,27 @@
+{
+  "name": "geo_location_history",
+  "defaultGrants": false,
+  "fields": [
+    { "name": "entity_type", "type": "text", "required": true },
+    { "name": "entity_id", "type": "text", "required": true, "indexed": true },
+    { "name": "location", "type": "location", "required": true },
+    { "name": "accuracy_m", "type": "decimal" },
+    { "name": "altitude_m", "type": "decimal" },
+    { "name": "speed_kmh", "type": "decimal" },
+    { "name": "heading_deg", "type": "decimal" },
+    {
+      "name": "source",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "api",
+      "options": { "values": ["api", "gps", "manual"] }
+    },
+    { "name": "metadata", "type": "json" },
+    { "name": "recorded_at", "type": "datetime" }
+  ],
+  "validation": [
+    { "field": "accuracy_m", "rule": "min", "config": { "value": 0 }, "message": "An accuracy is not negative." },
+    { "field": "speed_kmh", "rule": "min", "config": { "value": 0 }, "message": "A speed is not negative." },
+    { "field": "heading_deg", "rule": "range", "config": { "min": 0, "max": 360 }, "message": "A heading is from 0 to 360 degrees." }
+  ]
+}

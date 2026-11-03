@@ -1,64 +1,17 @@
 import type { ZveltioExtension } from '@zveltio/sdk/extension';
-import { join } from 'path';
-import { postgisRoutes } from './routes.js';
 
+// Location history is the collection this extension declares in
+// `schema/collections/` (manifest `collections`); the engine creates it, owns
+// its rules and serves it through the data API. Proximity and bounding-box
+// questions are data API filters on any `location` field
+// (`location[near]=lat,lng,radius`, `location[within]=minLat,minLng,maxLat,maxLng`,
+// ADR 0019), so no route of its own is left.
 const extension: ZveltioExtension = {
   name: 'geospatial/postgis',
   category: 'geospatial',
-  // S3-01: sub-app mounted at /ext/geospatial/postgis by the engine.
   mountStrategy: 'subapp',
 
-  getMigrations() {
-    return [
-      join(import.meta.dir, 'migrations/001_initial.sql'),
-      join(import.meta.dir, 'migrations/002_tenant_rls.sql'),
-    ];
-  },
-
-  registerFieldTypes(registry) {
-    // Polygon field type (stored as WKB geography)
-    registry.register({
-      type: 'polygon',
-      label: 'Polygon (Geography)',
-      category: 'location',
-      db: {
-        columnType: 'GEOGRAPHY(POLYGON, 4326)',
-        indexType: 'gist',
-        requiresExtensions: ['postgis'],
-      },
-      api: {
-        filterOperators: ['within', 'intersects', 'is_null', 'is_not_null'],
-        serialize: (v) => v,
-      },
-      typescript: {
-        inputType: '{ type: "Polygon"; coordinates: number[][][] }',
-        outputType: '{ type: "Polygon"; coordinates: number[][][] }',
-      },
-    });
-
-    // LineString field type
-    registry.register({
-      type: 'linestring',
-      label: 'LineString (Geography)',
-      category: 'location',
-      db: {
-        columnType: 'GEOGRAPHY(LINESTRING, 4326)',
-        indexType: 'gist',
-        requiresExtensions: ['postgis'],
-      },
-      api: {
-        filterOperators: ['within', 'intersects', 'is_null', 'is_not_null'],
-      },
-      typescript: {
-        inputType: '{ type: "LineString"; coordinates: number[][] }',
-        outputType: '{ type: "LineString"; coordinates: number[][] }',
-      },
-    });
-  },
-
-  async register(app, ctx) {
-    app.route('/', postgisRoutes(ctx));
-  },
+  async register() {},
 };
 
 export default extension;

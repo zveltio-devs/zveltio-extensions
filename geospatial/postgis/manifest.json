@@ -2,23 +2,15 @@
   "name": "geospatial/postgis",
   "displayName": "PostGIS",
   "category": "geospatial",
-  "description": "Geospatial queries — proximity search, bounding box, polygon containment",
-  "version": "1.0.9",
-  "zveltioMinVersion": "1.0.0",
+  "description": "Location history and map components — proximity and bounding-box search through the data API",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.98",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-postgis",
-  "permissions": [
-    "database",
-    "field-types"
-  ],
+  "permissions": [],
   "i18nPrefixes": [
     "geospatial"
   ],
-  "requires": {
-    "postgres_extensions": [
-      "postgis"
-    ]
-  },
   "studio": {
     "pages": [
       {
@@ -46,11 +38,6 @@
       "MapPicker",
       "LocationField",
       "MapView"
-    ],
-    "fieldTypes": [
-      "location",
-      "polygon",
-      "linestring"
     ]
   },
   "engine": {
@@ -60,11 +47,12 @@
     "bundled": true,
     "bundlePeers": false
   },
+  "collections": [
+    "geo_location_history"
+  ],
   "integrity": {
-    "engineSha256": "a89dc33d556096db61b941901c01078c917c42c0695ef119d1edf0212e4eb994",
-    "sourceSha256": "80f35dd5b742ea9ce4ae681acac74440f0ddcb1ed3d3064050087f2ce9b04728"
-  },
-  "resources": [
-    "postgis"
-  ]
+    "engineSha256": "f4fc51e7e56960de0c173e49e704cf3038a4282d1b7cf0b8cce922bfe977b597",
+    "sourceSha256": "781336334955cc4533ee92a6f6c3b83dd931b1069cfc8200aefd32d3ff21a880",
+    "schemaSha256": "0f7fc0de3a6b19324855830688bcd78afd387fd07401f728bef0b7f9914c218d"
+  }
 }
