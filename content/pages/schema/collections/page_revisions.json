@@ -1,0 +1,34 @@
+{
+  "name": "page_revisions",
+  "defaultGrants": false,
+  "fields": [
+    {
+      "name": "page_id",
+      "type": "m2o",
+      "options": {
+        "related_collection": "pages"
+      },
+      "indexed": true,
+      "required": true,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "content",
+      "type": "json",
+      "required": true,
+      "writtenBy": "actions"
+    }
+  ],
+  "relations": [
+    {
+      "name": "page_revisions_page_id",
+      "type": "m2o",
+      "field": "page_id",
+      "target": "pages",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

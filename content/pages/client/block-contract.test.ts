@@ -15,7 +15,7 @@
 
 import { describe, expect, test } from 'bun:test';
 import { join } from 'node:path';
-import { ALL_BLOCK_TYPES, BLOCK_TYPES, LEGACY_BLOCK_TYPES } from './block-types.js';
+import { ALL_BLOCK_TYPES, BLOCK_TYPES } from './block-types.js';
 import { HTML_KEYS, URL_KEYS } from './bind.js';
 
 const HERE = import.meta.dir;
@@ -72,31 +72,6 @@ describe('block vocabulary', () => {
 
     const unpreviewed = ALL_BLOCK_TYPES.filter((t) => !handled.has(t));
     expect(unpreviewed).toEqual([]);
-  });
-
-  test('the block-type library seeded by the migrations matches', async () => {
-    // Every migration, not just the first: block types are seeded wherever they
-    // were introduced, and a test that reads only 001 starts lying the moment a
-    // type ships in 003.
-    const dir = join(HERE, '../engine/migrations');
-    const { readdirSync } = await import('node:fs');
-    const seeded = new Set<string>();
-    for (const file of readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()) {
-      const sql = await Bun.file(join(dir, file)).text();
-      let at = sql.indexOf('INSERT INTO zv_page_block_types');
-      while (at !== -1) {
-        const chunk = sql.slice(at, sql.indexOf(';', at));
-        for (const m of chunk.matchAll(/^\s*\('([a-z_]+)',/gm)) seeded.add(m[1]);
-        at = sql.indexOf('INSERT INTO zv_page_block_types', at + 1);
-      }
-    }
-
-    // The seed is the picker's reference library; it should name every current
-    // block type. Legacy names are deliberately absent — they are readable, not
-    // offerable.
-    const missing = BLOCK_TYPES.filter((t) => !seeded.has(t));
-    expect(missing).toEqual([]);
-    for (const legacy of LEGACY_BLOCK_TYPES) expect(seeded.has(legacy)).toBe(false);
   });
 });
 

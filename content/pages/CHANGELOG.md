@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.0.0 (2026-11-03)
+
+- feat!: sites, pages, publications, revisions and menus are collections declared in `schema/collections/`, created and owned by the engine; no SQL migrations, and every hand-written `/ext/content/pages/sites|pages|cms` route is gone — read and write through `/api/data/<collection>`
+- feat!: the site reads `page_publications`, never the draft: the `publish` action writes a sanitized snapshot of a page and keeps a revision; `restoreRevision` puts a revision back into the draft; deleting a publication takes the page off the site
+- feat!: no authorization in the extension. A site's `is_public`, `access_roles` and `public_collections`, and a page's `auth_required` and `allowed_roles`, are gone: the operator grants the `public` role (anonymous visitors, ADR 0017) or a portal's roles `read` on `page_publications`, `page_sites`, `page_menus` and on each collection a data block shows
+- feat!: data blocks and record pages read their rows from the data API as the visitor (`client/query.ts`); a host loads a page with `loadPage` and the menus with `loadMenus` (`client/load.ts`)
+- feat!: `/sitemap.xml` and `/robots.txt` are gone for now: a public route has no caller to read the data API as, so the sitemap cannot list only what visitors may read; it returns with an engine change that reads as the `public` role there
+- feat!: a page is live while it has a publication (a page's `is_active` is gone); a site's `is_active` switches the whole site off for hosts that load through `loadPage`/`loadSite`
+- feat!: dropped, with no screen using them: A/B variants and their tracking, page metrics and their tracking, SEO scores, redirects, saved templates and the block-type table (the catalogue is `client/block-types.ts`)
+- requires engine 3.0.0-beta.97
+
 ## 1.1.15 (2026-10-27)
 
 - feat(content/pages): refuse page slugs, site slugs and base paths under reserved paths (#266)
