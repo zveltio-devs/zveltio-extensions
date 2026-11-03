@@ -1,0 +1,56 @@
+{
+  "name": "data_export_templates",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "target_collection",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "format",
+      "type": "enum",
+      "options": {
+        "values": [
+          "csv",
+          "json",
+          "ndjson"
+        ]
+      },
+      "required": true,
+      "defaultValue": "csv"
+    },
+    {
+      "name": "fields",
+      "type": "text"
+    },
+    {
+      "name": "row_limit",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 1000
+    }
+  ],
+  "validation": [
+    {
+      "field": "row_limit",
+      "rule": "min",
+      "config": {
+        "value": 1
+      },
+      "message": "An export has at least one row."
+    },
+    {
+      "field": "row_limit",
+      "rule": "max",
+      "config": {
+        "value": 50000
+      },
+      "message": "An export has at most 50000 rows."
+    }
+  ]
+}
