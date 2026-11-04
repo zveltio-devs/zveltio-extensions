@@ -6,15 +6,21 @@
   "resources": [
     {
       "id": "scans",
-      "dataSource": "/ext/analytics/quality/scan/{masterId}/issues",
-      "dataPath": "issues",
+      "dataSource": "/api/data/quality_issues?scan_id[eq]={masterId}&dismissed[eq]=false&sort=created_at&order=asc&limit=500",
+      "dataPath": "records",
       "master": {
-        "dataSource": "/ext/analytics/quality/scans",
-        "dataPath": "scans",
+        "dataSource": "/api/data/quality_scans?sort=created_at&order=desc&limit=50",
+        "dataPath": "records",
         "idKey": "id",
-        "titleKey": "collection",
-        "subtitle": { "keys": ["status", "issues_found"], "sep": " · " },
-        "badgeKey": "status"
+        "titleKey": "target_collection",
+        "subtitle": {
+          "keys": [
+            "scan_type",
+            "issues_found"
+          ],
+          "sep": " \u00b7 "
+        },
+        "badgeKey": "scan_type"
       },
       "detailActions": [
         {
@@ -32,15 +38,25 @@
           "type": "badge",
           "badge": {
             "colors": {
-              "critical": "badge-error",
-              "high": "badge-warning",
+              "error": "badge-error",
+              "warning": "badge-warning",
               "info": "badge-info"
             }
           }
         },
-        { "key": "issue_type", "label": "common.col.type" },
-        { "key": "field_name", "label": "common.col.field", "type": "mono" },
-        { "key": "description", "label": "common.col.description" }
+        {
+          "key": "issue_type",
+          "label": "common.col.type"
+        },
+        {
+          "key": "field_name",
+          "label": "common.col.field",
+          "type": "mono"
+        },
+        {
+          "key": "description",
+          "label": "common.col.description"
+        }
       ],
       "rowActions": [
         {
@@ -74,11 +90,26 @@
             "colSpan": 2,
             "default": "full",
             "options": [
-              { "value": "full", "label": "analytics.quality.scan.full" },
-              { "value": "duplicates", "label": "analytics.quality.scan.duplicates" },
-              { "value": "anomalies", "label": "analytics.quality.scan.anomalies" },
-              { "value": "missing_data", "label": "analytics.quality.scan.missing_data" },
-              { "value": "normalization", "label": "analytics.quality.scan.normalization" }
+              {
+                "value": "full",
+                "label": "analytics.quality.scan.full"
+              },
+              {
+                "value": "duplicates",
+                "label": "analytics.quality.scan.duplicates"
+              },
+              {
+                "value": "anomalies",
+                "label": "analytics.quality.scan.anomalies"
+              },
+              {
+                "value": "missing_data",
+                "label": "analytics.quality.scan.missing_data"
+              },
+              {
+                "value": "normalization",
+                "label": "analytics.quality.scan.normalization"
+              }
             ]
           }
         ]

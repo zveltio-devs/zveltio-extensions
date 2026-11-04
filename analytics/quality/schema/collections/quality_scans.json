@@ -1,0 +1,46 @@
+{
+  "name": "quality_scans",
+  "fields": [
+    {
+      "name": "target_collection",
+      "type": "text",
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "scan_type",
+      "type": "enum",
+      "options": {
+        "values": [
+          "full",
+          "duplicates",
+          "anomalies",
+          "missing_data",
+          "normalization"
+        ]
+      },
+      "required": true,
+      "defaultValue": "full"
+    },
+    {
+      "name": "records_scanned",
+      "type": "integer",
+      "required": true
+    },
+    {
+      "name": "issues_found",
+      "type": "integer",
+      "required": true
+    },
+    {
+      "name": "truncated",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": false
+    },
+    {
+      "name": "skipped_checks",
+      "type": "json"
+    }
+  ]
+}
