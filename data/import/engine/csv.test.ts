@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { parseCSV } from './routes';
+import { parseCSV } from './csv';
 
 describe('parseCSV', () => {
   it('keeps a quoted line break, delimiter and quote inside one value', () => {

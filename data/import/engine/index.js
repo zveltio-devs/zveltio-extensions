@@ -1502,7 +1502,7 @@ async function readMultipart(c) {
     return null;
   }
 }
-// engine/routes.ts
+// engine/csv.ts
 function parseCSVRecords(text, delimiter) {
   const records = [];
   let record = [];
@@ -1558,6 +1558,8 @@ function parseCSV(text, delimiter = ",") {
   }
   return rows;
 }
+
+// engine/routes.ts
 var MAX_IMPORT_BYTES = 100 * 1024 * 1024;
 var MAX_ROWS = 1e4;
 var ROLLBACK_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
