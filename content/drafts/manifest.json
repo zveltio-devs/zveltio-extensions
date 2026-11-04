@@ -3,7 +3,7 @@
   "displayName": "Content Drafts",
   "category": "content",
   "description": "Draft, review and publish workflow for content collections, through the data API as the publishing user",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "zveltioMinVersion": "3.0.0-beta.99",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-drafts",
@@ -42,9 +42,9 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "dd2b2645592f1f1ca1f5381d8d51fe32f3ab5e642f02370401d7e8affac1a796",
-    "sourceSha256": "00b2815abd9bc9d5f32f9a2c7f72714f71943d782fe8b6fb0a74b7e3d80f1c18",
-    "schemaSha256": "423425777eeb0d0b3fb9df14ab0383a59a4c70d55b0990e7f688d59c764fc63b"
+    "engineSha256": "ae59ac2248a6763e52530c468d4f5302997fddde88e0d2754ebe00d0137f9a86",
+    "sourceSha256": "cd19985a5e193c5708fd536901348366bd6bdb770cc479ebc60da86421d0f038",
+    "schemaSha256": "cadb5766667ccf1cab4d2332498195b6f8ebf348b6a203d707f3dbd804925879"
   },
   "actions": [
     {
@@ -114,6 +114,7 @@
         "content_draft_snapshots"
       ],
       "writes": [
+        "content_drafts",
         "content_draft_snapshots"
       ]
     }

@@ -49,6 +49,21 @@ const draft = (extra: Row = {}): Row => ({
 });
 
 describe('reviewDraft', () => {
+  it('approves the draft as it is once locked, not as first read', async () => {
+    const { host, rows } = fakeHost({ content_drafts: [draft()] });
+    const h = host as Any;
+    const read = h.collections.read;
+    const update = h.collections.update;
+    h.collections.read = async (c: string, id: string) => ({ ...(await read(c, id)) });
+    // The author's edit commits while this request waits for the row lock.
+    h.collections.update = async (c: string, id: string, data: Row, opts?: unknown) => {
+      if ('review_status' in data) rows('content_drafts')[0]!.draft_data = { title: 'v3' };
+      return update(c, id, data, opts);
+    };
+    await a.reviewDraft({ id: 'd1', decision: 'approved' }, host);
+    expect(rows('content_drafts')[0]!.approved_data).toMatchObject({ data: { title: 'v3' } });
+  });
+
   it('records the decision with the author and moves review_status', async () => {
     const { host, rows } = fakeHost({ content_drafts: [draft()] });
     const d = (await a.reviewDraft({ id: 'd1', decision: 'approved', note: 'ok' }, host)) as Row;
@@ -85,6 +100,24 @@ describe('snapshotDraft', () => {
     expect(await a.snapshotDraft({ id: 'd1' }, host)).toMatchObject({ version: 1, snapshot_data: { title: 'v2' } });
     expect(await a.snapshotDraft({ id: 'd1', description: 'b' }, host)).toMatchObject({ version: 2, description: 'b' });
     expect(rows('content_draft_snapshots')).toHaveLength(3);
+    expect(rows('content_drafts')[0]!.snapshot_count).toBe(2);
+  });
+
+  it('numbers from the draft count, not from the snapshots the caller sees', async () => {
+    // Versions 3-5 are hidden from this caller by a row rule; the count is not.
+    const { host } = fakeHost({
+      content_drafts: [draft({ snapshot_count: 5 })],
+      content_draft_snapshots: [{ id: 's2', draft_id: 'd1', version: 2 }],
+    });
+    expect(await a.snapshotDraft({ id: 'd1' }, host)).toMatchObject({ version: 6 });
+  });
+
+  it('refuses, busy, when another snapshot took the number first', async () => {
+    const { host, rows } = fakeHost({ content_drafts: [draft({ snapshot_count: 1 })] });
+    const stale = { ...rows('content_drafts')[0]! };
+    rows('content_drafts')[0]!.snapshot_count = 2;
+    const raced = { ...(host as Any), collections: { ...(host as Any).collections, read: async () => stale } };
+    await expect(a.snapshotDraft({ id: 'd1' }, raced)).rejects.toMatchObject({ code: 'snapshot_busy' });
   });
 });
 

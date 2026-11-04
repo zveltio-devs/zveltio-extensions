@@ -39,14 +39,10 @@ async function loadDraft(host, id) {
 var conflict = (err, code) => err.code === code;
 var reviewDraft = async (input, host) => {
   const { id, decision, note } = input;
-  const draft = await loadDraft(host, id);
-  if (draft.published_at != null) {
-    throw new ActionRefusal(409, "already_published", "A published draft is no longer reviewed.");
-  }
+  const seen = await loadDraft(host, id);
   try {
-    const approved_data = decision === "approved" ? { target_collection: draft.target_collection, record_id: draft.record_id, data: draft.draft_data ?? {} } : null;
-    await host.collections.update(DRAFTS, id, { review_status: decision, approved_data }, {
-      expect: { review_status: [String(draft.review_status)] }
+    await host.collections.update(DRAFTS, id, { review_status: decision }, {
+      expect: { review_status: [String(seen.review_status)] }
     });
   } catch (err) {
     if (conflict(err, "precondition_failed")) {
@@ -54,6 +50,13 @@ var reviewDraft = async (input, host) => {
     }
     throw err;
   }
+  const draft = await loadDraft(host, id);
+  if (draft.published_at != null) {
+    throw new ActionRefusal(409, "already_published", "A published draft is no longer reviewed.");
+  }
+  await host.collections.update(DRAFTS, id, {
+    approved_data: decision === "approved" ? { target_collection: draft.target_collection, record_id: draft.record_id, data: draft.draft_data ?? {} } : null
+  });
   return host.collections.insert(DECISIONS, {
     draft_id: id,
     decision,
@@ -64,14 +67,18 @@ var reviewDraft = async (input, host) => {
 var snapshotDraft = async (input, host) => {
   const { id, description } = input;
   const draft = await loadDraft(host, id);
+  const counted = draft.snapshot_count == null ? null : Number(draft.snapshot_count);
   const last = await host.collections.list(SNAPSHOTS, {
     filter: { draft_id: { eq: id } },
     sort: "version",
     order: "desc",
     limit: 1
   });
-  const version = Number(last.records?.[0]?.version ?? 0) + 1;
+  const version = Math.max(counted ?? 0, Number(last.records?.[0]?.version ?? 0)) + 1;
   try {
+    await host.collections.update(DRAFTS, id, { snapshot_count: version }, {
+      expect: { snapshot_count: [counted === null ? null : String(counted)] }
+    });
     return await host.collections.insert(SNAPSHOTS, {
       draft_id: id,
       version,
@@ -79,7 +86,7 @@ var snapshotDraft = async (input, host) => {
       description: description ?? null
     });
   } catch (err) {
-    if (conflict(err, "23505")) {
+    if (conflict(err, "precondition_failed") || conflict(err, "23505")) {
       throw new ActionRefusal(409, "snapshot_busy", "Another snapshot of this draft was taken at the same time; try again.");
     }
     throw err;
