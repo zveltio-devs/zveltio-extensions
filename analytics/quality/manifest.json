@@ -46,8 +46,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "a407eb0254944137a433ac2ee21d73dcdd47b6e1d7e5533f4db62a9c7c191902",
-    "sourceSha256": "cac0590ac722590b4aff2fcef56843accb083e1a9739a366212783d14dbcc162",
-    "schemaSha256": "1611e1d405fba52f29fbde8a91dd1c8303c83b27ef03b9ce331e8259c5577163"
+    "engineSha256": "75cfac4494a64332c68949d666ff1d17d1cbb5884f2a4a821000243d36f30cb5",
+    "sourceSha256": "e51f779e65211a8137f30f162e2a96ee09d730a087d985ff7ae682d95756654f",
+    "schemaSha256": "1efbfb3359a1d793759dde3ca983900aab9bced5c0965cfe2cf293e3244d6e43"
   }
 }

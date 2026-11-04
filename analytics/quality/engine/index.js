@@ -6781,7 +6781,8 @@ function detectMissingData(rows) {
   }
   return issues;
 }
-function detectOutliers(rows) {
+var MIN_OUTLIER_VALUES = 11;
+function detectOutliers(rows, skipped = []) {
   const issues = [];
   for (const field of fieldsOf(rows)) {
     const points = [];
@@ -6799,8 +6800,12 @@ function detectOutliers(rows) {
         break;
       }
     }
-    if (!numeric || points.length < 3)
+    if (!numeric || points.length === 0)
       continue;
+    if (points.length < MIN_OUTLIER_VALUES) {
+      skipped.push(`outliers on "${field}": ${points.length} values, at least ${MIN_OUTLIER_VALUES} needed`);
+      continue;
+    }
     const mean = points.reduce((s, p) => s + p.n, 0) / points.length;
     const stddev = Math.sqrt(points.reduce((s, p) => s + (p.n - mean) ** 2, 0) / (points.length - 1));
     if (!stddev)
@@ -6820,9 +6825,13 @@ function detectOutliers(rows) {
   }
   return issues;
 }
-async function aiAnalyzeQuality(providers, collection, rows) {
+async function aiAnalyzeQuality(providers, collection, rows, skipped = []) {
   const provider = providers?.getDefault?.();
-  if (!provider || rows.length === 0)
+  if (!provider) {
+    skipped.push("normalization: no AI provider installed");
+    return [];
+  }
+  if (rows.length === 0)
     return [];
   const prompt = `Analyze these sample records from collection "${collection}".
 Fields: ${fieldsOf(rows).join(", ")}
@@ -6850,12 +6859,14 @@ Maximum 5 issues. Return [] if data looks clean.`;
 }
 async function analyze(rows, scanType, collection, ai) {
   const all = scanType === "full";
-  return [
+  const skipped = [];
+  const issues = [
     ...all || scanType === "duplicates" ? detectDuplicates(rows) : [],
     ...all || scanType === "missing_data" ? detectMissingData(rows) : [],
-    ...all || scanType === "anomalies" ? detectOutliers(rows) : [],
-    ...all || scanType === "normalization" ? await aiAnalyzeQuality(ai, collection, rows) : []
+    ...all || scanType === "anomalies" ? detectOutliers(rows, skipped) : [],
+    ...all || scanType === "normalization" ? await aiAnalyzeQuality(ai, collection, rows, skipped) : []
   ];
+  return { issues, skipped };
 }
 
 // engine/routes.ts
@@ -6891,18 +6902,23 @@ function qualityRoutes(ctx) {
       if (page * PAGE >= total)
         break;
     }
-    let issues;
+    let result;
     try {
-      issues = await analyze(rows, scan_type, collection, ctx.services?.get("ai.providers"));
+      result = await analyze(rows, scan_type, collection, ctx.services?.get("ai.providers"));
     } catch (err) {
       return c.json({ error: "The AI normalization check failed", detail: err instanceof Error ? err.message : String(err) }, 502);
+    }
+    const { issues, skipped } = result;
+    if (scan_type === "normalization" && skipped.length) {
+      return c.json({ error: "The requested check could not run", skipped_checks: skipped }, 422);
     }
     const scan = await internals.createRecord(c, SCANS, {
       target_collection: collection,
       scan_type,
       records_scanned: rows.length,
       issues_found: issues.length,
-      truncated: total > rows.length
+      truncated: total > rows.length,
+      skipped_checks: skipped
     });
     if (scan.status !== 201)
       refuse(c, scan.status, { error: "Could not record the scan", detail: scan.body });

@@ -97,11 +97,13 @@ export function detectMissingData(rows: Row[]): QualityIssue[] {
 }
 
 /**
- * Values more than 3σ from the mean, on fields whose every value is a number.
- * With the sample σ no value can sit 3σ out below 11 values, so a smaller
- * collection never reports one.
+ * Below this many values no value can sit 3σ out: with the sample σ, |z| is
+ * at most (n-1)/√n. A field with fewer is reported as not checked.
  */
-export function detectOutliers(rows: Row[]): QualityIssue[] {
+const MIN_OUTLIER_VALUES = 11;
+
+/** Values more than 3σ from the mean, on fields whose every value is a number. */
+export function detectOutliers(rows: Row[], skipped: string[] = []): QualityIssue[] {
   const issues: QualityIssue[] = [];
   for (const field of fieldsOf(rows)) {
     const points: Array<{ id: string; n: number }> = [];
@@ -117,7 +119,11 @@ export function detectOutliers(rows: Row[]): QualityIssue[] {
         break;
       }
     }
-    if (!numeric || points.length < 3) continue;
+    if (!numeric || points.length === 0) continue;
+    if (points.length < MIN_OUTLIER_VALUES) {
+      skipped.push(`outliers on "${field}": ${points.length} values, at least ${MIN_OUTLIER_VALUES} needed`);
+      continue;
+    }
     const mean = points.reduce((s, p) => s + p.n, 0) / points.length;
     const stddev = Math.sqrt(points.reduce((s, p) => s + (p.n - mean) ** 2, 0) / (points.length - 1));
     if (!stddev) continue;
@@ -141,13 +147,22 @@ export function detectOutliers(rows: Row[]): QualityIssue[] {
 export type AiProviders = { getDefault(): any } | undefined;
 
 /**
- * AI normalization suggestions on a five-row sample. No provider: no check,
- * and nothing claims it ran. A provider that fails or answers something that
+ * AI normalization suggestions on a five-row sample. No provider: the check is
+ * recorded as skipped, so nothing claims it ran. A provider that fails or answers something that
  * is not a JSON array throws, so the scan fails instead of passing silently.
  */
-export async function aiAnalyzeQuality(providers: AiProviders, collection: string, rows: Row[]): Promise<QualityIssue[]> {
+export async function aiAnalyzeQuality(
+  providers: AiProviders,
+  collection: string,
+  rows: Row[],
+  skipped: string[] = [],
+): Promise<QualityIssue[]> {
   const provider = providers?.getDefault?.();
-  if (!provider || rows.length === 0) return [];
+  if (!provider) {
+    skipped.push('normalization: no AI provider installed');
+    return [];
+  }
+  if (rows.length === 0) return [];
   const prompt = `Analyze these sample records from collection "${collection}".
 Fields: ${fieldsOf(rows).join(', ')}
 
@@ -172,12 +187,20 @@ Maximum 5 issues. Return [] if data looks clean.`;
   }));
 }
 
-export async function analyze(rows: Row[], scanType: ScanType, collection: string, ai: AiProviders): Promise<QualityIssue[]> {
+/** The issues found, and each check that could not run, so silence is never read as a pass. */
+export async function analyze(
+  rows: Row[],
+  scanType: ScanType,
+  collection: string,
+  ai: AiProviders,
+): Promise<{ issues: QualityIssue[]; skipped: string[] }> {
   const all = scanType === 'full';
-  return [
+  const skipped: string[] = [];
+  const issues = [
     ...(all || scanType === 'duplicates' ? detectDuplicates(rows) : []),
     ...(all || scanType === 'missing_data' ? detectMissingData(rows) : []),
-    ...(all || scanType === 'anomalies' ? detectOutliers(rows) : []),
-    ...(all || scanType === 'normalization' ? await aiAnalyzeQuality(ai, collection, rows) : []),
+    ...(all || scanType === 'anomalies' ? detectOutliers(rows, skipped) : []),
+    ...(all || scanType === 'normalization' ? await aiAnalyzeQuality(ai, collection, rows, skipped) : []),
   ];
+  return { issues, skipped };
 }

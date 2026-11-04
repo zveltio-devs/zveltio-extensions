@@ -129,11 +129,23 @@ d('analytics/quality — a scan sees what the caller sees', () => {
     const res = await post('/scan', { collection: C });
     expect(res.status).toBe(201);
     const body = await res.json();
-    expect(body.scan).toMatchObject({ target_collection: C, records_scanned: 41, truncated: false });
+    expect(body.scan).toMatchObject({
+      target_collection: C,
+      records_scanned: 41,
+      truncated: false,
+      skipped_checks: ['normalization: no AI provider installed'],
+    });
     const found = await issues();
     expect(found.map((i: Any) => `${i.issue_type}:${i.field_name}`)).toEqual(['duplicate:label', 'outlier:qty']);
     expect(body.issues_found).toBe(2);
     expect(found.every((i: Any) => i.created_by === member.userId)).toBe(true);
+  });
+
+  it('the AI check alone, with no provider, is refused rather than recorded as clean', async () => {
+    const before = (await scans()).length;
+    const res = await post('/scan', { collection: C, scan_type: 'normalization' });
+    expect(res.status).toBe(422);
+    expect((await scans()).length).toBe(before);
   });
 
   it('checks the open issues against the SLA target', async () => {

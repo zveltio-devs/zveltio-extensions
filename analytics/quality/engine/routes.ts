@@ -53,11 +53,16 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
       if (page * PAGE >= total) break;
     }
 
-    let issues: Awaited<ReturnType<typeof analyze>>;
+    let result: Awaited<ReturnType<typeof analyze>>;
     try {
-      issues = await analyze(rows, scan_type, collection, ctx.services?.get<AiProviders>('ai.providers'));
+      result = await analyze(rows, scan_type, collection, ctx.services?.get<AiProviders>('ai.providers'));
     } catch (err) {
       return c.json({ error: 'The AI normalization check failed', detail: err instanceof Error ? err.message : String(err) }, 502);
+    }
+    const { issues, skipped } = result;
+    // Asked for the AI check alone with no provider: nothing ran, so there is no scan to record.
+    if (scan_type === 'normalization' && skipped.length) {
+      return c.json({ error: 'The requested check could not run', skipped_checks: skipped }, 422);
     }
 
     const scan = await internals.createRecord(c, SCANS, {
@@ -66,6 +71,7 @@ export function qualityRoutes(ctx: ExtensionContext): Hono {
       records_scanned: rows.length,
       issues_found: issues.length,
       truncated: total > rows.length,
+      skipped_checks: skipped,
     });
     if (scan.status !== 201) refuse(c, scan.status, { error: 'Could not record the scan', detail: scan.body });
     const scanId = String((scan.body as Row).id);

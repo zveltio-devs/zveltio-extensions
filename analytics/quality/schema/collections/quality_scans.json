@@ -37,6 +37,10 @@
       "type": "boolean",
       "required": true,
       "defaultValue": false
+    },
+    {
+      "name": "skipped_checks",
+      "type": "json"
     }
   ]
 }
