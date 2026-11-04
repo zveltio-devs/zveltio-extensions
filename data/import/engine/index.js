@@ -1503,41 +1503,52 @@ async function readMultipart(c) {
   }
 }
 // engine/routes.ts
-function parseCSVLine(line, delimiter) {
-  const result = [];
-  let current = "";
+function parseCSVRecords(text, delimiter) {
+  const records = [];
+  let record = [];
+  let field = "";
   let inQuotes = false;
-  for (let i = 0;i < line.length; i++) {
-    const char = line[i];
-    if (char === '"' && !inQuotes) {
-      inQuotes = true;
-    } else if (char === '"' && inQuotes) {
-      if (line[i + 1] === '"') {
-        current += '"';
+  for (let i = 0;i < text.length; i++) {
+    const char = text[i];
+    if (inQuotes) {
+      if (char === '"' && text[i + 1] === '"') {
+        field += '"';
         i++;
-      } else {
+      } else if (char === '"')
         inQuotes = false;
-      }
-    } else if (char === delimiter && !inQuotes) {
-      result.push(current);
-      current = "";
-    } else {
-      current += char;
-    }
+      else
+        field += char;
+    } else if (char === '"')
+      inQuotes = true;
+    else if (char === delimiter) {
+      record.push(field);
+      field = "";
+    } else if (char === `
+` || char === "\r") {
+      if (char === "\r" && text[i + 1] === `
+`)
+        i++;
+      record.push(field);
+      records.push(record);
+      record = [];
+      field = "";
+    } else
+      field += char;
   }
-  result.push(current);
-  return result;
+  if (field !== "" || record.length > 0) {
+    record.push(field);
+    records.push(record);
+  }
+  return records;
 }
 function parseCSV(text, delimiter = ",") {
-  const lines = text.trim().split(/\r?\n/);
-  if (lines.length < 2)
+  const [headers, ...records] = parseCSVRecords(text, delimiter);
+  if (!headers)
     return [];
-  const headers = parseCSVLine(lines[0], delimiter);
   const rows = [];
-  for (let i = 1;i < lines.length; i++) {
-    if (!lines[i].trim())
+  for (const values of records) {
+    if (values.every((v) => !v.trim()))
       continue;
-    const values = parseCSVLine(lines[i], delimiter);
     const row = {};
     headers.forEach((h, idx) => {
       const value = (values[idx] ?? "").trim();

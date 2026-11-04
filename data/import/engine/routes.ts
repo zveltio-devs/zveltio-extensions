@@ -11,42 +11,50 @@ import { readMultipart, MULTIPART_REQUIRED } from '@zveltio/sdk/extension';
 
 // ─── CSV parsing ──────────────────────────────────────────────────────────────
 
-function parseCSVLine(line: string, delimiter: string): string[] {
-  const result: string[] = [];
-  let current = '';
+/**
+ * RFC 4180 records: a quoted field may hold the delimiter, `""` and line
+ * breaks. Splitting the text into lines first cut a quoted multi-line value
+ * into two broken rows.
+ */
+function parseCSVRecords(text: string, delimiter: string): string[][] {
+  const records: string[][] = [];
+  let record: string[] = [];
+  let field = '';
   let inQuotes = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-    if (char === '"' && !inQuotes) {
-      inQuotes = true;
-    } else if (char === '"' && inQuotes) {
-      if (line[i + 1] === '"') {
-        current += '"';
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (inQuotes) {
+      if (char === '"' && text[i + 1] === '"') {
+        field += '"';
         i++;
-      } else {
-        inQuotes = false;
-      }
-    } else if (char === delimiter && !inQuotes) {
-      result.push(current);
-      current = '';
-    } else {
-      current += char;
-    }
+      } else if (char === '"') inQuotes = false;
+      else field += char;
+    } else if (char === '"') inQuotes = true;
+    else if (char === delimiter) {
+      record.push(field);
+      field = '';
+    } else if (char === '\n' || char === '\r') {
+      if (char === '\r' && text[i + 1] === '\n') i++;
+      record.push(field);
+      records.push(record);
+      record = [];
+      field = '';
+    } else field += char;
   }
-  result.push(current);
-  return result;
+  if (field !== '' || record.length > 0) {
+    record.push(field);
+    records.push(record);
+  }
+  return records;
 }
 
 /** A blank CSV cell is a missing value; a JSON `""` stays a string. */
-function parseCSV(text: string, delimiter = ','): Record<string, string | null>[] {
-  const lines = text.trim().split(/\r?\n/);
-  if (lines.length < 2) return [];
-  const headers = parseCSVLine(lines[0], delimiter);
+export function parseCSV(text: string, delimiter = ','): Record<string, string | null>[] {
+  const [headers, ...records] = parseCSVRecords(text, delimiter);
+  if (!headers) return [];
   const rows: Record<string, string | null>[] = [];
-  for (let i = 1; i < lines.length; i++) {
-    if (!lines[i].trim()) continue;
-    const values = parseCSVLine(lines[i], delimiter);
+  for (const values of records) {
+    if (values.every((v) => !v.trim())) continue;
     const row: Record<string, string | null> = {};
     headers.forEach((h, idx) => {
       const value = (values[idx] ?? '').trim();

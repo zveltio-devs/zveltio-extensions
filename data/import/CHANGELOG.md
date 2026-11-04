@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.1 (2026-11-04)
+
+- fix: a CSV value in quotes may hold line breaks (RFC 4180). The file was split into lines before parsing, so a quoted multi-line value became two broken rows
+
 ## 2.0.0 (2026-11-03)
 
 - feat!: imports read and write through the data API as the importing user (`ctx.internals.createRecord`): a row lands only where the caller may create one, with the target collection's validation, column rules, hooks, revisions and webhooks. The 1.x admin-only gate and the `import` permission resource are gone; who may import into a collection is who may create in it and in `data_import_jobs` (and read `data_import_profiles` to use a profile)
