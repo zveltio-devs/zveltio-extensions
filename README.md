@@ -56,7 +56,7 @@ for end-user applications. Import them directly:
 | `content` | `document-templates`, `documents`, `drafts`, `media`, `pages`, `pdf-viewer` |
 | `crm` | CRM module |
 | `data` | `export`, `import` |
-| `developer` | `api-docs`, `byod`, `database`, `edge-functions`, `graphql`, `validation` |
+| `developer` | `api-docs`, `byod`, `database`, `graphql`, `validation` |
 | `ecommerce` | `store` |
 | `finance` | `accounting`, `banking`, `expenses`, `invoicing`, `quotes`, `subscriptions` |
 | `forms` | `forms` |
@@ -71,9 +71,9 @@ for end-user applications. Import them directly:
 | `storage` | `cloud` |
 | `workflow` | `approvals`, `checklists` |
 
-**Catalog size:** 56 official extensions across 23 categories
-(53 with database migrations + tenant RLS, 3 stateless / API-only:
-`content/pdf-viewer`, `developer/edge-functions`, and extensions without DB tables).
+**Catalog size:** 55 official extensions across 23 categories
+(53 with database migrations + tenant RLS, 2 stateless / API-only:
+`content/pdf-viewer` and extensions without DB tables).
 
 Admin Studio pages are **SDUI schemas** unless listed in [STUDIO-DEFERRED.md](./STUDIO-DEFERRED.md).
 
