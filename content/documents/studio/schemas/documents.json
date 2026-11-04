@@ -8,11 +8,18 @@
       "id": "generated",
       "label": "content.documents.tab.generated",
       "icon": "FileText",
-      "dataSource": "/ext/content/documents/generated",
-      "dataPath": "documents",
+      "dataSource": "/api/data/generated_documents?sort=created_at&order=desc&limit=500",
+      "dataPath": "records",
       "columns": [
-        { "key": "document_number", "label": "common.col.number", "type": "mono" },
-        { "key": "template_name", "label": "content.documents.tab.templates" },
+        {
+          "key": "document_number",
+          "label": "common.col.number",
+          "type": "mono"
+        },
+        {
+          "key": "template_name",
+          "label": "content.documents.tab.templates"
+        },
         {
           "key": "status",
           "label": "common.col.status",
@@ -20,57 +27,47 @@
           "badge": {
             "colors": {
               "active": "badge-success",
-              "expired": "badge-warning",
               "revoked": "badge-error"
             }
           }
         },
         {
-          "key": "is_signed",
-          "label": "content.documents.col.signed",
-          "type": "boolean"
-        },
-        { "key": "generated_at", "label": "common.col.created", "type": "date" }
+          "key": "created_at",
+          "label": "common.col.created",
+          "type": "date"
+        }
       ],
       "rowActions": [
         {
-          "id": "signRequest",
-          "icon": "Send",
-          "label": "content.documents.btn.requestSignature",
+          "id": "sign",
+          "icon": "PenLine",
+          "label": "content.documents.btn.sign",
           "method": "POST",
-          "endpoint": "/ext/content/documents/generated/{id}/sign-request",
-          "prompt": {
-            "title": "content.documents.ui.request_signature",
-            "submitLabel": "content.documents.btn.send",
-            "fields": [
-              {
-                "name": "signer_email",
-                "label": "common.col.email",
-                "type": "email",
-                "required": true
-              },
-              {
-                "name": "signer_name",
-                "label": "common.col.name",
-                "required": true
-              },
-              {
-                "name": "message",
-                "label": "content.documents.ui.message_optional",
-                "type": "textarea",
-                "rows": 2
-              }
-            ]
-          }
+          "endpoint": "/api/data/document_signatures",
+          "visibleWhen": {
+            "field": "status",
+            "equals": "active"
+          },
+          "body": {
+            "document_id": "{id}"
+          },
+          "confirm": "content.documents.confirmSign"
         },
         {
-          "id": "delete",
-          "icon": "Trash2",
+          "id": "revoke",
+          "icon": "Ban",
           "variant": "text-error",
-          "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/ext/content/documents/generated/{id}",
-          "confirm": "content.documents.confirmDelete"
+          "label": "content.documents.btn.revoke",
+          "method": "PATCH",
+          "endpoint": "/api/data/generated_documents/{id}",
+          "visibleWhen": {
+            "field": "status",
+            "equals": "active"
+          },
+          "body": {
+            "status": "revoked"
+          },
+          "confirm": "content.documents.confirmRevoke"
         }
       ]
     },
@@ -78,12 +75,17 @@
       "id": "templates",
       "label": "content.documents.tab.templates",
       "icon": "Plus",
-      "dataSource": "/ext/content/documents/templates",
-      "dataPath": "templates",
+      "dataSource": "/api/data/document_templates?is_active[eq]=true&sort=name&limit=500",
+      "dataPath": "records",
       "columns": [
-        { "key": "name", "label": "common.col.name" },
-        { "key": "category", "label": "common.col.category" },
-        { "key": "description", "label": "common.col.description" }
+        {
+          "key": "name",
+          "label": "common.col.name"
+        },
+        {
+          "key": "description",
+          "label": "common.col.description"
+        }
       ],
       "rowActions": [
         {
@@ -110,8 +112,14 @@
                 "type": "select",
                 "default": "pdf",
                 "options": [
-                  { "value": "pdf", "label": "content.documents.format.pdf" },
-                  { "value": "html", "label": "content.documents.format.html" }
+                  {
+                    "value": "pdf",
+                    "label": "content.documents.format.pdf"
+                  },
+                  {
+                    "value": "html",
+                    "label": "content.documents.format.html"
+                  }
                 ]
               }
             ]

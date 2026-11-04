@@ -2,14 +2,18 @@
   "name": "content/document-templates",
   "displayName": "Document Templates",
   "category": "content",
-  "description": "Admin-managed HTML/PDF templates with variable interpolation and async generation",
-  "version": "1.0.8",
-  "zveltioMinVersion": "1.0.0",
+  "description": "HTML templates with {{variable}} interpolation, rendered to PDF as the caller",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.99",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-document-templates",
   "permissions": [
-    "database",
-    "documents"
+    "documents",
+    "data:write"
+  ],
+  "collections": [
+    "document_templates",
+    "document_renders"
   ],
   "i18nPrefixes": [
     "content.document-templates"
@@ -38,7 +42,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "999c3024cd29787bafd08c6987af8845cd511b1ded8a796ac38b40ad8294f333",
-    "sourceSha256": "71ca2ecee34bea1cd6cd7b49f6788e2e8613a9119e4e51dbb6ca234aec5d1656"
+    "engineSha256": "9c91dfb4b238045dfdbc8126a5a6096b3e135b88382485663e5826bb6db7cd9e",
+    "sourceSha256": "72a70cd0f091064675727505f74c14d386b96c046d773f50034b702f49017a56",
+    "schemaSha256": "17e66e04a795ff00e5957d096deb4d42181a926a20b343f5bffa16135b8db510"
   }
 }

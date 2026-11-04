@@ -1,0 +1,33 @@
+{
+  "name": "document_number_sequences",
+  "fields": [
+    {
+      "name": "template_id",
+      "type": "uuid",
+      "required": true,
+      "unique": true
+    },
+    {
+      "name": "prefix",
+      "type": "text",
+      "required": true,
+      "defaultValue": "DOC"
+    },
+    {
+      "name": "year_reset",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true
+    },
+    {
+      "name": "reset_year",
+      "type": "integer"
+    },
+    {
+      "name": "next_number",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 1
+    }
+  ]
+}

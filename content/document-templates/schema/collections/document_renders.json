@@ -1,0 +1,29 @@
+{
+  "name": "document_renders",
+  "fields": [
+    {
+      "name": "template_id",
+      "type": "m2o",
+      "options": {
+        "related_collection": "document_templates"
+      },
+      "indexed": true
+    },
+    {
+      "name": "variables",
+      "type": "json"
+    }
+  ],
+  "relations": [
+    {
+      "name": "document_renders_template_id",
+      "type": "m2o",
+      "field": "template_id",
+      "target": "document_templates",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

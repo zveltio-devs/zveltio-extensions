@@ -2,27 +2,28 @@
   "name": "content/documents",
   "displayName": "Document Generator",
   "category": "content",
-  "description": "Generate PDF documents from templates with data binding",
-  "version": "1.0.9",
-  "zveltioMinVersion": "1.0.0",
+  "description": "Numbered documents generated from templates as the caller, with signatures by logged-in users",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.99",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-documents",
   "permissions": [
-    "database",
-    "documents"
+    "documents",
+    "data:write"
+  ],
+  "collections": [
+    "generated_documents",
+    "document_number_sequences",
+    "document_signatures"
   ],
   "dependencies": [
     {
       "name": "content/document-templates",
-      "minVersion": "1.0.0"
+      "minVersion": "2.0.0"
     }
   ],
   "i18nPrefixes": [
     "content.documents"
-  ],
-  "publicRoutes": [
-    "/sign/*",
-    "/share/*"
   ],
   "studio": {
     "pages": [
@@ -47,7 +48,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "ac1e886c0b45eef691ee8d2eaeb697b7d0a2cb4db765764b77a96f4d7fe9b59f",
-    "sourceSha256": "ed1804d9ed6dfeec11da7e58275c06c3c246f78e5137ba5315193dd7aff5e2ba"
+    "engineSha256": "31c469521a5eface87212a3b95da657e32d36c73197e6c9a135478de8be09ab0",
+    "sourceSha256": "ca1bf6296bca8fa8df268064d132b16895c70818d736eef44d7c1815373ce035",
+    "schemaSha256": "b6626dbc48aa2be4eb2e5dcb550845b4bd1edebb3068c5b0372039bf4b39ecc7"
   }
 }

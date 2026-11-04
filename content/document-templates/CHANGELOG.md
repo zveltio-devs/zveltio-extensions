@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.0.0 (2026-11-04)
+
+- feat!: templates and the render log are the declared collections `document_templates` and `document_renders`, created and owned by the engine and served by the data API; no SQL migrations. The 1.x tables `zv_document_templates`, `zv_document_renders`, `zv_document_template_versions`, `zv_document_template_access` and `zv_document_render_jobs` are no longer read or written and their rows are not carried over
+- feat!: no authorization in the extension: the admin-only gate on every route is gone. Who may manage templates is who may write `document_templates`; who may generate is who may read the template and create in `document_renders`
+- feat!: the one route left is `POST /:id/generate`, which reads the template and logs the render through the data API as the caller, then answers the PDF; a failed PDF answers 502 and keeps no render row. The hand-written CRUD, `/stats` and `/:id/generations` are dropped (the data API serves both collections)
+- feat!: template history is the engine's record revisions (`/api/revisions`, with revert); the hand-made `/versions` snapshots and restore are dropped. Batch jobs (`/batch-jobs`), which were stored and never processed, are dropped, as are the never-applied `template_type`, `output_format`, `usage_count` and `last_used_at`
+- fix: variables are HTML-escaped when filled in; 1.x inserted them raw, so a caller's value could add markup (an `<img src>` the PDF renderer fetches) to the document
+- fix: the Studio form posts `html_body` (1.x posted `body` and `format`, which the route rejected)
+- chore: the legacy `database` permission label is dropped
+
 ## 1.0.8 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)

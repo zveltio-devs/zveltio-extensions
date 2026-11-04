@@ -1,584 +1,110 @@
-/**
- * Documents Management — Enterprise Edition
- *
- * GET    /api/documents/templates                    — list active templates
- * POST   /api/documents/generate/:templateId         — generate document with auto doc number
- * GET    /api/documents/generated                    — list generated docs (filters + pagination)
- * GET    /api/documents/generated/:id                — get doc details with sign requests
- * DELETE /api/documents/generated/:id                — revoke document (admin only)
- * POST   /api/documents/generated/:id/sign-request   — create sign request
- * GET    /api/documents/generated/:id/sign-requests  — list sign requests
- * POST   /api/documents/sign/:token                  — public: sign a document
- * GET    /api/documents/share/:token                 — public: view by share token
- * GET    /api/documents/sequences                    — list number sequences (admin)
- * POST   /api/documents/sequences                    — create/update sequence (admin)
- * GET    /api/documents/stats                        — stats summary
- */
-
 import { Hono } from 'hono';
+import { HTTPException } from 'hono/http-exception';
+import type { Context } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
-import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { renderTemplate } from './lib/doc-template.js';
-import { toJsonb } from '@zveltio/sdk/extension';
-// ── Schemas ───────────────────────────────────────────────────────────────────
+
+// Generated documents, their numbering and their signatures are declared
+// collections served by the data API. The one route left issues a document:
+// the template (`content/document-templates`) is read, the number is taken and
+// the document is recorded through the data API as the caller, all in the
+// request's transaction. Nothing here decides who may do it.
+//
+// A signature is a row of `document_signatures`, created by the signer through
+// the data API, so the engine stamps who signed (ADR 0015). There is no signing
+// or sharing by public token any more (owner decision 2026-11-03, B3).
+
+const TEMPLATES = 'document_templates';
+const DOCS = 'generated_documents';
+const SEQUENCES = 'document_number_sequences';
+
+type Row = Record<string, unknown>;
 
 const GenerateDocSchema = z.object({
   variables_data: z.record(z.string(), z.any()).optional().default({}),
-  source_record_id: z.string().uuid().optional(),
+  source_record_id: z.string().optional(),
   source_collection: z.string().optional(),
   output_format: z.enum(['pdf', 'html']).default('pdf'),
   expires_hours: z.number().int().positive().optional(),
 });
 
-const SignRequestSchema = z.object({
-  signer_email: z.string().email(),
-  signer_name: z.string().min(1),
-  message: z.string().optional(),
-  expires_hours: z.number().int().positive().default(168),
-});
-
-const SequenceSchema = z.object({
-  template_id: z.string().uuid(),
-  prefix: z.string().min(1).max(20),
-  year_reset: z.boolean().default(true),
-});
-
-// ── Helper: get or generate next doc number ───────────────────────────────────
-
-async function getNextDocNumber(dbh: any, templateId: string, prefix: string): Promise<string> {
-  const now = new Date();
-  const year = now.getFullYear();
-
-  const seq = await (dbh as any)
-    .selectFrom('zv_document_number_sequences')
-    .selectAll()
-    .where('template_id', '=', templateId)
-    .executeTakeFirst();
-
-  if (!seq) {
-    // Create initial sequence
-    await (dbh as any)
-      .insertInto('zv_document_number_sequences')
-      .values({
-        template_id: templateId,
-        prefix,
-        next_number: 2,
-        year_reset: true,
-        reset_year: year,
-      })
-      .execute();
-    return `${prefix}-${year}-0001`;
-  }
-
-  // Check year reset
-  let nextNumber = seq.next_number;
-  if (seq.year_reset && seq.reset_year !== year) {
-    nextNumber = 1;
-    await (dbh as any)
-      .updateTable('zv_document_number_sequences')
-      .set({ next_number: 2, reset_year: year, updated_at: new Date() })
-      .where('template_id', '=', templateId)
-      .execute();
-  } else {
-    await (dbh as any)
-      .updateTable('zv_document_number_sequences')
-      .set({ next_number: nextNumber + 1, updated_at: new Date() })
-      .where('template_id', '=', templateId)
-      .execute();
-  }
-
-  const padded = String(nextNumber).padStart(4, '0');
-  return seq.year_reset ? `${seq.prefix}-${year}-${padded}` : `${seq.prefix}-${padded}`;
+/** Answer `status` and roll the request's transaction back: nothing written so far is kept. */
+function refuse(c: Context, status: number, body: object): never {
+  throw new HTTPException(status as 400, { res: c.json(body, status as 400) });
 }
 
-// ── Route factory ─────────────────────────────────────────────────────────────
-
-export function documentsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: any } }> {
-  const { db, auth, checkPermission } = ctx;
-
-  // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
-  // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
-  // a handler is therefore already RLS-scoped — there is one spelling, so there
-  // is none to forget.
-
-  // `renderTemplate` used to come from `ctx.internals`; it now lives in
-  // `./lib/doc-template.js`, with the feature. `generatePDFAsync` is called
-  // directly: the old `generatePDF` was a one-line delegation to it that
-  // existed only so the engine had something to export. The worker pool
-  // behind it stays the host's — spawning Workers is ambient authority.
-  const { generatePDFAsync } = ctx.internals;
-
-  const app = new Hono<{ Variables: { user: any } }>();
-
-  // Auth middleware (skipped for public routes below)
-  const requireAuth = async (c: any, next: any) => {
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (!session) return c.json({ error: 'Unauthorized' }, 401);
-    c.set('user', session.user);
-    return next();
-  };
-
-  // ── Public routes (no auth) ──────────────────────────────────────────────────
-
-  // POST /sign/:token — sign a document
-  app.post('/sign/:token', async (c) => {
-    const token = c.req.param('token');
-    const ip = c.req.header('x-forwarded-for') || c.req.header('cf-connecting-ip') || 'unknown';
-
-    const signReq = await (db as any)
-      .selectFrom('zv_document_sign_requests')
-      .selectAll()
-      .where('sign_token', '=', token)
-      .executeTakeFirst();
-
-    if (!signReq) return c.json({ error: 'Invalid or expired sign token' }, 404);
-    if (signReq.status !== 'pending') return c.json({ error: `Request already ${signReq.status}` }, 400);
-    if (new Date(signReq.expires_at) < new Date()) {
-      await (db as any)
-        .updateTable('zv_document_sign_requests')
-        .set({ status: 'expired' })
-        .where('id', '=', signReq.id)
-        .execute();
-      return c.json({ error: 'Sign token has expired' }, 410);
-    }
-
-    // A signature is one event recorded three times: the request that was
-    // fulfilled, the document that is now signed, and the access log entry that
-    // says who signed it and from where.
-    //
-    // The guard is `status !== 'pending'`, so a request marked signed without
-    // the document being flagged can never be signed again — the signer has
-    // used their one-time token, the document still reads unsigned, and there
-    // is no route that lets them try. And a document flagged signed with no log
-    // entry is a signature with no evidence of who gave it, which for a signed
-    // document is the whole point.
-    await db.transaction().execute(async (trx) => {
-      await (trx as any)
-        .updateTable('zv_document_sign_requests')
-        .set({ status: 'signed', signed_at: new Date(), ip_address: ip })
-        .where('id', '=', signReq.id)
-        .execute();
-
-      // Update document is_signed flag
-      await (trx as any)
-        .updateTable('zv_generated_docs')
-        .set({ is_signed: true })
-        .where('id', '=', signReq.document_id)
-        .execute();
-
-      // Log access
-      await (trx as any)
-        .insertInto('zv_document_access_log')
-        .values({ document_id: signReq.document_id, ip, action: 'sign' })
-        .execute();
-    });
-
-    return c.json({ success: true, signed_at: new Date() });
-  });
-
-  // GET /share/:token — view document metadata by share token
-  app.get('/share/:token', async (c) => {
-    const token = c.req.param('token');
-    const ip = c.req.header('x-forwarded-for') || c.req.header('cf-connecting-ip') || 'unknown';
-
-    const doc = await (db as any)
-      .selectFrom('zv_generated_docs')
-      .select(['id', 'template_name', 'document_number', 'output_format', 'generated_at', 'status', 'is_signed', 'expires_at'])
-      .where('share_token', '=', token)
-      .where('status', '=', 'active')
-      .executeTakeFirst();
-
-    if (!doc) return c.json({ error: 'Document not found or has been revoked' }, 404);
-
-    if (doc.expires_at && new Date(doc.expires_at) < new Date()) {
-      return c.json({ error: 'Document has expired' }, 410);
-    }
-
-    // Log access
-    await (db as any)
-      .insertInto('zv_document_access_log')
-      .values({ document_id: doc.id, ip, action: 'view' })
-      .execute();
-
-    return c.json({ document: doc });
-  });
-
-  // ── Authenticated routes ─────────────────────────────────────────────────────
-
-  app.use('/templates', requireAuth);
-  app.use('/templates/*', requireAuth);
-  app.use('/generate/*', requireAuth);
-  app.use('/generated', requireAuth);
-  app.use('/generated/*', requireAuth);
-  app.use('/sequences', requireAuth);
-  app.use('/sequences/*', requireAuth);
-  app.use('/stats', requireAuth);
-
-  // GET /templates — list active templates
-  app.get('/templates', async (c) => {
-    const templates = await (db as any)
-      .selectFrom('zv_document_templates')
-      .select(['id', 'name', 'description', 'category', 'variables', 'pdf_options'])
-      .where('is_active', '=', true)
-      .orderBy('name', 'asc')
-      .execute();
-    return c.json({ templates });
-  });
-
-  // POST /generate/:templateId — generate document
-  app.post('/generate/:templateId', zValidator('json', GenerateDocSchema), async (c) => {
-    const user = c.get('user');
-    const templateId = c.req.param('templateId');
-    const data = c.req.valid('json');
-
-    const template = await (db as any)
-      .selectFrom('zv_document_templates')
-      .selectAll()
-      .where('id', '=', templateId)
-      .where('is_active', '=', true)
-      .executeTakeFirst();
-
-    if (!template) return c.json({ error: 'Template not found or inactive' }, 404);
-
-    // Generate document number via sequence
-    const seqData = await (db as any)
-      .selectFrom('zv_document_number_sequences')
-      .selectAll()
-      .where('template_id', '=', templateId)
-      .executeTakeFirst();
-
-    const prefix = seqData?.prefix || template.category || 'DOC';
-    const docNumber = await getNextDocNumber(db, templateId, prefix);
-
-    const allVariables = {
-      ...data.variables_data,
-      _document_number: docNumber,
-      _generated_at: new Date().toLocaleDateString('ro-RO'),
-      _generated_by: user.name || user.id,
-    };
-
-    const htmlBody = typeof template.html_body === 'string' ? template.html_body : '';
-    const htmlContent = renderTemplate(htmlBody, allVariables);
-    const pdfBuffer = await generatePDFAsync(htmlContent, { title: `${template.name} ${docNumber}` }) as Buffer;
-
-    const expiresAt = data.expires_hours
-      ? new Date(Date.now() + data.expires_hours * 3600 * 1000)
-      : null;
-
-    // The document row and the template's usage counter commit together.
-    //
-    // The number was already allocated above by `getNextDocNumber`, which
-    // advances a sequence. Without a transaction a failure here consumes the
-    // number and writes no document — a gap in a numbering series that exists
-    // precisely so there are none, and on a legal document a gap is something
-    // somebody has to explain.
-    const doc = await db.transaction().execute(async (trx) => {
-      const created = await (trx as any)
-        .insertInto('zv_generated_docs')
-        .values({
-          template_id: templateId,
-          template_name: template.name,
-          source_collection: data.source_collection || null,
-          source_record_id: data.source_record_id || null,
-          variables_used: toJsonb(allVariables),
-          output_format: data.output_format,
-          document_number: docNumber,
-          generated_by: user.id,
-          expires_at: expiresAt,
-          status: 'active',
-        })
-        .returningAll()
-        .executeTakeFirst();
-
-      // Increment template usage
-      await (trx as any)
-        .updateTable('zv_document_templates')
-        .set({
-          usage_count: sql`usage_count + 1`,
-          last_used_at: new Date(),
-        })
-        .where('id', '=', templateId)
-        .execute();
-      return created;
-    });
-
-    if (data.output_format === 'pdf') {
-      const filename = `${template.name.replace(/\s/g, '_')}_${docNumber.replace(/\//g, '-')}.pdf`;
-      c.header('Content-Type', 'application/pdf');
-      c.header('Content-Disposition', `attachment; filename="${filename}"`);
-      c.header('X-Document-Id', doc.id);
-      c.header('X-Document-Number', docNumber);
-      return c.body(new Uint8Array(pdfBuffer));
-    }
-
-    return c.json({ document: doc, html: htmlContent }, 201);
-  });
-
-  // GET /generated — list generated docs
+export function documentsRoutes(ctx: ExtensionContext): Hono {
+  const { internals } = ctx;
+  const app = new Hono();
 
   /**
-   * May this user read a generated document?
-   *
-   * `GET /generated` listed every document in the tenant to anyone with a
-   * session, and `GET /generated/:id` returned any of them together with its
-   * signature requests — signer names and email addresses included. These are
-   * contracts, invoices and official papers generated from templates; on a
-   * Business OS for companies and public institutions, "any employee can read
-   * all of them" is not a default anyone chose, it is one nobody wrote down.
-   *
-   * Three ways in, using what the row already carries:
-   *   - you generated it (`generated_by`);
-   *   - you are a tenant admin, who can already revoke any of them;
-   *   - it was generated FROM a record, and you may read that collection.
-   *
-   * The third is the interesting one and mirrors the `?expand=` fix in the
-   * engine: a document about an invoice is as readable as the invoice. A
-   * document with no source collection is nobody's but its author's.
+   * The template's next number, `PREFIX-YEAR-0001` (or `PREFIX-0001` without
+   * the yearly reset). The sequence row is created on first use.
+   * ponytail: two concurrent issues can read the same number; `document_number`
+   * is unique, so the second answers 409 instead of a duplicate. A row lock
+   * (`expect`) when the data API's update grows one.
    */
-  async function mayReadDoc(
-    doc: { generated_by?: string | null; source_collection?: string | null },
-    userId: string,
-    isAdmin: boolean,
-    // Memoised across a listing: a page spans few distinct collections and
-    // `checkPermission` is cached anyway.
-    readable: Map<string, boolean>,
-  ): Promise<boolean> {
-    if (isAdmin) return true;
-    if (doc.generated_by === userId) return true;
-    const src = doc.source_collection;
-    if (!src) return false;
-    if (!readable.has(src)) {
-      readable.set(src, await checkPermission(userId, src, 'read').catch(() => false));
+  async function nextNumber(c: Context, templateId: string): Promise<string> {
+    const year = new Date().getFullYear();
+    const list = await internals.listRecords(c, SEQUENCES, { limit: 1, filter: { template_id: { eq: templateId } } });
+    if (list.status !== 200) refuse(c, list.status, list.body as object);
+    const seq = (list.body as { records: Row[] }).records[0];
+    if (!seq) {
+      const created = await internals.createRecord(c, SEQUENCES, { template_id: templateId, next_number: 2, reset_year: year });
+      if (created.status !== 201) refuse(c, created.status, { error: 'Could not start the numbering', detail: created.body });
+      return `${(created.body as Row).prefix}-${year}-0001`;
     }
-    return readable.get(src) === true;
+    const reset = Boolean(seq.year_reset) && Number(seq.reset_year) !== year;
+    const n = reset ? 1 : Number(seq.next_number);
+    const updated = await internals.updateRecord(c, SEQUENCES, String(seq.id), { next_number: n + 1, reset_year: year });
+    if (updated.status !== 200) refuse(c, updated.status, { error: 'Could not take a number', detail: updated.body });
+    const padded = String(n).padStart(4, '0');
+    return seq.year_reset ? `${seq.prefix}-${year}-${padded}` : `${seq.prefix}-${padded}`;
   }
 
-  app.get('/generated', async (c) => {
-    const { template_id, source_collection, source_record_id, status, limit = '50', offset = '0' } = c.req.query();
-
-    let query = (db as any)
-      .selectFrom('zv_generated_docs')
-      .selectAll()
-      .orderBy('generated_at', 'desc');
-
-    if (template_id) query = query.where('template_id', '=', template_id);
-    if (source_collection) query = query.where('source_collection', '=', source_collection);
-    if (source_record_id) query = query.where('source_record_id', '=', source_record_id);
-    if (status) query = query.where('status', '=', status);
-
-    const rows = await query.limit(Number(limit)).offset(Number(offset)).execute();
-
-    const listUser = c.get('user');
-    const listAdmin = await checkPermission(listUser.id, 'admin', '*').catch(() => false);
-    const readable = new Map<string, boolean>();
-    const docs = [];
-    for (const d of rows) {
-      if (await mayReadDoc(d, listUser.id, listAdmin, readable)) docs.push(d);
-    }
-
-    // The count reflects what was returned. Reporting the tenant-wide total
-    // next to a filtered page tells the caller exactly how many documents they
-    // are not allowed to see, which is most of what they wanted to know.
-    return c.json({
-      documents: docs,
-      pagination: { total: docs.length, limit: Number(limit), offset: Number(offset) },
-    });
-  });
-
-  // GET /generated/:id — doc details with sign requests
-  app.get('/generated/:id', async (c) => {
-    const id = c.req.param('id');
-
-    const doc = await (db as any)
-      .selectFrom('zv_generated_docs')
-      .selectAll()
-      .where('id', '=', id)
-      .executeTakeFirst();
-
-    if (!doc) return c.json({ error: 'Document not found' }, 404);
-
-    // 404, not 403 — whether a document exists is part of what it discloses.
-    const getUser = c.get('user');
-    const getAdmin = await checkPermission(getUser.id, 'admin', '*').catch(() => false);
-    if (!(await mayReadDoc(doc, getUser.id, getAdmin, new Map()))) {
-      return c.json({ error: 'Document not found' }, 404);
-    }
-
-    const signRequests = await (db as any)
-      .selectFrom('zv_document_sign_requests')
-      .select(['id', 'signer_email', 'signer_name', 'status', 'signed_at', 'expires_at', 'created_at'])
-      .where('document_id', '=', id)
-      .orderBy('created_at', 'desc')
-      .execute();
-
-    return c.json({ document: doc, sign_requests: signRequests });
-  });
-
-  // DELETE /generated/:id — revoke (admin only)
-  app.delete('/generated/:id', async (c) => {
-    const user = c.get('user');
-    const id = c.req.param('id');
-
-    const isAdmin = await checkPermission(user.id, 'admin', '*');
-    if (!isAdmin) return c.json({ error: 'Admin access required' }, 403);
-
-    const doc = await (db as any)
-      .selectFrom('zv_generated_docs')
-      .select('id')
-      .where('id', '=', id)
-      .executeTakeFirst();
-
-    if (!doc) return c.json({ error: 'Document not found' }, 404);
-
-    await (db as any)
-      .updateTable('zv_generated_docs')
-      .set({ status: 'revoked' })
-      .where('id', '=', id)
-      .execute();
-
-    return c.json({ success: true });
-  });
-
-  // POST /generated/:id/sign-request
-  app.post('/generated/:id/sign-request', zValidator('json', SignRequestSchema), async (c) => {
-    const user = c.get('user');
-    const id = c.req.param('id');
+  app.post('/generate/:templateId', zValidator('json', GenerateDocSchema), async (c) => {
     const data = c.req.valid('json');
+    const found = await internals.readRecord(c, TEMPLATES, c.req.param('templateId'));
+    if (found.status !== 200) return c.json(found.body as object, found.status as 404);
+    const template = found.body as Row;
+    if (!template.is_active) return c.json({ error: 'Template is not active' }, 400);
 
-    const doc = await (db as any)
-      .selectFrom('zv_generated_docs')
-      .select(['id', 'status', 'generated_by', 'source_collection'])
-      .where('id', '=', id)
-      .executeTakeFirst();
-
-    if (!doc) return c.json({ error: 'Document not found' }, 404);
-    // Same gate as reading it. Asking a third party to put their signature on a
-    // document you are not allowed to read is worse than reading it.
-    const signAdmin = await checkPermission(user.id, 'admin', '*').catch(() => false);
-    if (!(await mayReadDoc(doc, user.id, signAdmin, new Map()))) {
-      return c.json({ error: 'Document not found' }, 404);
-    }
-    if (doc.status !== 'active') return c.json({ error: 'Cannot create sign request for inactive document' }, 400);
-
-    const expiresAt = new Date(Date.now() + data.expires_hours * 3600 * 1000);
-
-    const signReq = await (db as any)
-      .insertInto('zv_document_sign_requests')
-      .values({
-        document_id: id,
-        signer_email: data.signer_email,
-        signer_name: data.signer_name,
-        message: data.message || null,
-        expires_at: expiresAt,
-        created_by: user.id,
-      })
-      .returningAll()
-      .executeTakeFirst();
-
-    return c.json({ sign_request: signReq }, 201);
-  });
-
-  // GET /generated/:id/sign-requests
-  app.get('/generated/:id/sign-requests', async (c) => {
-    const id = c.req.param('id');
-
-    // Signature requests carry the signer's name and email — the same gate as
-    // the document they belong to.
-    const srUser = c.get('user');
-    const srDoc = await (db as any)
-      .selectFrom('zv_generated_docs')
-      .select(['id', 'generated_by', 'source_collection'])
-      .where('id', '=', id)
-      .executeTakeFirst();
-    if (!srDoc) return c.json({ error: 'Document not found' }, 404);
-    const srAdmin = await checkPermission(srUser.id, 'admin', '*').catch(() => false);
-    if (!(await mayReadDoc(srDoc, srUser.id, srAdmin, new Map()))) {
-      return c.json({ error: 'Document not found' }, 404);
-    }
-
-    const signRequests = await (db as any)
-      .selectFrom('zv_document_sign_requests')
-      .selectAll()
-      .where('document_id', '=', id)
-      .orderBy('created_at', 'desc')
-      .execute();
-
-    return c.json({ sign_requests: signRequests });
-  });
-
-  // GET /sequences (admin)
-  app.get('/sequences', async (c) => {
-    const user = c.get('user');
-    const isAdmin = await checkPermission(user.id, 'admin', '*');
-    if (!isAdmin) return c.json({ error: 'Admin access required' }, 403);
-
-    const sequences = await (db as any)
-      .selectFrom('zv_document_number_sequences')
-      .selectAll()
-      .orderBy('updated_at', 'desc')
-      .execute();
-
-    return c.json({ sequences });
-  });
-
-  // POST /sequences (admin)
-  app.post('/sequences', zValidator('json', SequenceSchema), async (c) => {
-    const user = c.get('user');
-    const isAdmin = await checkPermission(user.id, 'admin', '*');
-    if (!isAdmin) return c.json({ error: 'Admin access required' }, 403);
-
-    const data = c.req.valid('json');
-
-    const result = await sql<any>`
-      INSERT INTO zv_document_number_sequences (template_id, prefix, year_reset)
-      VALUES (${data.template_id}, ${data.prefix}, ${data.year_reset})
-      ON CONFLICT (template_id) DO UPDATE
-        SET prefix = EXCLUDED.prefix,
-            year_reset = EXCLUDED.year_reset,
-            updated_at = NOW()
-      RETURNING *
-    `.execute(db);
-
-    return c.json({ sequence: result.rows[0] }, 201);
-  });
-
-  // GET /stats
-  app.get('/stats', async (c) => {
-    const now = new Date();
-    const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-    const [totalDocs, docsThisMonth, pendingSigs, byTemplate] = await Promise.all([
-      (db as any)
-        .selectFrom('zv_generated_docs')
-        .select((eb: any) => eb.fn.count('id').as('count'))
-        .executeTakeFirst(),
-      (db as any)
-        .selectFrom('zv_generated_docs')
-        .select((eb: any) => eb.fn.count('id').as('count'))
-        .where('generated_at', '>=', firstOfMonth)
-        .executeTakeFirst(),
-      (db as any)
-        .selectFrom('zv_document_sign_requests')
-        .select((eb: any) => eb.fn.count('id').as('count'))
-        .where('status', '=', 'pending')
-        .executeTakeFirst(),
-      (db as any)
-        .selectFrom('zv_generated_docs')
-        .select(['template_name', (eb: any) => eb.fn.count('id').as('count')])
-        .groupBy('template_name')
-        .orderBy('count', 'desc')
-        .limit(10)
-        .execute(),
-    ]);
-
-    return c.json({
-      total_documents: Number(totalDocs?.count || 0),
-      documents_this_month: Number(docsThisMonth?.count || 0),
-      pending_signatures: Number(pendingSigs?.count || 0),
-      by_template: byTemplate,
+    const documentNumber = await nextNumber(c, String(template.id));
+    const variables = {
+      ...data.variables_data,
+      _document_number: documentNumber,
+      _generated_at: new Date().toLocaleDateString('ro-RO'),
+    };
+    const html = renderTemplate(String(template.html_body ?? ''), variables);
+    const doc = await internals.createRecord(c, DOCS, {
+      template_id: template.id,
+      template_name: template.name,
+      document_number: documentNumber,
+      source_collection: data.source_collection ?? null,
+      source_record_id: data.source_record_id ?? null,
+      variables_used: variables,
+      expires_at: data.expires_hours ? new Date(Date.now() + data.expires_hours * 3_600_000).toISOString() : null,
     });
+    if (doc.status !== 201) refuse(c, doc.status, { error: 'Could not record the document', detail: doc.body });
+    const docId = String((doc.body as Row).id);
+
+    if (data.output_format === 'html') return c.json({ document: doc.body, html }, 201);
+
+    let pdf: Uint8Array<ArrayBuffer>;
+    try {
+      pdf = Uint8Array.from((await internals.generatePDFAsync(html, { title: `${template.name} ${documentNumber}` })) as Buffer);
+    } catch (err) {
+      // No document row and no number taken for a PDF that was never made.
+      refuse(c, 502, { error: 'PDF generation failed', detail: err instanceof Error ? err.message : String(err) });
+    }
+    const filename = `${String(template.name).replace(/\s/g, '_')}_${documentNumber.replace(/\//g, '-')}.pdf`;
+    c.header('Content-Type', 'application/pdf');
+    c.header('Content-Disposition', `attachment; filename="${filename}"`);
+    c.header('X-Document-Id', docId);
+    c.header('X-Document-Number', documentNumber);
+    return c.body(pdf);
   });
 
   return app;

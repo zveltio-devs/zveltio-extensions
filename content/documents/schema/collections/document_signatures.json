@@ -1,0 +1,30 @@
+{
+  "name": "document_signatures",
+  "fields": [
+    {
+      "name": "document_id",
+      "type": "m2o",
+      "options": {
+        "related_collection": "generated_documents"
+      },
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "statement",
+      "type": "textarea"
+    }
+  ],
+  "relations": [
+    {
+      "name": "document_signatures_document_id",
+      "type": "m2o",
+      "field": "document_id",
+      "target": "generated_documents",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

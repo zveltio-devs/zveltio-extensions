@@ -1,0 +1,51 @@
+{
+  "name": "generated_documents",
+  "defaultGrants": false,
+  "fields": [
+    {
+      "name": "template_id",
+      "type": "uuid",
+      "indexed": true
+    },
+    {
+      "name": "template_name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "document_number",
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    {
+      "name": "source_collection",
+      "type": "text"
+    },
+    {
+      "name": "source_record_id",
+      "type": "text",
+      "indexed": true
+    },
+    {
+      "name": "variables_used",
+      "type": "json"
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "options": {
+        "values": [
+          "active",
+          "revoked"
+        ]
+      },
+      "required": true,
+      "defaultValue": "active"
+    },
+    {
+      "name": "expires_at",
+      "type": "datetime"
+    }
+  ]
+}

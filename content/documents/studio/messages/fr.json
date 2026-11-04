@@ -1,8 +1,5 @@
 {
   "content.documents.btn.generate": "Générer",
-  "content.documents.btn.requestSignature": "Demander une signature",
-  "content.documents.btn.send": "Envoyer",
-  "content.documents.btn.viewLink": "Voir le lien partagé",
   "content.documents.btn.viewTemplates": "Voir les modèles",
   "content.documents.col.filename": "Nom du fichier",
   "content.documents.col.signed": "Signé",
@@ -20,9 +17,11 @@
   "content.documents.tab.templates": "Modèles",
   "content.documents.title": "Documents",
   "content.documents.toast.generated": "Document généré.",
-  "content.documents.ui.message_optional": "Message (facultatif)",
-  "content.documents.ui.request_signature": "Demander une signature",
   "content.documents.ui.signer_email": "E-mail du signataire *",
   "content.documents.ui.signer_name": "Nom du signataire",
-  "content.documents.variablesCount": "{n} variable(s)"
+  "content.documents.variablesCount": "{n} variable(s)",
+  "content.documents.btn.sign": "Sign",
+  "content.documents.btn.revoke": "Revoke",
+  "content.documents.confirmSign": "Sign this document as yourself?",
+  "content.documents.confirmRevoke": "Revoke this document?"
 }

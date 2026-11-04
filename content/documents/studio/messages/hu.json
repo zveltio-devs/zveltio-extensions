@@ -1,8 +1,5 @@
 {
   "content.documents.btn.generate": "Létrehozás",
-  "content.documents.btn.requestSignature": "Aláírás kérése",
-  "content.documents.btn.send": "Küldés",
-  "content.documents.btn.viewLink": "Megosztott hivatkozás megtekintése",
   "content.documents.btn.viewTemplates": "Sablonok megtekintése",
   "content.documents.col.filename": "Fájlnév",
   "content.documents.col.signed": "Aláírva",
@@ -20,9 +17,11 @@
   "content.documents.tab.templates": "Sablonok",
   "content.documents.title": "Dokumentumok",
   "content.documents.toast.generated": "Dokumentum létrehozva.",
-  "content.documents.ui.message_optional": "Üzenet (opcionális)",
-  "content.documents.ui.request_signature": "Aláírás kérése",
   "content.documents.ui.signer_email": "Aláíró e-mail *",
   "content.documents.ui.signer_name": "Aláíró neve",
-  "content.documents.variablesCount": "{n} variable(s)"
+  "content.documents.variablesCount": "{n} variable(s)",
+  "content.documents.btn.sign": "Sign",
+  "content.documents.btn.revoke": "Revoke",
+  "content.documents.confirmSign": "Sign this document as yourself?",
+  "content.documents.confirmRevoke": "Revoke this document?"
 }
