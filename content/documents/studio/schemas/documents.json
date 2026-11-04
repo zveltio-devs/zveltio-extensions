@@ -69,63 +69,51 @@
           },
           "confirm": "content.documents.confirmRevoke"
         }
-      ]
-    },
-    {
-      "id": "templates",
-      "label": "content.documents.tab.templates",
-      "icon": "Plus",
-      "dataSource": "/api/data/document_templates?is_active[eq]=true&sort=name&limit=500",
-      "dataPath": "records",
-      "columns": [
-        {
-          "key": "name",
-          "label": "common.col.name"
-        },
-        {
-          "key": "description",
-          "label": "common.col.description"
-        }
       ],
-      "rowActions": [
-        {
-          "id": "generate",
-          "icon": "FileText",
-          "label": "content.documents.btn.generate",
-          "method": "POST",
-          "endpoint": "/ext/content/documents/generate/{id}",
-          "prompt": {
-            "title": "content.documents.generateLabel",
-            "submitLabel": "content.documents.btn.generate",
-            "fields": [
+      "form": {
+        "endpoint": "/ext/content/documents/generate/{template_id}",
+        "fields": [
+          {
+            "name": "template_id",
+            "label": "content.documents.tab.templates",
+            "type": "relation",
+            "required": true,
+            "colSpan": 2,
+            "relation": {
+              "dataSource": "/api/data/document_templates?is_active[eq]=true&sort=name&limit=500",
+              "dataPath": "records",
+              "valueKey": "id",
+              "labelKey": "name"
+            }
+          },
+          {
+            "name": "variables_data",
+            "label": "content.documents.col.variable",
+            "type": "json",
+            "mono": true,
+            "rows": 6,
+            "default": "{}",
+            "colSpan": 2
+          },
+          {
+            "name": "output_format",
+            "label": "content.documents.form.outputFormat",
+            "type": "select",
+            "default": "pdf",
+            "options": [
               {
-                "name": "variables_data",
-                "label": "content.documents.col.variable",
-                "type": "json",
-                "mono": true,
-                "rows": 6,
-                "default": "{}"
+                "value": "pdf",
+                "label": "content.documents.format.pdf"
               },
               {
-                "name": "output_format",
-                "label": "content.documents.form.outputFormat",
-                "type": "select",
-                "default": "pdf",
-                "options": [
-                  {
-                    "value": "pdf",
-                    "label": "content.documents.format.pdf"
-                  },
-                  {
-                    "value": "html",
-                    "label": "content.documents.format.html"
-                  }
-                ]
+                "value": "html",
+                "label": "content.documents.format.html"
               }
-            ]
+            ],
+            "colSpan": 2
           }
-        }
-      ]
+        ]
+      }
     }
   ]
 }
