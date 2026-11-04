@@ -3,59 +3,12 @@ import { HTTPException } from 'hono/http-exception';
 import type { Context } from 'hono';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
 import { readMultipart, MULTIPART_REQUIRED } from '@zveltio/sdk/extension';
+import { parseCSV } from './csv';
 
 // Every read and write here is the data API's own, as the caller
 // (`ctx.internals.*Record`): a row lands only where the caller may create one,
 // with the target collection's validation, column rules, hooks and webhooks.
 // Nothing here decides who may import what (owner decision 2026-11-03, B1).
-
-// ─── CSV parsing ──────────────────────────────────────────────────────────────
-
-function parseCSVLine(line: string, delimiter: string): string[] {
-  const result: string[] = [];
-  let current = '';
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-    if (char === '"' && !inQuotes) {
-      inQuotes = true;
-    } else if (char === '"' && inQuotes) {
-      if (line[i + 1] === '"') {
-        current += '"';
-        i++;
-      } else {
-        inQuotes = false;
-      }
-    } else if (char === delimiter && !inQuotes) {
-      result.push(current);
-      current = '';
-    } else {
-      current += char;
-    }
-  }
-  result.push(current);
-  return result;
-}
-
-/** A blank CSV cell is a missing value; a JSON `""` stays a string. */
-function parseCSV(text: string, delimiter = ','): Record<string, string | null>[] {
-  const lines = text.trim().split(/\r?\n/);
-  if (lines.length < 2) return [];
-  const headers = parseCSVLine(lines[0], delimiter);
-  const rows: Record<string, string | null>[] = [];
-  for (let i = 1; i < lines.length; i++) {
-    if (!lines[i].trim()) continue;
-    const values = parseCSVLine(lines[i], delimiter);
-    const row: Record<string, string | null> = {};
-    headers.forEach((h, idx) => {
-      const value = (values[idx] ?? '').trim();
-      row[h.trim()] = value === '' ? null : value;
-    });
-    rows.push(row);
-  }
-  return rows;
-}
 
 const MAX_IMPORT_BYTES = 100 * 1024 * 1024;
 const MAX_ROWS = 10_000;

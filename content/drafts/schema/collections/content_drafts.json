@@ -50,6 +50,12 @@
     {
       "name": "published_at",
       "type": "datetime"
+    },
+    {
+      "name": "snapshot_count",
+      "type": "integer",
+      "defaultValue": 0,
+      "writtenBy": "actions"
     }
   ]
 }

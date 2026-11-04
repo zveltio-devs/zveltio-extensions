@@ -23,20 +23,13 @@ const conflict = (err: unknown, code: string) => (err as { code?: unknown }).cod
  */
 const reviewDraft: ExtensionAction = async (input, host) => {
   const { id, decision, note } = input as { id: string; decision: 'approved' | 'rejected'; note?: string };
-  const draft = await loadDraft(host, id);
-  if (draft.published_at != null) {
-    throw new ActionRefusal(409, 'already_published', 'A published draft is no longer reviewed.');
-  }
+  const seen = await loadDraft(host, id);
   try {
-    // What was approved, and where it goes, is kept apart from the draft's own
-    // fields, which the author can still edit: a scheduled publish writes this,
-    // never a later edit and never into another record.
-    const approved_data =
-      decision === 'approved'
-        ? { target_collection: draft.target_collection, record_id: draft.record_id, data: draft.draft_data ?? {} }
-        : null;
-    await host.collections.update(DRAFTS, id, { review_status: decision, approved_data }, {
-      expect: { review_status: [String(draft.review_status)] },
+    // Locks the row for the rest of the request: what is approved below is read
+    // after this, so an edit landing between a first read and the write cannot
+    // be approved unseen.
+    await host.collections.update(DRAFTS, id, { review_status: decision }, {
+      expect: { review_status: [String(seen.review_status)] },
     });
   } catch (err) {
     if (conflict(err, 'precondition_failed')) {
@@ -44,6 +37,19 @@ const reviewDraft: ExtensionAction = async (input, host) => {
     }
     throw err;
   }
+  const draft = await loadDraft(host, id);
+  if (draft.published_at != null) {
+    throw new ActionRefusal(409, 'already_published', 'A published draft is no longer reviewed.');
+  }
+  // What was approved, and where it goes, is kept apart from the draft's own
+  // fields, which the author can still edit: a scheduled publish writes this,
+  // never a later edit and never into another record.
+  await host.collections.update(DRAFTS, id, {
+    approved_data:
+      decision === 'approved'
+        ? { target_collection: draft.target_collection, record_id: draft.record_id, data: draft.draft_data ?? {} }
+        : null,
+  });
   return host.collections.insert(DECISIONS, {
     draft_id: id,
     decision,
@@ -52,18 +58,28 @@ const reviewDraft: ExtensionAction = async (input, host) => {
   });
 };
 
-/** Keep the draft's current content as its next numbered version. */
+/**
+ * Keep the draft's current content as its next numbered version. The number is
+ * the draft's `snapshot_count`, taken under the draft's row lock: counted from
+ * the snapshots the caller may see, a row rule hiding some gave a number that
+ * was taken, refused by the unique key every time. A draft from before the
+ * count starts from the highest version the caller sees.
+ */
 const snapshotDraft: ExtensionAction = async (input, host) => {
   const { id, description } = input as { id: string; description?: string };
   const draft = await loadDraft(host, id);
+  const counted = draft.snapshot_count == null ? null : Number(draft.snapshot_count);
   const last = (await host.collections.list(SNAPSHOTS, {
     filter: { draft_id: { eq: id } },
     sort: 'version',
     order: 'desc',
     limit: 1,
   })) as { records?: Row[] };
-  const version = Number(last.records?.[0]?.version ?? 0) + 1;
+  const version = Math.max(counted ?? 0, Number(last.records?.[0]?.version ?? 0)) + 1;
   try {
+    await host.collections.update(DRAFTS, id, { snapshot_count: version }, {
+      expect: { snapshot_count: [counted === null ? null : String(counted)] },
+    });
     return await host.collections.insert(SNAPSHOTS, {
       draft_id: id,
       version,
@@ -71,8 +87,8 @@ const snapshotDraft: ExtensionAction = async (input, host) => {
       description: description ?? null,
     });
   } catch (err) {
-    // Two snapshots raced for one version; the unique key refused the second.
-    if (conflict(err, '23505')) {
+    // Another snapshot of this draft took the number first.
+    if (conflict(err, 'precondition_failed') || conflict(err, '23505')) {
       throw new ActionRefusal(409, 'snapshot_busy', 'Another snapshot of this draft was taken at the same time; try again.');
     }
     throw err;

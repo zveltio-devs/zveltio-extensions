@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.0 (2026-11-04)
+
+- fix: `reviewDraft` approves the draft as it is once its row is locked. It read the draft, then wrote `approved_data` from that read, so an edit committing in between was approved unseen; the review status is now written first (with its `expect`), the draft read again under the lock, and `approved_data` taken from that read
+- fix: `snapshotDraft` numbers snapshots from the draft's new `snapshot_count` (written only by the action, under the draft's row lock), not from the snapshots the caller may see: a row rule hiding some gave a version already taken, refused by the unique key every time. A draft from before 2.1.0 continues from the highest version the caller sees
 ## 2.0.0 (2026-11-03)
 
 - feat!: drafts, review comments, review decisions and snapshots are the declared collections `content_drafts`, `content_draft_comments`, `content_draft_decisions` and `content_draft_snapshots`, created and owned by the engine and served by the data API; no SQL migrations. The 1.x tables (`zv_content_drafts`, `zv_collection_publish_settings`, `zv_publish_schedule`, `zv_draft_review_comments`, `zv_draft_snapshots`, `zv_draft_publish_jobs`) are no longer written or read, their rows are not carried over, and the tables are left in place
