@@ -2,9 +2,9 @@
   "name": "analytics/quality",
   "displayName": "Data Quality",
   "category": "analytics",
-  "description": "Automated data quality scans, anomaly detection and issue management",
-  "version": "1.0.11",
-  "zveltioMinVersion": "1.0.0",
+  "description": "Data quality scans over the data API, as the scanning user: duplicates, missing values, outliers and optional AI normalization hints",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.99",
   "zveltioMaxVersion": "4.0.0",
   "optionalDependencies": [
     {
@@ -13,8 +13,12 @@
   ],
   "package": "@zveltio/ext-quality",
   "permissions": [
-    "database",
-    "introspection"
+    "data:write"
+  ],
+  "collections": [
+    "quality_scans",
+    "quality_issues",
+    "quality_targets"
   ],
   "i18nPrefixes": [
     "analytics.quality"
@@ -42,7 +46,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "2d1201f19d68351af884d9cecc03ad3543a44f615b74851b6edee0fa11cfdc0a",
-    "sourceSha256": "f3465e8fcb207567267b52cf5f75d4c86c7e6ccc4d59fa3286879ef97bbcc3aa"
+    "engineSha256": "a407eb0254944137a433ac2ee21d73dcdd47b6e1d7e5533f4db62a9c7c191902",
+    "sourceSha256": "cac0590ac722590b4aff2fcef56843accb083e1a9739a366212783d14dbcc162",
+    "schemaSha256": "1611e1d405fba52f29fbde8a91dd1c8303c83b27ef03b9ce331e8259c5577163"
   }
 }

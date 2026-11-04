@@ -1,0 +1,27 @@
+{
+  "name": "quality_targets",
+  "fields": [
+    {
+      "name": "target_collection",
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    {
+      "name": "max_error_issues",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 5
+    },
+    {
+      "name": "max_warning_issues",
+      "type": "integer"
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true
+    }
+  ]
+}

@@ -1,0 +1,87 @@
+{
+  "name": "quality_issues",
+  "fields": [
+    {
+      "name": "scan_id",
+      "type": "m2o",
+      "options": {
+        "related_collection": "quality_scans"
+      },
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "target_collection",
+      "type": "text",
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "issue_type",
+      "type": "enum",
+      "options": {
+        "values": [
+          "duplicate",
+          "missing_data",
+          "outlier",
+          "format_inconsistency",
+          "normalization_suggestion",
+          "anomaly"
+        ]
+      },
+      "required": true
+    },
+    {
+      "name": "severity",
+      "type": "enum",
+      "options": {
+        "values": [
+          "info",
+          "warning",
+          "error"
+        ]
+      },
+      "required": true,
+      "defaultValue": "warning"
+    },
+    {
+      "name": "field_name",
+      "type": "text"
+    },
+    {
+      "name": "description",
+      "type": "textarea",
+      "required": true
+    },
+    {
+      "name": "suggestion",
+      "type": "textarea"
+    },
+    {
+      "name": "record_ids",
+      "type": "json"
+    },
+    {
+      "name": "dismissed",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": false
+    },
+    {
+      "name": "dismissed_at",
+      "type": "datetime"
+    }
+  ],
+  "relations": [
+    {
+      "name": "quality_issues_scan_id",
+      "type": "m2o",
+      "field": "scan_id",
+      "target": "quality_scans",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}
