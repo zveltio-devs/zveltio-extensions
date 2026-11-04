@@ -1,8 +1,5 @@
 {
   "content.documents.btn.generate": "Genereren",
-  "content.documents.btn.requestSignature": "Handtekening aanvragen",
-  "content.documents.btn.send": "Verzenden",
-  "content.documents.btn.viewLink": "Gedeelde link bekijken",
   "content.documents.btn.viewTemplates": "Sjablonen bekijken",
   "content.documents.col.filename": "Bestandsnaam",
   "content.documents.col.signed": "Ondertekend",
@@ -20,9 +17,11 @@
   "content.documents.tab.templates": "Sjablonen",
   "content.documents.title": "Documenten",
   "content.documents.toast.generated": "Document gegenereerd.",
-  "content.documents.ui.message_optional": "Bericht (optioneel)",
-  "content.documents.ui.request_signature": "Handtekening aanvragen",
   "content.documents.ui.signer_email": "E-mail ondertekenaar *",
   "content.documents.ui.signer_name": "Naam ondertekenaar",
-  "content.documents.variablesCount": "{n} variable(s)"
+  "content.documents.variablesCount": "{n} variable(s)",
+  "content.documents.btn.sign": "Sign",
+  "content.documents.btn.revoke": "Revoke",
+  "content.documents.confirmSign": "Sign this document as yourself?",
+  "content.documents.confirmRevoke": "Revoke this document?"
 }

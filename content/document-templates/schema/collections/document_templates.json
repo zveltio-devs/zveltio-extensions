@@ -1,0 +1,37 @@
+{
+  "name": "document_templates",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "description",
+      "type": "textarea"
+    },
+    {
+      "name": "html_body",
+      "type": "textarea",
+      "required": true
+    },
+    {
+      "name": "variables",
+      "type": "json"
+    },
+    {
+      "name": "pdf_options",
+      "type": "json"
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true
+    },
+    {
+      "name": "tags",
+      "type": "tags"
+    }
+  ]
+}

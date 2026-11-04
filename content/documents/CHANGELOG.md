@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.0.0 (2026-11-04)
+
+- feat!: generated documents, numbering sequences and signatures are the declared collections `generated_documents`, `document_number_sequences` and `document_signatures`, created and owned by the engine and served by the data API; no SQL migrations. The 1.x tables `zv_generated_docs`, `zv_document_sign_requests`, `zv_document_access_log` and `zv_document_number_sequences` are no longer read or written and their rows are not carried over
+- feat!: `POST /generate/:templateId` reads the template (`content/document-templates` 2.0.0, now a required `minVersion`), takes the next number and records the document through the data API as the caller, in one transaction: a refused write or a failed PDF (502) keeps no document and takes no number. Who may generate is who may read `document_templates`, read and write `document_number_sequences`, and create in `generated_documents`
+- feat!: signing and sharing by public token are gone (owner decision 2026-11-03, B3): `POST /sign/:token`, `GET /share/:token`, sign requests and the access log are dropped, and the extension has no public routes. A logged-in user signs by creating a row of `document_signatures` (`document_id`), and the engine records who signed (ADR 0015); who may sign is who may create in it
+- feat!: no authorization in the extension: the admin checks and the "author or reader of the source collection" filter are gone. `generated_documents` has no default grants, because a document holds the variables it was made from; the operator grants `read` to the roles that should see them, or adds a row rule such as `created_by eq user_id`
+- feat!: dropped: `GET /templates`, `/generated`, `/generated/:id`, `DELETE /generated/:id` (revoke is `PATCH /api/data/generated_documents/:id` with `status: "revoked"`), `/sequences` and `/stats`; the data API serves the collections. The template `category` as a number prefix is gone (the sequence's `prefix`, default `DOC`), as is `_generated_by` among the variables (the row's `created_by` records it)
+- chore: the legacy `database` permission label is dropped
+
 ## 1.0.9 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)
