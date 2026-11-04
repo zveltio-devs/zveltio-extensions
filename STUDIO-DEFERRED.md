@@ -24,7 +24,6 @@ Tier-3 pages appear only where the product calls for them (e.g.
 | `content/pages` | sites + page metadata list | **Block builder shipped** (`/admin/pages/builder/:id`). Still optional: live resolved preview, templates/menus/insights shell | Canvas under `studio/src/components/builder/` |
 | `content/media` | metadata CRUD | File browser + upload UI | |
 | `developer/graphql` | schema/endpoints admin | **Playground shipped** (`/admin/developer/graphql/playground`) | POST `/ext/developer/graphql` |
-| `developer/edge-functions` | list/create/edit/invoke | **IDE shipped** (`/admin/developer/edge-functions/ide`) | Textarea editor + invoke |
 | `geospatial/postgis` | geofences CRUD | **Explore shipped** (`/admin/geospatial/postgis/explore`) — near/cluster/bbox | MapView |
 | `projects/management` | projects CRUD | **Kanban shipped** (`/admin/projects/management/kanban`) | Drag → PATCH status |
 | `projects/helpdesk` | tickets list/create/reply | Live conversation panel | |
