@@ -12,14 +12,19 @@
 // account is the engine's to find or create (`provisionUser`): a first sign-in
 // provisions it, and an address the tenant has no claim to — the instance
 // owner's — signs nobody in.
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { Kysely, PostgresDialect, sql } from 'kysely';
 // @ts-ignore — node-forge ships no types in this repository.
 import forge from 'node-forge';
 import { Pool } from 'pg';
 // @ts-ignore — xml-crypto 2.x ships no types.
 import { SignedXml } from 'xml-crypto';
-import { engineSession, mountForTest } from '../../../testing/ext-harness';
+import { engineSession, godAcrossFirms, mountForTest } from '../../../testing/ext-harness';
+
+const ENGINE = join(import.meta.dir, '../../../../zveltio/packages/engine/src');
+const manifest = JSON.parse(readFileSync(join(import.meta.dir, '../manifest.json'), 'utf8'));
 
 const d =
   process.env.TEST_DATABASE_URL && process.env.BETTER_AUTH_SECRET ? describe : describe.skip;
@@ -92,7 +97,38 @@ d('auth/saml — an assertion is a session the engine accepts', () => {
   const pool = new Pool({ connectionString: process.env.TEST_DATABASE_URL });
   const db = new Kysely<Record<string, never>>({ dialect: new PostgresDialect({ pool }) });
   const idp = createIdp();
+  let engineDb: any;
+
+  // The IdP settings are the declared collection `saml_settings`, saved through
+  // the data API in the product; here one row per test tenant is written.
+  const seed = (tenant: string | null, c: { entryPoint: string; issuer: string; cert: string; callbackUrl: string }) =>
+    sql`
+      INSERT INTO zvd_saml_settings (tenant_id, scope, enabled, entry_point, issuer, cert, callback_url)
+      VALUES (COALESCE(${tenant}::uuid, '00000000-0000-0000-0000-000000000001'::uuid), 'tenant', true,
+              ${c.entryPoint}, ${c.issuer}, ${c.cert}, ${c.callbackUrl})`.execute(db);
+
+  beforeAll(async () => {
+    const { getTestApp } = await import(join(ENGINE, 'testing/app-harness.js'));
+    const { applyDeclaredCollections, readDeclaredCollections } = await import(
+      join(ENGINE, 'lib/extensions/declared-collections.js')
+    );
+    ({ db: engineDb } = await getTestApp());
+    const files = await readDeclaredCollections(
+      manifest.name,
+      join(import.meta.dir, '..'),
+      manifest.collections,
+      manifest.integrity?.schemaSha256,
+    );
+    await applyDeclaredCollections(engineDb, manifest.name, files, true);
+    await sql`DELETE FROM zvd_saml_settings`.execute(db);
+    await seed(null, idp.config);
+  });
+
   afterAll(async () => {
+    if (engineDb) {
+      const { dropTestCollection } = await import(join(ENGINE, 'testing/app-harness.js'));
+      for (const name of manifest.collections) await dropTestCollection(engineDb, name);
+    }
     await db.destroy();
   });
 
@@ -105,13 +141,9 @@ d('auth/saml — an assertion is a session the engine accepts', () => {
   };
 
   const setUp = async () => {
-    const { app } = await mountForTest(import.meta.dir);
-    const cfg = await app.request('/config', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(idp.config),
-    });
-    expect(cfg.status).toBe(200);
+    // Anonymous, in the tenant transaction: the callback reads the settings and
+    // claims the assertion as the system, which runs only inside a tenant.
+    const { app } = await mountForTest(import.meta.dir, { authed: false, admin: false, transaction: true });
     return (email: string, samlResponse = idp.response(email)) => {
       const form = new FormData();
       form.set('SAMLResponse', samlResponse);
@@ -168,5 +200,27 @@ d('auth/saml — an assertion is a session the engine accepts', () => {
     const res = await acs('ext-harness-uuid@test.local');
     expect(res.status).toBe(403);
     expect(res.headers.get('set-cookie')).toBeNull();
+  });
+
+  // A god's read reach is every firm, so the settings read without its tenant
+  // filter answers with whichever firm's row comes first. The SP metadata names
+  // the firm's own entity ID.
+  it('the metadata is the identity provider of the firm the request runs in', async () => {
+    const A = '00000000-0000-4000-8000-0000000d5a0a';
+    const B = '00000000-0000-4000-8000-0000000d5a0b';
+    const h = await godAcrossFirms(import.meta.dir, [A, B]);
+    try {
+      for (const [tenant, tag] of [[A, 'a'], [B, 'b']]) {
+        await seed(tenant, { ...idp.config, issuer: `sp-${tag}` });
+      }
+      for (const [tenant, tag] of [[A, 'a'], [B, 'b']]) {
+        const res = await (await h.asGod(tenant)).request('/metadata');
+        expect(res.status).toBe(200);
+        expect(await res.text()).toContain(`entityID="sp-${tag}"`);
+      }
+    } finally {
+      await h.pool.query(`DELETE FROM zvd_saml_settings WHERE tenant_id = ANY($1)`, [[A, B]]);
+      await h.done();
+    }
   });
 });

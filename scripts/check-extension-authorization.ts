@@ -55,6 +55,12 @@ const ALLOWLIST: Record<string, string> = {
   // a grant, and the subject is the session's user: there is no permission for
   // the route to ask. Everything else it writes goes through actions.
   'compliance/gdpr/engine/self-service.ts': 'self-service erasure of the caller’s own account (Art. 17)',
+  // Its one write route, `POST /callback`, is the SAML assertion consumer: the
+  // caller is a browser carrying an IdP-signed assertion, before any session
+  // exists, so there is no principal to ask. The signature is the check
+  // (`validateSamlResponse`); it writes only the spent-assertion claim (as the
+  // system) and the session the engine creates.
+  'auth/saml/engine/routes.ts': 'SAML assertion consumer, authenticated by the IdP signature',
 };
 
 /** Any helper that represents an authorization decision. */

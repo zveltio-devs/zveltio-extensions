@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.0.0 (2026-11-05)
+
+- feat!: the identity-provider configuration is the collection `saml_settings`, declared in `schema/collections/` and created and owned by the engine, one row per tenant; no SQL migrations. `private_key` is encrypted at rest by the engine (the instance needs `FIELD_ENCRYPTION_KEY`). `audience` `false` is now `audience_check: false`. **Upgrade step:** 2.0.0 does not read `zvd_saml_config`; re-enter the IdP settings in Studio (SAML SSO) before users sign in again. The 1.x tables are left in place
+- feat!: replay protection is the collection `saml_spent_assertions` (a new name: the 1.x table `zvd_saml_consumed_assertions` stays where it is, and an assertion spent under 1.x is not remembered by 2.0.0; the assertion's own validity window, minutes at most IdPs, bounds that gap)
+- feat!: `GET`/`POST /config` are dropped; the data API serves `saml_settings`, so who may read or change it is the engine's rules. The collection has no default grants: tenant admins (whose grant is total) administer it, other roles only when granted. A reader of `saml_settings` reads `private_key` (1.x never returned it): grant `read` only to the roles that administer sign-in, or deny that column
+- feat!: `/login`, `/callback` and `/metadata` read the settings as the system (`data:system`, audited per request), in the request's tenant only; `/callback` claims the assertion the same way
+- feat!: `zvd_saml_login_log`, `zvd_saml_idp_metadata` and `zvd_saml_attribute_mappings` are no longer created; no code read or wrote them
+- fix: the Studio page sends the ACS callback URL, which 1.x required on save and its form never had, so a save from Studio was refused
+- chore: the `database`, `documents` and `secrets` permission labels are dropped
+
 ## 1.3.2 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)

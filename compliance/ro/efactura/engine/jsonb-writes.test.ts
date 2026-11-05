@@ -141,8 +141,8 @@ d('efactura — jsonb columns hold arrays under Bun.SQL (the production driver)'
     );
     if (hasSource.rowCount) {
       await pool.query(
-        `INSERT INTO zvd_invoices (id, number, client_name, due_date, created_by)
-         VALUES ($1, $2, 'B', CURRENT_DATE, 'jsonb-user')`,
+        `INSERT INTO zvd_invoices (id, number, client_name, issue_date, due_date)
+         VALUES ($1, $2, 'B', CURRENT_DATE, CURRENT_DATE)`,
         [sourceId, `JB-SRC-${Date.now()}`],
       );
     }

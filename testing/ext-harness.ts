@@ -125,7 +125,8 @@ const RECORDED_STUBS = new Set(
   (harnessStubs as { members: Array<{ member: string }> }).members.map((m) => m.member),
 );
 
-const ENGINE_LIB = join(REPO, '..', 'zveltio', 'packages', 'engine', 'src', 'lib', 'extensions');
+const ENGINE_SRC = join(REPO, '..', 'zveltio', 'packages', 'engine', 'src');
+const ENGINE_LIB = join(ENGINE_SRC, 'lib', 'extensions');
 const restrictP = import(join(ENGINE_LIB, 'extension-context.js'));
 const capsP = import(join(ENGINE_LIB, 'capabilities.js'));
 const broadcastP = import(join(ENGINE_LIB, 'broadcast.js'));
@@ -983,6 +984,17 @@ export async function extensionContract(engineDir: string, opts: ContractOptions
         const depMod = await import(join(REPO, dep, 'engine/index.js'));
         await applyMigrations(depMod.default);
       }
+      // The declared collections, as the engine's load path applies them before
+      // it mounts the routes: without them a route reading one answers 500 here
+      // and nowhere else.
+      if (Array.isArray(manifest?.collections) && manifest.collections.length > 0) {
+        const { applyDeclaredCollections, readDeclaredCollections } = await import(
+          join(ENGINE_SRC, 'lib', 'extensions', 'declared-collections.js')
+        );
+        const files = await readDeclaredCollections(name, extDir, manifest.collections, manifest.integrity?.schemaSha256);
+        const { getTestApp } = await import(join(ENGINE_SRC, 'testing', 'app-harness.js'));
+        await applyDeclaredCollections((await getTestApp()).db, name, files, true);
+      }
       if (typeof ext?.getMigrations !== 'function') return; // no migrations = valid
       // getMigrations() uses import.meta.dir of the PACKED file → engineDir.
       const files: string[] = ext.getMigrations();
@@ -1001,7 +1013,7 @@ export async function extensionContract(engineDir: string, opts: ContractOptions
     it('no parameterless GET route crashes (authed admin)', async () => {
       if (envUnsupported) return; // migrations env-skipped → tables absent by design
       const db = await getDb();
-      const app = await tenantApp();
+      const app = await tenantApp(undefined, true);
       await ext.register(app, await makeCtx(db, { authed: true, admin: true }, undefined, await productionWiring(extDir, name, ext)));
       const gets: string[] = [
         ...new Set(
@@ -1023,7 +1035,7 @@ export async function extensionContract(engineDir: string, opts: ContractOptions
     it('no parameterless POST route crashes on an empty body', async () => {
       if (envUnsupported) return; // migrations env-skipped → tables absent by design
       const db = await getDb();
-      const app = await tenantApp();
+      const app = await tenantApp(undefined, true);
       await ext.register(app, await makeCtx(db, { authed: true, admin: true }, undefined, await productionWiring(extDir, name, ext)));
       const posts: string[] = [
         ...new Set(
@@ -1058,7 +1070,7 @@ export async function extensionContract(engineDir: string, opts: ContractOptions
     it('unauthenticated request does not crash', async () => {
       if (envUnsupported) return; // migrations env-skipped → tables absent by design
       const db = await getDb();
-      const app = await tenantApp();
+      const app = await tenantApp(undefined, true);
       await ext.register(app, await makeCtx(db, { authed: false, admin: false }, undefined, await productionWiring(extDir, name, ext)));
       const first = (app.routes as Array<{ method: string; path: string }>).find(
         (r) => r.method === 'GET' && !r.path.includes(':') && !r.path.includes('*'),

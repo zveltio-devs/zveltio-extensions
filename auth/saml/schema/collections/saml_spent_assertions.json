@@ -1,0 +1,17 @@
+{
+  "name": "saml_spent_assertions",
+  "defaultGrants": false,
+  "fields": [
+    {
+      "name": "assertion_id",
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    {
+      "name": "expires_at",
+      "type": "datetime",
+      "required": true
+    }
+  ]
+}

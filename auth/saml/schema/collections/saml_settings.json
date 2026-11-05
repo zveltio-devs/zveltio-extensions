@@ -1,0 +1,84 @@
+{
+  "name": "saml_settings",
+  "defaultGrants": false,
+  "fields": [
+    {
+      "name": "scope",
+      "type": "enum",
+      "required": true,
+      "unique": true,
+      "defaultValue": "tenant",
+      "options": {
+        "values": [
+          "tenant"
+        ]
+      }
+    },
+    {
+      "name": "enabled",
+      "type": "boolean",
+      "defaultValue": false
+    },
+    {
+      "name": "entry_point",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "issuer",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "cert",
+      "type": "textarea",
+      "required": true
+    },
+    {
+      "name": "callback_url",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "private_key",
+      "type": "textarea",
+      "encrypted": true
+    },
+    {
+      "name": "signature_algorithm",
+      "type": "enum",
+      "defaultValue": "sha256",
+      "options": {
+        "values": [
+          "sha1",
+          "sha256",
+          "sha512"
+        ]
+      }
+    },
+    {
+      "name": "want_authn_response_signed",
+      "type": "boolean",
+      "defaultValue": true
+    },
+    {
+      "name": "audience",
+      "type": "text"
+    },
+    {
+      "name": "audience_check",
+      "type": "boolean",
+      "defaultValue": true
+    },
+    {
+      "name": "map_email",
+      "type": "text",
+      "defaultValue": "email"
+    },
+    {
+      "name": "map_name",
+      "type": "text",
+      "defaultValue": "displayName"
+    }
+  ]
+}
