@@ -37,17 +37,23 @@ DELETE /scim/v2/Users/{id}
 
 **This is the step people forget**, and without it nothing works.
 
-The extension asks for `database`, `secrets` and `auth:users`. They are **declared** in the
-manifest but not granted automatically — an administrator has to approve them
-explicitly. That is by design: an extension asking for more power has to ask
-visibly.
+The extension asks for `auth:users`, `identity:provision`, `secrets`,
+`data:system` and `data:write`. They are **declared** in the manifest but not
+granted automatically — an administrator has to approve them explicitly. That is
+by design: an extension asking for more power has to ask visibly.
 
 Without the `secrets` capability the extension cannot validate the token, and the
-provider gets a 401 on every call — including with a perfectly valid token.
+provider gets `500 SCIM is not configured on this server` on every call —
+including with a perfectly valid token.
+
+Without `data:system` it cannot look the token up or record provisioning state,
+and every call answers 500: the provider has no user behind it, so the extension
+reads `scim_tokens` and writes `scim_users` as the system, inside the token's
+tenant (audited per call).
 
 Without `auth:users` it cannot revoke a session, block a sign-in or delete an
 account, so every provisioning, (de)activation and delete answers 500 until it
-is approved — the IdP retries, so nothing is lost. Version 1.0.10 added it: approve it after updating.
+is approved — the IdP retries, so nothing is lost.
 
 Approval happens from the **Marketplace**, on the extension's card, at
 installation or after an update that asks for a new capability.
@@ -62,9 +68,20 @@ The token begins with `zvscim_` and is **shown only once**. Save it immediately;
 only its fingerprint is kept in the database, so it cannot be recovered, only
 replaced.
 
+Who may mint, list and revoke tokens is the engine's rule on the collection
+`scim_tokens`. It has no default grants: tenant administrators manage it, other
+roles only when granted. Listing and revoking go through the data API
+(`/api/data/scim_tokens`); minting is `POST /ext/auth/scim/tokens`, because the
+raw token exists only there.
+
 Each token belongs to a single tenant. The users the provider provisions land in
-that token's tenant — there is no ambiguity and no way to get the tenant wrong
-from outside.
+that token's tenant. The token is looked up **in the tenant the request names**:
+on a multi-tenant instance give the provider the tenant's own hostname (or have
+it send `x-tenant-slug`), or the request is the default tenant's and another
+tenant's token answers 401.
+
+**Upgrading from 1.x:** see the 2.0.0 entry in `CHANGELOG.md` — tokens are
+minted again, and 1.x provisioning state is not carried over.
 
 Provisioning creates **new** accounts. If the email already has an account on
 the instance — for example, the person also works for another tenant — the
@@ -166,14 +183,16 @@ still get in on Monday with a browser left open.
 
 ## If something does not work
 
-**401 on every call, with a valid token** — almost certainly the capabilities are
-not approved. Check Step 1.
+**500 on every call, with a valid token** — almost certainly the capabilities are
+not approved (`secrets`, `data:system`). Check Step 1.
 
-**401 on `ServiceProviderConfig` too** — wrong token, or the address is under
-`/ext/` instead of the root.
+**401 on `ServiceProviderConfig` too** — wrong token, the address is under
+`/ext/` instead of the root, or (multi-tenant) the request does not name the
+token's tenant: use the tenant's hostname.
 
-**500 "SCIM is not configured on this server"** — `FIELD_ENCRYPTION_KEY` is
-missing from the instance configuration. Tokens are stored as a fingerprint and
+**500 "SCIM is not configured on this server"** — the `secrets` capability is not
+approved, or the instance's auth secret (`BETTER_AUTH_SECRET`) is missing from
+its configuration. Tokens are stored as a fingerprint and
 cannot be verified without it.
 
 **Users are created but have no rights** — SCIM makes them members of the tenant;

@@ -7,8 +7,8 @@
     {
       "id": "tokens",
       "label": "auth.scim.tab.tokens",
-      "dataSource": "/ext/auth/scim/tokens",
-      "dataPath": "tokens",
+      "dataSource": "/api/data/scim_tokens?sort=created_at&order=desc&limit=200",
+      "dataPath": "records",
       "columns": [
         { "key": "name", "label": "common.col.name" },
         { "key": "created_at", "label": "common.col.created", "type": "date" },
@@ -20,7 +20,7 @@
           "label": "common.revoke",
           "kind": "call",
           "method": "DELETE",
-          "endpoint": "/ext/auth/scim/tokens/{id}",
+          "endpoint": "/api/data/scim_tokens/{id}",
           "variant": "btn-error btn-outline",
           "confirm": "auth.scim.confirm.revoke"
         }

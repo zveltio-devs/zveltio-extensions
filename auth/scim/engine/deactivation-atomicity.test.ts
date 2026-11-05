@@ -12,7 +12,7 @@
 import { afterAll, describe, expect, it } from 'bun:test';
 import { Kysely, PostgresDialect, sql } from 'kysely';
 import { Pool } from 'pg';
-import { mountForTest } from '../../../testing/ext-harness';
+import { scimApp } from '../testing/scim-app';
 
 const d =
   process.env.TEST_DATABASE_URL && process.env.BETTER_AUTH_SECRET ? describe : describe.skip;
@@ -29,15 +29,7 @@ d('auth/scim — deactivation is all-or-nothing', () => {
   });
 
   it('a failed enforcement statement does not leave the user marked inactive', async () => {
-    const { app } = await mountForTest(import.meta.dir);
-
-    const mint = await app.request('/tokens', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: 'Okta' }),
-    });
-    const token = ((await mint.json()) as { token: string }).token;
-    const json = { Authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    const { app, json } = await scimApp(import.meta.dir);
 
     const email = `scim-atomic-${Date.now()}@test.local`;
     const create = await app.request('/scim/v2/Users', {
@@ -75,7 +67,7 @@ d('auth/scim — deactivation is all-or-nothing', () => {
 
     // And the flag must not claim the deactivation happened.
     const flag = await sql<{ active: boolean }>`
-      SELECT active FROM zv_scim_users WHERE user_id = ${id}
+      SELECT active FROM zvd_scim_users WHERE user_id = ${id}
     `.execute(db);
     expect(flag.rows[0]?.active ?? true).toBe(true);
   });

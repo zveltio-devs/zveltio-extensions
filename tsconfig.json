@@ -80,5 +80,5 @@
     "**/studio/pages/**/*.ts",
     /* compile-time slot contributions — `$lib/*` resolves in packages/studio only */
     "**/studio/src/contribute.ts",
-    "**/node_modules", "**/dist", "**/*.test.ts", "testing"]
+    "**/node_modules", "**/dist", "**/*.test.ts", "**/testing"]
 }

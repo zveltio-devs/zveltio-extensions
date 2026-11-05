@@ -62,40 +62,22 @@ function toScimUser(u: any, state: { external_id?: string | null; active?: boole
 }
 
 export function scimAdminRoutes(ctx: ExtensionContext): Hono {
-  const { db, auth, checkPermission } = ctx;
   const app = new Hono();
 
-  app.use('*', async (c, next) => {
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (!session) return c.json({ error: 'Unauthorized' }, 401);
-    if (!(await checkPermission(session.user.id, 'admin', '*').catch(() => false))) {
-      return c.json({ error: 'Forbidden' }, 403);
-    }
-    c.set('user', session.user);
-    return next();
-  });
-
-  app.get('/tokens', async (c) => {
-    const rows = await sql<Record<string, unknown>>`
-      SELECT id::text, name, created_at, last_used_at FROM zv_scim_tokens ORDER BY created_at DESC
-    `.execute(db);
-    return c.json({ tokens: rows.rows });
-  });
-
+  // Minting is the one thing the data API cannot do: the raw token exists only
+  // here, and only its hash is stored. The row goes in through the data API as
+  // the caller, so who may mint a token is the engine's rule on `scim_tokens`
+  // (no default grants: tenant administrators). Listing and revoking tokens is
+  // `GET`/`DELETE /api/data/scim_tokens`.
   app.post('/tokens', zValidator('json', z.object({ name: z.string().min(1).max(120) })), async (c) => {
     const raw = `zvscim_${randomBytes(24).toString('hex')}`;
-    const user = c.get('user') as { id: string };
-    await sql`
-      INSERT INTO zv_scim_tokens (name, token_hash, created_by)
-      VALUES (${c.req.valid('json').name}, ${await hashToken(ctx.internals, raw)}, ${user.id})
-    `.execute(db);
+    const answer = await ctx.internals.createRecord(c, 'scim_tokens', {
+      name: c.req.valid('json').name,
+      token_hash: await hashToken(ctx.internals, raw),
+    });
+    if (answer.status !== 201) return c.json(answer.body as object, answer.status as 403);
     // Shown exactly once — paste it into the IdP's provisioning config.
-    return c.json({ token: raw, base_url: '/scim/v2' }, 201);
-  });
-
-  app.delete('/tokens/:id', async (c) => {
-    await sql`DELETE FROM zv_scim_tokens WHERE id = ${c.req.param('id')}`.execute(db);
-    return c.json({ success: true });
+    return c.json({ id: (answer.body as { id: string }).id, token: raw, base_url: '/scim/v2' }, 201);
   });
 
   return app;
@@ -152,6 +134,9 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
    * makes a user visible to an IdP; `listTenantUsers` answers it, and on a
    * single-tenant instance every user is the one tenant's.
    */
+  // With `data:system` the transaction is the system's inside the tenant
+  // (marked and audited by the host), which is what lets it write `scim_users`:
+  // the IdP has no principal for collection permissions to answer.
   const asTokenTenant = <T>(c: Ctx, fn: (trx: Db) => Promise<T>): Promise<T> =>
     internals.withTenantIsolation(tenantOf(c), fn);
 
@@ -180,7 +165,7 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
     const r = await sql<ScimRow>`
       SELECT user_id, external_id, active,
              ${iso('suspended_at')} AS suspended_at, ${iso('held_valid_to')} AS held_valid_to
-        FROM zv_scim_users
+        FROM zvd_scim_users
        WHERE tenant_id = ${tenantId}::uuid AND user_id IN (${sql.join(userIds)})
     `.execute(trx);
     return new Map(r.rows.map((row) => [row.user_id, row]));
@@ -271,16 +256,30 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
     // session and no tenant middleware — so the token is the only thing that
     // says which tenant the caller is, and it has to be read here or the
     // handlers have nothing to scope by.
-    const row = await sql<{ id: string; tenant_id: string }>`
-      SELECT id::text, tenant_id::text FROM zv_scim_tokens WHERE token_hash = ${hash}
-    `.execute(db);
-    if (row.rows.length === 0) return scimError(c, 401, 'Invalid bearer token');
-    (c as Ctx).set('scimTenantId', row.rows[0]!.tenant_id);
+    // The lookup runs in the request's tenant (per-tenant hostname or
+    // `x-tenant-slug`), as the system: the IdP has no principal. A token issued
+    // by another tenant is not found here, so the token's tenant is the
+    // request's.
+    const row = await internals.asSystem(
+      ['scim_tokens'],
+      async () => {
+        // The tenant transaction runs as `zveltio_rls`: the row policy keeps
+        // another tenant's tokens out of this lookup.
+        const found = await sql<{ id: string; tenant_id: string }>`
+          SELECT id::text, tenant_id::text FROM zvd_scim_tokens WHERE token_hash = ${hash}
+        `.execute(db);
+        const token = found.rows[0];
+        if (token) {
+          await sql`UPDATE zvd_scim_tokens SET last_used_at = NOW() WHERE id = ${token.id}::uuid`.execute(db);
+        }
+        return token;
+      },
+      { reason: 'SCIM bearer token' },
+    );
+    if (!row) return scimError(c, 401, 'Invalid bearer token');
+    (c as Ctx).set('scimTenantId', row.tenant_id);
     // Who offboarded somebody: the audit row names the token, not a user.
-    (c as Ctx).set('scimTokenId', row.rows[0]!.id);
-    await sql`UPDATE zv_scim_tokens SET last_used_at = NOW() WHERE id = ${row.rows[0]!.id}`
-      .execute(db)
-      .catch(() => undefined);
+    (c as Ctx).set('scimTokenId', row.id);
     return next();
   });
 
@@ -375,8 +374,8 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
       // next `GET /Users` would not return the user SCIM just created.
       await internals.addTenantMember(trx, user.id, 'member');
       await sql`
-        INSERT INTO zv_scim_users (tenant_id, user_id, external_id, active)
-        VALUES (${tenantId}::uuid, ${user.id}, ${body?.externalId ?? null}, ${active})
+        INSERT INTO zvd_scim_users (user_id, external_id, active)
+        VALUES (${user.id}, ${body?.externalId ?? null}, ${active})
         ON CONFLICT (tenant_id, user_id) DO UPDATE SET external_id = EXCLUDED.external_id, active = EXCLUDED.active, updated_at = NOW()
       `.execute(trx);
       // Provisioned inactive is what a later `active=false` would make it.
@@ -428,8 +427,8 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
    */
   async function setActive(trx: Db, userId: string, tenantId: string, active: boolean): Promise<void> {
     await sql`
-      INSERT INTO zv_scim_users (tenant_id, user_id, active)
-      VALUES (${tenantId}::uuid, ${userId}, ${active})
+      INSERT INTO zvd_scim_users (user_id, active)
+      VALUES (${userId}, ${active})
       ON CONFLICT (tenant_id, user_id) DO UPDATE SET active = EXCLUDED.active, updated_at = NOW()
     `.execute(trx);
     if (await internals.isSingleTenantInstance()) {
@@ -445,7 +444,7 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
           ifValidTo: row.suspended_at,
         });
         await sql`
-          UPDATE zv_scim_users SET suspended_at = NULL, held_valid_to = NULL
+          UPDATE zvd_scim_users SET suspended_at = NULL, held_valid_to = NULL
            WHERE tenant_id = ${tenantId}::uuid AND user_id = ${userId}
         `.execute(trx);
         inForceAnywhere = back?.inForceAnywhere ?? inForceAnywhere;
@@ -456,7 +455,7 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
     const ended = await internals.setTenantMembershipEnd(trx, userId, 'now', { ifInForce: true });
     if (ended?.changed) {
       await sql`
-        UPDATE zv_scim_users SET suspended_at = ${ended.validTo}::timestamptz,
+        UPDATE zvd_scim_users SET suspended_at = ${ended.validTo}::timestamptz,
                                  held_valid_to = ${ended.previousValidTo}::timestamptz
          WHERE tenant_id = ${tenantId}::uuid AND user_id = ${userId}
       `.execute(trx);
@@ -501,8 +500,8 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
       // the dangerous half.
       await updateProfile(trx, m, { name, email });
       await sql`
-        INSERT INTO zv_scim_users (tenant_id, user_id, external_id, active)
-        VALUES (${tenantId}::uuid, ${id}, ${body?.externalId ?? null}, ${active})
+        INSERT INTO zvd_scim_users (user_id, external_id, active)
+        VALUES (${id}, ${body?.externalId ?? null}, ${active})
         ON CONFLICT (tenant_id, user_id)
         DO UPDATE SET external_id = EXCLUDED.external_id, active = EXCLUDED.active
       `.execute(trx);
@@ -573,7 +572,7 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
       if (!(await memberOf(trx, id))) return scimError(c, 404, 'User not found');
       const gone = await internals.removeTenantMember(trx, id);
       await sql`
-        DELETE FROM zv_scim_users WHERE user_id = ${id} AND tenant_id = ${tenantId}::uuid
+        DELETE FROM zvd_scim_users WHERE user_id = ${id} AND tenant_id = ${tenantId}::uuid
       `.execute(trx);
       if (gone.orphaned) {
         // Revokes the sessions too; `account` goes with the row (ON DELETE CASCADE).
