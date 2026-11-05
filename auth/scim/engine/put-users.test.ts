@@ -12,7 +12,7 @@
 // mentioned". Getting that backwards would silently reactivate every user an
 // IdP pushes a profile update for.
 import { describe, expect, it } from 'bun:test';
-import { mountForTest } from '../../../testing/ext-harness';
+import { scimApp } from '../testing/scim-app';
 
 const d =
   process.env.TEST_DATABASE_URL && process.env.BETTER_AUTH_SECRET ? describe : describe.skip;
@@ -21,17 +21,7 @@ const SCIM_USER = 'urn:ietf:params:scim:schemas:core:2.0:User';
 
 d('auth/scim — PUT /Users/:id (RFC 7644 §3.5.1 replace)', () => {
   it('replaces the profile, and absence of `active` means true', async () => {
-    const { app } = await mountForTest(import.meta.dir);
-
-    const mint = await app.request('/tokens', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: 'Okta' }),
-    });
-    expect(mint.status).toBeLessThan(300);
-    const token = ((await mint.json()) as { token: string }).token;
-    const bearer = { Authorization: `Bearer ${token}` };
-    const json = { ...bearer, 'content-type': 'application/json' };
+    const { app, bearer, json } = await scimApp(import.meta.dir);
 
     const email = `scim-put-${Date.now()}@test.local`;
     const create = await app.request('/scim/v2/Users', {
@@ -78,14 +68,7 @@ d('auth/scim — PUT /Users/:id (RFC 7644 §3.5.1 replace)', () => {
   });
 
   it('deactivates when `active: false` is sent explicitly', async () => {
-    const { app } = await mountForTest(import.meta.dir);
-    const mint = await app.request('/tokens', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: 'Okta2' }),
-    });
-    const token = ((await mint.json()) as { token: string }).token;
-    const json = { Authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    const { app, json } = await scimApp(import.meta.dir);
 
     const email = `scim-put-off-${Date.now()}@test.local`;
     const create = await app.request('/scim/v2/Users', {
@@ -109,14 +92,7 @@ d('auth/scim — PUT /Users/:id (RFC 7644 §3.5.1 replace)', () => {
   });
 
   it('refuses a PUT for a user outside the caller’s tenant', async () => {
-    const { app } = await mountForTest(import.meta.dir);
-    const mint = await app.request('/tokens', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: 'Okta3' }),
-    });
-    const token = ((await mint.json()) as { token: string }).token;
-    const json = { Authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    const { app, json } = await scimApp(import.meta.dir);
 
     // A syntactically valid id that is not a member. PUT must answer like the
     // other methods — the cross-tenant enumeration migration 002 closed came

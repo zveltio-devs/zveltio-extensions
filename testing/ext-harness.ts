@@ -652,7 +652,7 @@ async function makeCtx(
         engineAssertNonMetadataUrl(url, label),
       assertPublicUrl: (url: string) => engineAssertPublicUrl(url),
       validatePublicUrl: (url: string) => engineValidatePublicUrl(url),
-      // ── Data API reads: the answer of a tenant nobody has granted ────────
+      // ── Data API: the answer of a tenant nobody has granted ──────────────
       //
       // The harness mounts no data API, so these answer what a fresh tenant
       // answers a caller without a grant: 403. That is exactly a public route's
@@ -660,6 +660,9 @@ async function makeCtx(
       // direction for any other caller — never rows. A route's own tests give it
       // a fake `listRecords` to prove what it does with rows.
       readRecord: async () => ({ status: 403, body: { title: 'Forbidden' } }),
+      // And so a write: a route that writes through the data API as the caller
+      // is shown the refusal; a test proving the allow path fakes it.
+      createRecord: async () => ({ status: 403, body: { title: 'Forbidden' } }),
       listRecords: async () => ({ status: 403, body: { title: 'Forbidden' } }),
       encryptSecret: async (plaintext: string, o?: { keyring?: string }) =>
         harnessEncrypt(plaintext, o?.keyring ?? 'field'),
@@ -860,6 +863,26 @@ async function applyMigrations(ext: any): Promise<boolean> {
  * lands on the public website). `{ user }` signs in as that real user instead
  * of the shared harness god — a test that erases its session user needs its own.
  */
+/**
+ * The extension's declared collections, as the engine's load path applies them
+ * before it mounts the routes: without them a route reading one answers 500
+ * here and nowhere else.
+ */
+async function applyDeclared(name: string, extDir: string, manifest: any): Promise<void> {
+  if (!Array.isArray(manifest?.collections) || manifest.collections.length === 0) return;
+  const { applyDeclaredCollections, readDeclaredCollections } = await import(
+    join(ENGINE_SRC, 'lib', 'extensions', 'declared-collections.js')
+  );
+  const files = await readDeclaredCollections(
+    name,
+    extDir,
+    manifest.collections,
+    manifest.integrity?.schemaSha256,
+  );
+  const { getTestApp } = await import(join(ENGINE_SRC, 'testing', 'app-harness.js'));
+  await applyDeclaredCollections((await getTestApp()).db, name, files, true);
+}
+
 export async function mountForTest(
   engineDir: string,
   opts: {
@@ -898,6 +921,10 @@ export async function mountForTest(
   // `mountForTest` receives the ENGINE dir; the extension is its parent, which
   // is what names it and where its manifest lives.
   const extDir = dirname(engineDir);
+  const manifestPath = join(extDir, 'manifest.json');
+  if (existsSync(manifestPath)) {
+    await applyDeclared(relative(REPO, extDir), extDir, JSON.parse(readFileSync(manifestPath, 'utf8')));
+  }
   const wiring = await productionWiring(extDir, relative(REPO, extDir), mod.default);
   const ctx = await makeCtx(db, { authed, admin, user, grants }, publicRoutes, wiring);
   await mod.default.register(app, ctx);
@@ -987,14 +1014,7 @@ export async function extensionContract(engineDir: string, opts: ContractOptions
       // The declared collections, as the engine's load path applies them before
       // it mounts the routes: without them a route reading one answers 500 here
       // and nowhere else.
-      if (Array.isArray(manifest?.collections) && manifest.collections.length > 0) {
-        const { applyDeclaredCollections, readDeclaredCollections } = await import(
-          join(ENGINE_SRC, 'lib', 'extensions', 'declared-collections.js')
-        );
-        const files = await readDeclaredCollections(name, extDir, manifest.collections, manifest.integrity?.schemaSha256);
-        const { getTestApp } = await import(join(ENGINE_SRC, 'testing', 'app-harness.js'));
-        await applyDeclaredCollections((await getTestApp()).db, name, files, true);
-      }
+      await applyDeclared(name, extDir, manifest);
       if (typeof ext?.getMigrations !== 'function') return; // no migrations = valid
       // getMigrations() uses import.meta.dir of the PACKED file → engineDir.
       const files: string[] = ext.getMigrations();

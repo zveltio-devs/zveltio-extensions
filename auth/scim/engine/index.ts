@@ -1,27 +1,17 @@
 import type { ZveltioExtension } from '@zveltio/sdk/extension';
-import { join } from 'path';
 import { buildScimApp, scimAdminRoutes } from './routes.js';
 
 /**
  * auth/scim — SCIM 2.0 provisioning for Azure AD / Entra, Okta and friends.
- * Admin token management under /ext/auth/scim; the SCIM protocol itself is a
- * root-level public route (/scim/v2/*, bearer-auth'd) so IdPs can reach it at
- * the URL shape they expect.
+ * Tokens and provisioning state are the declared collections `scim_tokens` and
+ * `scim_users`; /ext/auth/scim/tokens mints a token (the raw value exists only
+ * there). The SCIM protocol itself is a root-level public route (/scim/v2/*,
+ * bearer-auth'd) so IdPs can reach it at the URL shape they expect.
  */
 const extension: ZveltioExtension = {
   name: 'auth/scim',
   category: 'auth',
   mountStrategy: 'subapp',
-
-  getMigrations() {
-    return [
-      join(import.meta.dir, 'migrations/001_initial.sql'),
-      join(import.meta.dir, 'migrations/002_tenant_scoped_tokens.sql'),
-      join(import.meta.dir, 'migrations/003_per_tenant_deactivation.sql'),
-      join(import.meta.dir, 'migrations/004_block_ends_with_ban.sql'),
-      join(import.meta.dir, 'migrations/005_engine_ban_source.sql'),
-    ];
-  },
 
   async register(app, ctx) {
     app.route('/', scimAdminRoutes(ctx));

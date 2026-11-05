@@ -1,7 +1,4 @@
 // @bun
-// engine/index.ts
-import { join } from "path";
-
 // /zveltio-extension/node_modules/hono/dist/compose.js
 var compose = (middleware, onError, onNotFound) => {
   return (context, next) => {
@@ -10076,36 +10073,16 @@ function toScimUser(u, state = {}) {
   };
 }
 function scimAdminRoutes(ctx) {
-  const { db, auth, checkPermission } = ctx;
   const app = new Hono2;
-  app.use("*", async (c, next) => {
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (!session)
-      return c.json({ error: "Unauthorized" }, 401);
-    if (!await checkPermission(session.user.id, "admin", "*").catch(() => false)) {
-      return c.json({ error: "Forbidden" }, 403);
-    }
-    c.set("user", session.user);
-    return next();
-  });
-  app.get("/tokens", async (c) => {
-    const rows = await sql`
-      SELECT id::text, name, created_at, last_used_at FROM zv_scim_tokens ORDER BY created_at DESC
-    `.execute(db);
-    return c.json({ tokens: rows.rows });
-  });
   app.post("/tokens", zValidator("json", object({ name: string2().min(1).max(120) })), async (c) => {
     const raw = `zvscim_${randomBytes(24).toString("hex")}`;
-    const user = c.get("user");
-    await sql`
-      INSERT INTO zv_scim_tokens (name, token_hash, created_by)
-      VALUES (${c.req.valid("json").name}, ${await hashToken(ctx.internals, raw)}, ${user.id})
-    `.execute(db);
-    return c.json({ token: raw, base_url: "/scim/v2" }, 201);
-  });
-  app.delete("/tokens/:id", async (c) => {
-    await sql`DELETE FROM zv_scim_tokens WHERE id = ${c.req.param("id")}`.execute(db);
-    return c.json({ success: true });
+    const answer = await ctx.internals.createRecord(c, "scim_tokens", {
+      name: c.req.valid("json").name,
+      token_hash: await hashToken(ctx.internals, raw)
+    });
+    if (answer.status !== 201)
+      return c.json(answer.body, answer.status);
+    return c.json({ id: answer.body.id, token: raw, base_url: "/scim/v2" }, 201);
   });
   return app;
 }
@@ -10143,7 +10120,7 @@ function buildScimApp(ctx) {
     const r = await sql`
       SELECT user_id, external_id, active,
              ${iso("suspended_at")} AS suspended_at, ${iso("held_valid_to")} AS held_valid_to
-        FROM zv_scim_users
+        FROM zvd_scim_users
        WHERE tenant_id = ${tenantId}::uuid AND user_id IN (${sql.join(userIds)})
     `.execute(trx);
     return new Map(r.rows.map((row) => [row.user_id, row]));
@@ -10189,16 +10166,20 @@ function buildScimApp(ctx) {
     } catch {
       return scimError(c, 500, "SCIM is not configured on this server");
     }
-    const row = await sql`
-      SELECT id::text, tenant_id::text FROM zv_scim_tokens WHERE token_hash = ${hash}
-    `.execute(db);
-    if (row.rows.length === 0)
+    const row = await internals.asSystem(["scim_tokens"], async () => {
+      const found = await sql`
+          SELECT id::text, tenant_id::text FROM zvd_scim_tokens WHERE token_hash = ${hash}
+        `.execute(db);
+      const token = found.rows[0];
+      if (token) {
+        await sql`UPDATE zvd_scim_tokens SET last_used_at = NOW() WHERE id = ${token.id}::uuid`.execute(db);
+      }
+      return token;
+    }, { reason: "SCIM bearer token" });
+    if (!row)
       return scimError(c, 401, "Invalid bearer token");
-    c.set("scimTenantId", row.rows[0].tenant_id);
-    c.set("scimTokenId", row.rows[0].id);
-    await sql`UPDATE zv_scim_tokens SET last_used_at = NOW() WHERE id = ${row.rows[0].id}`.execute(db).catch(() => {
-      return;
-    });
+    c.set("scimTenantId", row.tenant_id);
+    c.set("scimTokenId", row.id);
     return next();
   });
   app.get("/ServiceProviderConfig", (c) => c.json({
@@ -10261,8 +10242,8 @@ function buildScimApp(ctx) {
       const { user } = found;
       await internals.addTenantMember(trx, user.id, "member");
       await sql`
-        INSERT INTO zv_scim_users (tenant_id, user_id, external_id, active)
-        VALUES (${tenantId}::uuid, ${user.id}, ${body?.externalId ?? null}, ${active})
+        INSERT INTO zvd_scim_users (user_id, external_id, active)
+        VALUES (${user.id}, ${body?.externalId ?? null}, ${active})
         ON CONFLICT (tenant_id, user_id) DO UPDATE SET external_id = EXCLUDED.external_id, active = EXCLUDED.active, updated_at = NOW()
       `.execute(trx);
       await setActive(trx, user.id, tenantId, active);
@@ -10275,8 +10256,8 @@ function buildScimApp(ctx) {
   });
   async function setActive(trx, userId, tenantId, active) {
     await sql`
-      INSERT INTO zv_scim_users (tenant_id, user_id, active)
-      VALUES (${tenantId}::uuid, ${userId}, ${active})
+      INSERT INTO zvd_scim_users (user_id, active)
+      VALUES (${userId}, ${active})
       ON CONFLICT (tenant_id, user_id) DO UPDATE SET active = EXCLUDED.active, updated_at = NOW()
     `.execute(trx);
     if (await internals.isSingleTenantInstance()) {
@@ -10294,7 +10275,7 @@ function buildScimApp(ctx) {
           ifValidTo: row.suspended_at
         });
         await sql`
-          UPDATE zv_scim_users SET suspended_at = NULL, held_valid_to = NULL
+          UPDATE zvd_scim_users SET suspended_at = NULL, held_valid_to = NULL
            WHERE tenant_id = ${tenantId}::uuid AND user_id = ${userId}
         `.execute(trx);
         inForceAnywhere = back?.inForceAnywhere ?? inForceAnywhere;
@@ -10306,7 +10287,7 @@ function buildScimApp(ctx) {
     const ended = await internals.setTenantMembershipEnd(trx, userId, "now", { ifInForce: true });
     if (ended?.changed) {
       await sql`
-        UPDATE zv_scim_users SET suspended_at = ${ended.validTo}::timestamptz,
+        UPDATE zvd_scim_users SET suspended_at = ${ended.validTo}::timestamptz,
                                  held_valid_to = ${ended.previousValidTo}::timestamptz
          WHERE tenant_id = ${tenantId}::uuid AND user_id = ${userId}
       `.execute(trx);
@@ -10336,8 +10317,8 @@ function buildScimApp(ctx) {
       const active = body?.active !== false;
       await updateProfile(trx, m, { name, email });
       await sql`
-        INSERT INTO zv_scim_users (tenant_id, user_id, external_id, active)
-        VALUES (${tenantId}::uuid, ${id}, ${body?.externalId ?? null}, ${active})
+        INSERT INTO zvd_scim_users (user_id, external_id, active)
+        VALUES (${id}, ${body?.externalId ?? null}, ${active})
         ON CONFLICT (tenant_id, user_id)
         DO UPDATE SET external_id = EXCLUDED.external_id, active = EXCLUDED.active
       `.execute(trx);
@@ -10396,7 +10377,7 @@ function buildScimApp(ctx) {
         return scimError(c, 404, "User not found");
       const gone = await internals.removeTenantMember(trx, id);
       await sql`
-        DELETE FROM zv_scim_users WHERE user_id = ${id} AND tenant_id = ${tenantId}::uuid
+        DELETE FROM zvd_scim_users WHERE user_id = ${id} AND tenant_id = ${tenantId}::uuid
       `.execute(trx);
       if (gone.orphaned) {
         await internals.deleteUser(trx, id, {
@@ -10419,15 +10400,6 @@ var extension = {
   name: "auth/scim",
   category: "auth",
   mountStrategy: "subapp",
-  getMigrations() {
-    return [
-      join(import.meta.dir, "migrations/001_initial.sql"),
-      join(import.meta.dir, "migrations/002_tenant_scoped_tokens.sql"),
-      join(import.meta.dir, "migrations/003_per_tenant_deactivation.sql"),
-      join(import.meta.dir, "migrations/004_block_ends_with_ban.sql"),
-      join(import.meta.dir, "migrations/005_engine_ban_source.sql")
-    ];
-  },
   async register(app, ctx) {
     app.route("/", scimAdminRoutes(ctx));
     if (typeof ctx.registerPublicRoute === "function") {

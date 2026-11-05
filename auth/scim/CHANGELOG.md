@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.0 (2026-11-05)
+
+- feat!: bearer tokens are the collection `scim_tokens` and provisioning state is the collection `scim_users`, declared in `schema/collections/` and created and owned by the engine; no SQL migrations. **Upgrade step:** 2.0.0 does not read `zv_scim_tokens` or `zv_scim_users` (an extension reaches only its declared collections), so the rows are not carried over. Mint a new token in Studio (SCIM Provisioning) and paste it into the identity provider. Sign-in blocks stay the engine's (`ban_source`), so a single-tenant provider's `active: true` still lifts its own; until the provider resends `active: false`, `GET /Users` reports a person it had deactivated as active. On a multi-tenant instance a membership the provider ended under 1.x stays ended, but 2.0.0 no longer knows the end was the provider's: its `active: true` answers 403 until a tenant administrator reopens the membership, and the end date the business had set before the suspension is not restored. The 1.x tables are left in place
+- feat!: `GET /tokens` and `DELETE /tokens/:id` are dropped; the data API serves `scim_tokens`, so who may list and revoke tokens is the engine's rules. `POST /tokens` still mints (the raw token exists only there) and writes the row through the data API as the caller: no default grants, so tenant administrators mint, other roles only when granted. 1.x gated all three on `admin`
+- feat!: the token is looked up in the request's tenant, as the system (`data:system`, audited per request); SCIM's writes to `scim_users` run as the system inside that tenant. A multi-tenant provider reaches SCIM at its tenant's hostname (or with `x-tenant-slug`). `tenant:enter` and `database` are no longer requested
+- chore: the token gate no longer swallows a failed `last_used_at` write
+- test: the suite runs every SCIM request in its tenant's transaction, one identity provider per tenant, and proves a tenant's token is refused (401) at another tenant
+
 ## 1.1.1 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)

@@ -12,7 +12,7 @@
 import { afterAll, describe, expect, it } from 'bun:test';
 import { Kysely, PostgresDialect, sql } from 'kysely';
 import { Pool } from 'pg';
-import { mountForTest } from '../../../testing/ext-harness';
+import { scimApp } from '../testing/scim-app';
 
 const d =
   process.env.TEST_DATABASE_URL && process.env.BETTER_AUTH_SECRET ? describe : describe.skip;
@@ -21,9 +21,6 @@ const SCIM_USER = 'urn:ietf:params:scim:schemas:core:2.0:User';
 const SCIM_ERROR = 'urn:ietf:params:scim:api:messages:2.0:Error';
 const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001';
 
-// biome-ignore lint/suspicious/noExplicitAny: the harness app is untyped
-type App = any;
-type Json = Record<string, string>;
 
 d('auth/scim — POST of an existing account is a 409 that changes nothing', () => {
   const pool = new Pool({ connectionString: process.env.TEST_DATABASE_URL });
@@ -31,39 +28,34 @@ d('auth/scim — POST of an existing account is a 409 that changes nothing', () 
   const tenantA = crypto.randomUUID();
   const tenantB = crypto.randomUUID();
   const userIds: string[] = [];
-  const tokenNames: string[] = [];
+  const tokenIds: string[] = [];
 
   afterAll(async () => {
-    for (const id of userIds) await sql`DELETE FROM zv_scim_users WHERE user_id = ${id}`.execute(db);
-    for (const n of tokenNames) await sql`DELETE FROM zv_scim_tokens WHERE name = ${n}`.execute(db);
+    for (const id of userIds) await sql`DELETE FROM zvd_scim_users WHERE user_id = ${id}`.execute(db);
+    for (const id of tokenIds) await sql`DELETE FROM zvd_scim_tokens WHERE id = ${id}::uuid`.execute(db);
     for (const id of userIds) await sql`DELETE FROM "user" WHERE id = ${id}`.execute(db);
     await sql`DELETE FROM zv_tenants WHERE id IN (${tenantA}::uuid, ${tenantB}::uuid)`.execute(db);
     await db.destroy();
   });
 
-  const mint = async (app: App, tenant: string): Promise<Json> => {
-    const name = `Okta ${crypto.randomUUID()}`;
-    tokenNames.push(name);
-    const res = await app.request('/tokens', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name }),
-    });
-    const token = ((await res.json()) as { token: string }).token;
-    await sql`UPDATE zv_scim_tokens SET tenant_id = ${tenant}::uuid WHERE name = ${name}`.execute(db);
-    return { Authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+  type Idp = Awaited<ReturnType<typeof scimApp>>;
+  /** A tenant's identity provider: the app as that tenant, with its bearer token. */
+  const idpOf = async (tenant: string): Promise<Idp> => {
+    const idp = await scimApp(import.meta.dir, tenant);
+    tokenIds.push(idp.tokenId);
+    return idp;
   };
 
-  const post = (app: App, json: Json, email: string, extra: object = {}) =>
-    app.request('/scim/v2/Users', {
+  const post = (idp: Idp, email: string, extra: object = {}) =>
+    idp.app.request('/scim/v2/Users', {
       method: 'POST',
-      headers: json,
+      headers: idp.json,
       body: JSON.stringify({ schemas: [SCIM_USER], userName: email, ...extra }),
     });
 
-  const provision = async (app: App, json: Json, tag: string) => {
+  const provision = async (idp: Idp, tag: string) => {
     const email = `scim-post-${tag}-${crypto.randomUUID()}@test.local`;
-    const res = await post(app, json, email, { displayName: `Original ${tag}` });
+    const res = await post(idp, email, { displayName: `Original ${tag}` });
     expect(res.status).toBe(201);
     const { id } = (await res.json()) as { id: string };
     userIds.push(id);
@@ -84,7 +76,7 @@ d('auth/scim — POST of an existing account is a 409 that changes nothing', () 
     ).rows,
     scim: (
       await sql<{ tenant_id: string; active: boolean }>`
-        SELECT tenant_id::text, active FROM zv_scim_users WHERE user_id = ${id} ORDER BY tenant_id
+        SELECT tenant_id::text, active FROM zvd_scim_users WHERE user_id = ${id} ORDER BY tenant_id
       `.execute(db)
     ).rows,
   });
@@ -100,11 +92,10 @@ d('auth/scim — POST of an existing account is a 409 that changes nothing', () 
     const t = await sql<{ n: number }>`SELECT COUNT(*)::int AS n FROM zv_tenants`.execute(db);
     expect(t.rows[0]!.n).toBe(1);
 
-    const { app } = await mountForTest(import.meta.dir);
-    const json = await mint(app, DEFAULT_TENANT_ID);
-    const u = await provision(app, json, 'solo');
+    const idp = await idpOf(DEFAULT_TENANT_ID);
+    const u = await provision(idp, 'solo');
     const before = await snapshot(u.id);
-    await expectUniqueness(await post(app, json, u.email.toUpperCase(), { active: false, displayName: 'X' }));
+    await expectUniqueness(await post(idp, u.email.toUpperCase(), { active: false, displayName: 'X' }));
     expect(await snapshot(u.id)).toEqual(before);
   });
 
@@ -113,50 +104,48 @@ d('auth/scim — POST of an existing account is a 409 that changes nothing', () 
       INSERT INTO zv_tenants (id, slug, name)
       VALUES (${tenantA}::uuid, ${`post-a-${tenantA}`}, 'A'), (${tenantB}::uuid, ${`post-b-${tenantB}`}, 'B')
     `.execute(db);
-    const { app } = await mountForTest(import.meta.dir);
-    const a = await mint(app, tenantA);
-    const b = await mint(app, tenantB);
+    const a = await idpOf(tenantA);
+    const b = await idpOf(tenantB);
 
-    const alice = await provision(app, a, 'alice');
+    const alice = await provision(a, 'alice');
     const before = await snapshot(alice.id);
     expect(before.user[0]!.banned).not.toBe(true);
 
     await expectUniqueness(
-      await post(app, b, alice.email, { active: false, displayName: 'Hijacked', externalId: 'b-1' }),
+      await post(b, alice.email, { active: false, displayName: 'Hijacked', externalId: 'b-1' }),
     );
     // No membership in B, no SCIM record in B, not banned, name and email as they were.
     expect(await snapshot(alice.id)).toEqual(before);
     // B's directory still does not contain her.
-    const probe = await app.request(
+    const probe = await b.app.request(
       `/scim/v2/Users?filter=${encodeURIComponent(`userName eq "${alice.email}"`)}`,
-      { headers: b },
+      { headers: b.json },
     );
     expect(((await probe.json()) as { totalResults: number }).totalResults).toBe(0);
 
     // A brand-new email from B still provisions normally, into B.
-    const bob = await provision(app, b, 'bob');
+    const bob = await provision(b, 'bob');
     const bobState = await snapshot(bob.id);
     expect(bobState.memberships.map((m) => m.tenant_id)).toEqual([tenantB]);
     expect(bobState.scim).toEqual([{ tenant_id: tenantB, active: true }]);
-    const seen = await app.request(`/scim/v2/Users/${bob.id}`, { headers: b });
+    const seen = await b.app.request(`/scim/v2/Users/${bob.id}`, { headers: b.json });
     expect(seen.status).toBe(200);
   });
 
   it('a lapsed tenant cannot DELETE its dated row and re-POST a fresh membership', async () => {
-    const { app } = await mountForTest(import.meta.dir);
-    const a = await mint(app, tenantA);
-    const b = await mint(app, tenantB);
+    const a = await idpOf(tenantA);
+    const b = await idpOf(tenantB);
 
     // Carol works for A, and B ended her contract with a date.
-    const carol = await provision(app, a, 'carol');
+    const carol = await provision(a, 'carol');
     await sql`
       INSERT INTO zv_tenant_users (tenant_id, user_id, role, valid_from, valid_to)
       VALUES (${tenantB}::uuid, ${carol.id}, 'member', now() - interval '2 days', now() - interval '1 hour')
     `.execute(db);
 
-    const patch = await app.request(`/scim/v2/Users/${carol.id}`, {
+    const patch = await b.app.request(`/scim/v2/Users/${carol.id}`, {
       method: 'PATCH',
-      headers: b,
+      headers: b.json,
       body: JSON.stringify({
         schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
         Operations: [{ op: 'replace', path: 'active', value: false }],
@@ -164,13 +153,13 @@ d('auth/scim — POST of an existing account is a 409 that changes nothing', () 
     });
     expect(patch.status).toBe(403);
     // B may still deprovision her; A keeps her, so the account stays.
-    const del = await app.request(`/scim/v2/Users/${carol.id}`, { method: 'DELETE', headers: b });
+    const del = await b.app.request(`/scim/v2/Users/${carol.id}`, { method: 'DELETE', headers: b.json });
     expect(del.status).toBe(204);
     const afterDelete = await snapshot(carol.id);
     expect(afterDelete.memberships.map((m) => m.tenant_id)).toEqual([tenantA]);
 
     // …and the re-POST that would have re-attached and banned her is refused.
-    await expectUniqueness(await post(app, b, carol.email, { active: false }));
+    await expectUniqueness(await post(b, carol.email, { active: false }));
     expect(await snapshot(carol.id)).toEqual(afterDelete);
   });
 });

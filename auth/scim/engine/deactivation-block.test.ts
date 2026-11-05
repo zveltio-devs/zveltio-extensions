@@ -9,7 +9,7 @@
 import { afterAll, describe, expect, it } from 'bun:test';
 import { Kysely, PostgresDialect, sql } from 'kysely';
 import { Pool } from 'pg';
-import { mountForTest } from '../../../testing/ext-harness';
+import { scimApp } from '../testing/scim-app';
 
 const d =
   process.env.TEST_DATABASE_URL && process.env.BETTER_AUTH_SECRET ? describe : describe.skip;
@@ -25,14 +25,7 @@ d('auth/scim — active=false blocks sign-in, active=true restores it', () => {
   });
 
   it('flags the user, ends their sessions, keeps their credentials, and undoes it', async () => {
-    const { app } = await mountForTest(import.meta.dir);
-    const mint = await app.request('/tokens', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: 'Okta' }),
-    });
-    const token = ((await mint.json()) as { token: string }).token;
-    const json = { Authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    const { app, json } = await scimApp(import.meta.dir);
 
     const email = `scim-block-${Date.now()}@test.local`;
     const create = await app.request('/scim/v2/Users', {
@@ -96,14 +89,7 @@ d('auth/scim — active=false blocks sign-in, active=true restores it', () => {
   it('active=true does not lift a ban SCIM did not place, even single-tenant', async () => {
     const tenants = await sql<{ n: number }>`SELECT COUNT(*)::int AS n FROM zv_tenants`.execute(db);
     expect(tenants.rows[0]!.n).toBeLessThanOrEqual(1); // the branch under test
-    const { app } = await mountForTest(import.meta.dir);
-    const mint = await app.request('/tokens', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: 'Okta' }),
-    });
-    const token = ((await mint.json()) as { token: string }).token;
-    const json = { Authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    const { app, json } = await scimApp(import.meta.dir);
     const email = `scim-adminban-${Date.now()}@test.local`;
     const create = await app.request('/scim/v2/Users', {
       method: 'POST',
@@ -138,14 +124,7 @@ d('auth/scim — active=false blocks sign-in, active=true restores it', () => {
   });
 
   it('refuses to deactivate or delete the instance owner, with a 400 naming why', async () => {
-    const { app } = await mountForTest(import.meta.dir);
-    const mint = await app.request('/tokens', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: 'Okta' }),
-    });
-    const token = ((await mint.json()) as { token: string }).token;
-    const json = { Authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    const { app, json } = await scimApp(import.meta.dir);
     // The harness seeds its session user as the instance's one god.
     const god = '00000000-0000-4000-8000-00000000e001';
     const snapshot = () =>

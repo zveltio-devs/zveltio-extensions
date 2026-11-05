@@ -12,7 +12,7 @@
 import { afterAll, describe, expect, it } from 'bun:test';
 import { Kysely, PostgresDialect, sql } from 'kysely';
 import { Pool } from 'pg';
-import { mountForTest } from '../../../testing/ext-harness';
+import { scimApp } from '../testing/scim-app';
 
 const d =
   process.env.TEST_DATABASE_URL && process.env.BETTER_AUTH_SECRET ? describe : describe.skip;
@@ -31,27 +31,21 @@ d('auth/scim — a lapsed membership reads as active: false and is not writable'
   const db = new Kysely<Record<string, never>>({ dialect: new PostgresDialect({ pool }) });
   const tenantId = crypto.randomUUID();
   const userIds: string[] = [];
-  const tokenNames: string[] = [];
+  const tokenIds: string[] = [];
 
   afterAll(async () => {
-    for (const id of userIds) await sql`DELETE FROM zv_scim_users WHERE user_id = ${id}`.execute(db);
-    for (const n of tokenNames) await sql`DELETE FROM zv_scim_tokens WHERE name = ${n}`.execute(db);
+    for (const id of userIds) await sql`DELETE FROM zvd_scim_users WHERE user_id = ${id}`.execute(db);
+    for (const id of tokenIds) await sql`DELETE FROM zvd_scim_tokens WHERE id = ${id}::uuid`.execute(db);
     for (const id of userIds) await sql`DELETE FROM "user" WHERE id = ${id}`.execute(db);
     await sql`DELETE FROM zv_tenants WHERE id = ${tenantId}::uuid`.execute(db);
     await db.destroy();
   });
 
-  const mint = async (app: App, tenant: string): Promise<Record<string, string>> => {
-    const name = `Entra ${crypto.randomUUID()}`;
-    tokenNames.push(name);
-    const res = await app.request('/tokens', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name }),
-    });
-    const token = ((await res.json()) as { token: string }).token;
-    await sql`UPDATE zv_scim_tokens SET tenant_id = ${tenant}::uuid WHERE name = ${name}`.execute(db);
-    return { Authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+  /** A tenant's identity provider: the app as that tenant, with its bearer token. */
+  const idpOf = async (tenant: string) => {
+    const idp = await scimApp(import.meta.dir, tenant);
+    tokenIds.push(idp.tokenId);
+    return idp;
   };
 
   const provision = async (
@@ -100,8 +94,7 @@ d('auth/scim — a lapsed membership reads as active: false and is not writable'
     const t = await sql<{ n: number }>`SELECT COUNT(*)::int AS n FROM zv_tenants`.execute(db);
     expect(t.rows[0]!.n).toBe(1);
 
-    const { app } = await mountForTest(import.meta.dir);
-    const json = await mint(app, DEFAULT_TENANT_ID);
+    const { app, json } = await idpOf(DEFAULT_TENANT_ID);
     const u = await provision(app, json, 'solo');
     await lapse(DEFAULT_TENANT_ID, u.id, 'expired');
 
@@ -128,8 +121,7 @@ d('auth/scim — a lapsed membership reads as active: false and is not writable'
     await sql`
       INSERT INTO zv_tenants (id, slug, name) VALUES (${tenantId}::uuid, ${`lapsed-${tenantId}`}, 'Lapsed')
     `.execute(db);
-    const { app } = await mountForTest(import.meta.dir);
-    const json = await mint(app, tenantId);
+    const { app, json } = await idpOf(tenantId);
 
     const expired = await provision(app, json, 'expired');
     const future = await provision(app, json, 'future');
@@ -215,11 +207,10 @@ d('auth/scim — a lapsed membership reads as active: false and is not writable'
     const t = await sql<{ n: number }>`SELECT COUNT(*)::int AS n FROM zv_tenants`.execute(db);
     expect(t.rows[0]!.n).toBeGreaterThan(1);
 
-    const { app } = await mountForTest(import.meta.dir);
-    const other = await mint(app, tenantId);
-    const dflt = await mint(app, DEFAULT_TENANT_ID);
+    const other = await idpOf(tenantId);
+    const { app, json: dflt } = await idpOf(DEFAULT_TENANT_ID);
     // Provisioned by the other tenant only: no default-tenant row.
-    const outsider = await provision(app, other, 'outsider');
+    const outsider = await provision(other.app, other.json, 'outsider');
     const insider = await provision(app, dflt, 'insider');
 
     const get = await app.request(`/scim/v2/Users/${outsider.id}`, { headers: dflt });

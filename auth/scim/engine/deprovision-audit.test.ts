@@ -8,7 +8,7 @@
 import { afterAll, describe, expect, it } from 'bun:test';
 import { Kysely, PostgresDialect, sql } from 'kysely';
 import { Pool } from 'pg';
-import { mountForTest } from '../../../testing/ext-harness';
+import { DEFAULT_TENANT_ID, scimApp } from '../testing/scim-app';
 
 const d =
   process.env.TEST_DATABASE_URL && process.env.BETTER_AUTH_SECRET ? describe : describe.skip;
@@ -23,19 +23,8 @@ d('auth/scim — DELETE /Users/:id', () => {
   });
 
   it('revokes the sessions, drops the grants and audits user.deleted with the token', async () => {
-    const { app } = await mountForTest(import.meta.dir);
-    const name = `Okta ${crypto.randomUUID()}`;
-    const mint = await app.request('/tokens', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name }),
-    });
-    const token = ((await mint.json()) as { token: string }).token;
-    const tok = await sql<{ id: string; tenant_id: string }>`
-      SELECT id::text, tenant_id::text FROM zv_scim_tokens WHERE name = ${name}
-    `.execute(db);
-    const { id: tokenId, tenant_id: tenantId } = tok.rows[0]!;
-    const json = { Authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    const { app, json, tokenId } = await scimApp(import.meta.dir);
+    const tenantId = DEFAULT_TENANT_ID;
 
     const create = await app.request('/scim/v2/Users', {
       method: 'POST',

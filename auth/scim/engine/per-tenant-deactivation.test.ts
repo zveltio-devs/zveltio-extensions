@@ -12,7 +12,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { join } from 'node:path';
 import { Kysely, PostgresDialect, sql } from 'kysely';
 import { Pool } from 'pg';
-import { mountForTest } from '../../../testing/ext-harness';
+import { scimApp } from '../testing/scim-app';
 
 const d =
   process.env.TEST_DATABASE_URL && process.env.BETTER_AUTH_SECRET ? describe : describe.skip;
@@ -34,7 +34,7 @@ d('auth/scim — multi-tenant deactivation is per tenant', () => {
   const db = new Kysely<Record<string, never>>({ dialect: new PostgresDialect({ pool }) });
   let engine: Any;
   let member: (app: Any, db: Any) => Promise<Person>;
-  let scim: Any;
+  const scim: Record<string, Any> = {};
   const hdr: Record<string, Record<string, string>> = {};
   const people: string[] = [];
   const tokens: string[] = [];
@@ -48,30 +48,34 @@ d('auth/scim — multi-tenant deactivation is per tenant', () => {
       await sql`INSERT INTO zv_tenants (id, slug, name, status)
                 VALUES (${t.id}::uuid, ${t.slug}, 'scim', 'active')`.execute(db);
     }
-    ({ app: scim } = await mountForTest(import.meta.dir));
+    // One IdP per tenant, each reaching SCIM as its own tenant (per-tenant
+    // hostname or `x-tenant-slug` in the engine).
     for (const t of [A, B]) {
-      const name = `IdP ${t.slug}`;
-      tokens.push(name);
-      const res = await scim.request('/tokens', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ name }),
-      });
-      const token = ((await res.json()) as { token: string }).token;
-      await sql`UPDATE zv_scim_tokens SET tenant_id = ${t.id}::uuid WHERE name = ${name}`.execute(db);
-      hdr[t.id] = { Authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+      const idp = await scimApp(import.meta.dir, t.id);
+      tokens.push(idp.tokenId);
+      scim[t.id] = idp.app;
+      hdr[t.id] = idp.json;
     }
   }, 60_000);
 
   afterAll(async () => {
     for (const id of people) {
-      await sql`DELETE FROM zv_scim_users WHERE user_id = ${id}`.execute(db);
+      await sql`DELETE FROM zvd_scim_users WHERE user_id = ${id}`.execute(db);
       await sql`DELETE FROM zv_tenant_users WHERE user_id = ${id}`.execute(db);
       await sql`DELETE FROM "user" WHERE id = ${id}`.execute(db);
     }
-    for (const n of tokens) await sql`DELETE FROM zv_scim_tokens WHERE name = ${n}`.execute(db);
+    for (const id of tokens) await sql`DELETE FROM zvd_scim_tokens WHERE id = ${id}::uuid`.execute(db);
     for (const t of [A, B]) await sql`DELETE FROM zv_tenants WHERE id = ${t.id}::uuid`.execute(db);
     await db.destroy();
+  });
+
+  // The token is looked up in the request's tenant: A's token at B's address
+  // is unknown there (the tenant transaction's row policy).
+  it("a tenant's token is refused at another tenant", async () => {
+    for (const path of ['/scim/v2/ServiceProviderConfig', '/scim/v2/Users']) {
+      expect((await scim[B.id].request(path, { headers: hdr[A.id] })).status).toBe(401);
+      expect((await scim[A.id].request(path, { headers: hdr[A.id] })).status).toBe(200);
+    }
   });
 
   const person = async (tenants: Array<{ id: string; validTo?: string }>): Promise<Person> => {
@@ -98,19 +102,19 @@ d('auth/scim — multi-tenant deactivation is per tenant', () => {
         SELECT valid_to FROM zv_tenant_users WHERE tenant_id = ${t.id}::uuid AND user_id = ${id}`.execute(db)
     ).rows[0]?.valid_to ?? null;
   const patch = (t: { id: string }, id: string, active: boolean) =>
-    scim.request(`/scim/v2/Users/${id}`, {
+    scim[t.id].request(`/scim/v2/Users/${id}`, {
       method: 'PATCH',
       headers: hdr[t.id],
       body: JSON.stringify({ schemas: [PATCH_OP], Operations: [{ op: 'replace', path: 'active', value: active }] }),
     });
   const put = (t: { id: string }, p: Person, active: boolean) =>
-    scim.request(`/scim/v2/Users/${p.userId}`, {
+    scim[t.id].request(`/scim/v2/Users/${p.userId}`, {
       method: 'PUT',
       headers: hdr[t.id],
       body: JSON.stringify({ schemas: [SCIM_USER], userName: p.email, displayName: 'Same', active }),
     });
   const reported = async (t: { id: string }, id: string) =>
-    ((await (await scim.request(`/scim/v2/Users/${id}`, { headers: hdr[t.id] })).json()) as { active: boolean })
+    ((await (await scim[t.id].request(`/scim/v2/Users/${id}`, { headers: hdr[t.id] })).json()) as { active: boolean })
       .active;
   const signIn = async (p: Person): Promise<Person> => {
     const res = await engine.request('/api/auth/sign-in/email', {
@@ -215,7 +219,7 @@ d('auth/scim — multi-tenant deactivation is per tenant', () => {
   });
 
   const del = (t: { id: string }, id: string) =>
-    scim.request(`/scim/v2/Users/${id}`, { method: 'DELETE', headers: hdr[t.id] });
+    scim[t.id].request(`/scim/v2/Users/${id}`, { method: 'DELETE', headers: hdr[t.id] });
   const sessions = async (id: string) =>
     (await sql<{ n: number }>`SELECT COUNT(*)::int AS n FROM session WHERE "userId" = ${id}`.execute(db))
       .rows[0]!.n;
@@ -240,7 +244,7 @@ d('auth/scim — multi-tenant deactivation is per tenant', () => {
   it('DELETE of a suspended member removes only that tenant; the last one takes the account', async () => {
     const p = await person([{ id: A.id }, { id: B.id }]);
     expect((await patch(B, p.userId, false)).status).toBe(200);
-    expect((await scim.request(`/scim/v2/Users/${p.userId}`, { method: 'DELETE', headers: hdr[B.id] })).status).toBe(
+    expect((await scim[B.id].request(`/scim/v2/Users/${p.userId}`, { method: 'DELETE', headers: hdr[B.id] })).status).toBe(
       204,
     );
     const rows = await sql<{ tenant_id: string }>`
@@ -250,7 +254,7 @@ d('auth/scim — multi-tenant deactivation is per tenant', () => {
 
     expect((await patch(A, p.userId, false)).status).toBe(200);
     expect(await banned(p.userId)).toBe(true);
-    expect((await scim.request(`/scim/v2/Users/${p.userId}`, { method: 'DELETE', headers: hdr[A.id] })).status).toBe(
+    expect((await scim[A.id].request(`/scim/v2/Users/${p.userId}`, { method: 'DELETE', headers: hdr[A.id] })).status).toBe(
       204,
     );
     const left = await sql`SELECT 1 FROM "user" WHERE id = ${p.userId}`.execute(db);

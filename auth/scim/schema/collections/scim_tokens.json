@@ -1,0 +1,21 @@
+{
+  "name": "scim_tokens",
+  "defaultGrants": false,
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "token_hash",
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    {
+      "name": "last_used_at",
+      "type": "datetime"
+    }
+  ]
+}
