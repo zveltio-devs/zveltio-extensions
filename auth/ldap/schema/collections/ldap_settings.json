@@ -1,0 +1,69 @@
+{
+  "name": "ldap_settings",
+  "defaultGrants": false,
+  "fields": [
+    {
+      "name": "scope",
+      "type": "enum",
+      "required": true,
+      "unique": true,
+      "defaultValue": "tenant",
+      "options": {
+        "values": [
+          "tenant"
+        ]
+      }
+    },
+    {
+      "name": "enabled",
+      "type": "boolean",
+      "defaultValue": false
+    },
+    {
+      "name": "url",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "bind_dn",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "bind_password",
+      "type": "text",
+      "required": true,
+      "encrypted": true
+    },
+    {
+      "name": "search_base",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "search_filter",
+      "type": "text",
+      "defaultValue": "(uid={{username}})"
+    },
+    {
+      "name": "username_attribute",
+      "type": "text",
+      "defaultValue": "uid"
+    },
+    {
+      "name": "email_attribute",
+      "type": "text",
+      "defaultValue": "mail"
+    },
+    {
+      "name": "name_attribute",
+      "type": "text",
+      "defaultValue": "cn"
+    },
+    {
+      "name": "tls_verify",
+      "type": "boolean",
+      "defaultValue": true
+    }
+  ]
+}

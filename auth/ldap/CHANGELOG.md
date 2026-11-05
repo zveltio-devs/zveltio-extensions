@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.0 (2026-11-05)
+
+- feat!: the configuration is the collection `ldap_settings`, declared in `schema/collections/` and created and owned by the engine, one row per tenant; no SQL migrations. `bind_password` is encrypted at rest by the engine (the instance needs `FIELD_ENCRYPTION_KEY`). **Upgrade step:** 2.0.0 does not read `zvd_ldap_config`; re-enter the directory settings in Studio (LDAP / AD) before users sign in again. The 1.x tables are left in place
+- feat!: `GET`/`POST /config` are dropped; the data API serves `ldap_settings`, so who may read or change the directory settings is the engine's rules. The collection has no default grants: tenant admins (whose grant is total) administer it, other roles only when granted. A reader of `ldap_settings` reads `bind_password` (1.x never returned it): grant `read` only to the roles that administer sign-in, or deny that column
+- feat!: `zvd_ldap_group_mappings`, `zvd_ldap_ip_allowlist` and `zvd_ldap_login_log` are no longer created; no code read or wrote them. Sign-ins are audited by the engine (`auth.login_success`, `auth.login_failed`)
+- feat!: `POST /login` reads the settings as the system (`data:system`, audited); `POST /test` gates on the engine object `admin` and reads them as the caller. The `ldaps://` check in production now refuses at sign-in and test (503), not at save
+- chore: the `database` and `secrets` permission labels are dropped
+
 ## 1.2.2 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)

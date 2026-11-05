@@ -57,11 +57,6 @@
       "reason": "a cache eviction. Doing nothing is correct when there is no cache."
     },
     {
-      "member": "maybeDecrypt",
-      "category": "inert-by-nature",
-      "reason": "the FIELD keyring, distinct from encryptSecret/decryptSecret which ARE real here. A test about field encryption sets FIELD_ENCRYPTION_KEY and asserts on the column."
-    },
-    {
       "member": "maybeEncrypt",
       "category": "inert-by-nature",
       "reason": "the FIELD keyring, distinct from encryptSecret which IS real here. Absent, a value is stored as given; a test about field encryption sets FIELD_ENCRYPTION_KEY and asserts on the column rather than on this."

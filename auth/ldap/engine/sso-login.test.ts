@@ -12,12 +12,17 @@
 // The account is the engine's to find or create (`provisionUser`): a first
 // sign-in provisions it, and an address the tenant has no claim to — the
 // instance owner's — signs nobody in.
-import { afterAll, describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 // @ts-ignore — asn1 ships no types; it is ldapts' own BER codec.
 import { Ber, BerReader, BerWriter } from 'asn1';
 import { Kysely, PostgresDialect, sql } from 'kysely';
 import { Pool } from 'pg';
-import { engineSession, mountForTest } from '../../../testing/ext-harness';
+import { engineSession, godAcrossFirms, mountForTest } from '../../../testing/ext-harness';
+
+const ENGINE = join(import.meta.dir, '../../../../zveltio/packages/engine/src');
+const manifest = JSON.parse(readFileSync(join(import.meta.dir, '../manifest.json'), 'utf8'));
 
 const d =
   process.env.TEST_DATABASE_URL && process.env.BETTER_AUTH_SECRET ? describe : describe.skip;
@@ -105,8 +110,37 @@ d('auth/ldap — a directory sign-in is a session the engine accepts', () => {
   // directories let users edit their own.
   const mallory = { uid: `mallory${tag}`, password: 'pw-mallory', mail: 'ext-harness-uuid@test.local' };
   const directory = startDirectory([alice, bob, carol, mallory]);
+  let engineDb: any;
+
+  // The settings are the declared collection `ldap_settings`, saved through the
+  // data API in the product; here one row is written with the bind password
+  // encrypted the way the engine stores it.
+  beforeAll(async () => {
+    const { getTestApp } = await import(join(ENGINE, 'testing/app-harness.js'));
+    const { applyDeclaredCollections, readDeclaredCollections } = await import(
+      join(ENGINE, 'lib/extensions/declared-collections.js')
+    );
+    const { maybeEncrypt } = await import(join(ENGINE, 'lib/data/field-crypto.js'));
+    ({ db: engineDb } = await getTestApp());
+    const files = await readDeclaredCollections(
+      manifest.name,
+      join(import.meta.dir, '..'),
+      manifest.collections,
+      manifest.integrity?.schemaSha256,
+    );
+    await applyDeclaredCollections(engineDb, manifest.name, files, true);
+    await sql`DELETE FROM zvd_ldap_settings`.execute(db);
+    await sql`
+      INSERT INTO zvd_ldap_settings (scope, enabled, url, bind_dn, bind_password, search_base, tls_verify)
+      VALUES ('tenant', true, ${directory.url}, ${SERVICE_DN}, ${await maybeEncrypt(SERVICE_PASSWORD, true)}, 'dc=test', false)`.execute(db);
+  });
+
   afterAll(async () => {
     directory.stop();
+    if (engineDb) {
+      const { dropTestCollection } = await import(join(ENGINE, 'testing/app-harness.js'));
+      await dropTestCollection(engineDb, 'ldap_settings');
+    }
     await db.destroy();
   });
 
@@ -119,20 +153,9 @@ d('auth/ldap — a directory sign-in is a session the engine accepts', () => {
   };
 
   const setUp = async () => {
-    const { app } = await mountForTest(import.meta.dir);
-    const cfg = await app.request('/config', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        enabled: true,
-        url: directory.url,
-        bindDN: SERVICE_DN,
-        bindPassword: SERVICE_PASSWORD,
-        searchBase: 'dc=test',
-        tlsVerify: false,
-      }),
-    });
-    expect(cfg.status).toBe(200);
+    // Anonymous, in the tenant transaction: `/login` reads the settings as the
+    // system, which the engine allows only inside the running tenant.
+    const { app } = await mountForTest(import.meta.dir, { authed: false, admin: false, transaction: true });
     const login = (u: DirectoryUser) =>
       app.request('/login', {
         method: 'POST',
@@ -185,5 +208,47 @@ d('auth/ldap — a directory sign-in is a session the engine accepts', () => {
     const res = await login(mallory);
     expect(res.status).toBe(403);
     expect(res.headers.get('set-cookie')).toBeNull();
+  });
+
+  it('POST /test refuses an anonymous caller (401) and a non-admin (403)', async () => {
+    for (const [opts, status] of [[{ authed: false, admin: false }, 401], [{ authed: true, admin: false }, 403]] as const) {
+      const { app } = await mountForTest(import.meta.dir, opts);
+      const res = await app.request('/test', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ username: alice.uid, password: alice.password }),
+      });
+      expect(res.status).toBe(status);
+    }
+  });
+
+  // A god's read reach is every firm, so the settings read without its tenant
+  // filter answers with whichever firm's row comes first. Each firm points at a
+  // different directory: only its own reaches the users.
+  it('POST /test uses the directory of the firm the admin works in', async () => {
+    const A = '00000000-0000-4000-8000-0000000d1a0a';
+    const B = '00000000-0000-4000-8000-0000000d1a0b';
+    const h = await godAcrossFirms(import.meta.dir, [A, B]);
+    try {
+      const pw = await (await import(join(ENGINE, 'lib/data/field-crypto.js'))).maybeEncrypt(SERVICE_PASSWORD, true);
+      for (const [tenant, url] of [[A, directory.url], [B, 'ldap://127.0.0.1:1']]) {
+        await h.pool.query(
+          `INSERT INTO zvd_ldap_settings (tenant_id, scope, enabled, url, bind_dn, bind_password, search_base, tls_verify)
+           VALUES ($1, 'tenant', true, $2, $3, $4, 'dc=test', false)`,
+          [tenant, url, SERVICE_DN, pw],
+        );
+      }
+      const test = async (tenant: string) =>
+        (await (await h.asGod(tenant)).request('/test', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ username: alice.uid, password: alice.password }),
+        })).json() as Promise<{ success: boolean }>;
+      expect((await test(A)).success).toBe(true);
+      expect((await test(B)).success).toBe(false);
+    } finally {
+      await h.pool.query(`DELETE FROM zvd_ldap_settings WHERE tenant_id = ANY($1)`, [[A, B]]);
+      await h.done();
+    }
   });
 });

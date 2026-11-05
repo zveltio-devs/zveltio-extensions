@@ -18,5 +18,7 @@
   "auth.ldap.ui.name_attr": "Név attribútum",
   "auth.ldap.ui.search_base": "Keresési bázis",
   "auth.ldap.ui.search_filter": "Keresési szűrő",
+  "auth.ldap.ui.test_password": "Jelszó",
+  "auth.ldap.ui.test_username": "Felhasználónév",
   "auth.ldap.ui.username_attr": "Felhasználónév attribútum"
 }
