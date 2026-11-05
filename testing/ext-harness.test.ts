@@ -15,6 +15,8 @@ const DEFAULT_TENANT = '00000000-0000-0000-0000-000000000001';
 d('ext-harness: the engine helpers behind ctx', () => {
   it('ctx.internals.countMembers is the engine’s, for the tenant the request runs as', async () => {
     const { app, ctx } = await mountForTest(BYOD);
+    // byod's router gates every path on `requireInstanceAdmin`, which the harness answers no.
+    ctx.internals.requireInstanceAdmin = async () => true;
     app.get('/__members', async (c: any) => c.json(await ctx.internals.countMembers()));
     const res = await app.request('/__members');
     expect(res.status).toBe(200);
@@ -25,6 +27,8 @@ d('ext-harness: the engine helpers behind ctx', () => {
 
   it('withTenantIsolation runs its callback in that tenant, on the extension’s table guard', async () => {
     const { app, ctx } = await mountForTest(BYOD);
+    // byod's router gates every path on `requireInstanceAdmin`, which the harness answers no.
+    ctx.internals.requireInstanceAdmin = async () => true;
     const { sql } = await import(join(import.meta.dir, '..', 'node_modules/kysely/dist/index.js'));
     app.get('/__enter', async (c: any) =>
       c.json(

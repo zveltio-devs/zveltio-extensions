@@ -793,11 +793,28 @@ async function tenantApp(tenant?: string, transaction = false, userId?: string):
   // domain, and `c.get('tenant')`, which a route scoping a check to the
   // request's own tenant reads (without it, it refuses everything).
   // biome-ignore lint/suspicious/noExplicitAny: Hono context, untyped here
-  app.use('*', (c: any, next: () => Promise<void>) => {
+  app.use('*', async (c: any, next: () => Promise<void>) => {
     c.set('tenant', { id });
-    return transaction
-      ? runWithDomain(id, () => withTenantIsolation(id, () => next(), userId ? { userId, identity: allCollectionsActor(userId) } : undefined))
-      : runWithDomain(id, () => next());
+    if (!transaction) return runWithDomain(id, () => next());
+    // As the engine's middleware: a handler that threw has been answered by
+    // `onError` already, and rethrowing its error rolls the transaction back
+    // while that answer stands. Without it every row written before the throw
+    // committed here and rolled back in production.
+    try {
+      await runWithDomain(id, () =>
+        withTenantIsolation(
+          id,
+          async () => {
+            await next();
+            if (c.error) throw c.error;
+          },
+          userId ? { userId, identity: allCollectionsActor(userId) } : undefined,
+        ),
+      );
+    } catch (err) {
+      if (c.error && err === c.error) return c.res;
+      throw err;
+    }
   });
   return app;
 }

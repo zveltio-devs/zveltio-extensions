@@ -8,8 +8,8 @@
       "id": "profiles",
       "label": "developer.byod.tab.profiles",
       "icon": "Database",
-      "dataSource": "/ext/developer/byod/profiles",
-      "dataPath": "profiles",
+      "dataSource": "/api/data/byod_profiles?sort=created_at&order=desc&limit=200",
+      "dataPath": "records",
       "columns": [
         {
           "key": "name",
@@ -21,7 +21,7 @@
           "type": "mono"
         },
         {
-          "key": "auto_sync",
+          "key": "is_active",
           "label": "common.col.active",
           "type": "boolean"
         },
@@ -51,12 +51,12 @@
           "variant": "text-error",
           "label": "common.delete",
           "method": "DELETE",
-          "endpoint": "/ext/developer/byod/profiles/{id}",
+          "endpoint": "/api/data/byod_profiles/{id}",
           "confirm": "developer.byod.confirmDelete"
         }
       ],
       "form": {
-        "endpoint": "/ext/developer/byod/profiles",
+        "endpoint": "/api/data/byod_profiles",
         "fields": [
           {
             "name": "name",
@@ -85,17 +85,10 @@
             "colSpan": 1
           },
           {
-            "name": "auto_sync",
+            "name": "is_active",
             "label": "common.col.active",
             "type": "boolean",
-            "default": false,
-            "colSpan": 1
-          },
-          {
-            "name": "sync_interval_hours",
-            "label": "developer.byod.form.syncInterval",
-            "type": "number",
-            "default": 24,
+            "default": true,
             "colSpan": 1
           }
         ]
@@ -105,11 +98,11 @@
       "id": "history",
       "label": "developer.byod.tab.history",
       "icon": "History",
-      "dataSource": "/ext/developer/byod/history",
-      "dataPath": "history",
+      "dataSource": "/api/data/byod_scans?expand=profile_id&sort=created_at&order=desc&limit=50",
+      "dataPath": "records",
       "columns": [
         {
-          "key": "profile_name",
+          "key": "profile_id.name",
           "label": "developer.byod.col.profile"
         },
         {
