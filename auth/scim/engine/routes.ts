@@ -274,7 +274,8 @@ export function buildScimApp(ctx: ExtensionContext): Hono {
         }
         return token;
       },
-      { reason: 'SCIM bearer token' },
+      // The audit row names the token that called, not only "system".
+      { reason: 'SCIM bearer token', actor: (t) => (t ? `scim:${t.id}` : undefined) },
     );
     if (!row) return scimError(c, 401, 'Invalid bearer token');
     (c as Ctx).set('scimTenantId', row.tenant_id);

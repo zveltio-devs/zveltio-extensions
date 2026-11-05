@@ -10175,7 +10175,7 @@ function buildScimApp(ctx) {
         await sql`UPDATE zvd_scim_tokens SET last_used_at = NOW() WHERE id = ${token.id}::uuid`.execute(db);
       }
       return token;
-    }, { reason: "SCIM bearer token" });
+    }, { reason: "SCIM bearer token", actor: (t) => t ? `scim:${t.id}` : undefined });
     if (!row)
       return scimError(c, 401, "Invalid bearer token");
     c.set("scimTenantId", row.tenant_id);

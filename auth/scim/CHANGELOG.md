@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.1 (2026-11-05)
+
+- feat: the `extension.as_system` audit row for a SCIM request names the bearer token that called (`metadata.claimed_actor = scim:<token id>`, the same name `user.deleted` carries), not only "system". Needs engine 3.0.0-beta.102
+
 ## 2.0.0 (2026-11-05)
 
 - feat!: bearer tokens are the collection `scim_tokens` and provisioning state is the collection `scim_users`, declared in `schema/collections/` and created and owned by the engine; no SQL migrations. **Upgrade step:** 2.0.0 does not read `zv_scim_tokens` or `zv_scim_users` (an extension reaches only its declared collections), so the rows are not carried over. Mint a new token in Studio (SCIM Provisioning) and paste it into the identity provider. Sign-in blocks stay the engine's (`ban_source`), so a single-tenant provider's `active: true` still lifts its own; until the provider resends `active: false`, `GET /Users` reports a person it had deactivated as active. On a multi-tenant instance a membership the provider ended under 1.x stays ended, but 2.0.0 no longer knows the end was the provider's: its `active: true` answers 403 until a tenant administrator reopens the membership, and the end date the business had set before the suspension is not restored. The 1.x tables are left in place
