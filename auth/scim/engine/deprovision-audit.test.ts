@@ -57,5 +57,11 @@ d('auth/scim — DELETE /Users/:id', () => {
         metadata: { actor: `scim:${tokenId}`, reason: 'scim.deprovision', tenant_id: tenantId },
       },
     ]);
+    // The token lookup runs as the system; its audit row names the token too.
+    const asSystem = await sql<{ n: number }>`
+      SELECT COUNT(*)::int AS n FROM zv_audit_log
+       WHERE event_type = 'extension.as_system' AND metadata->>'claimed_actor' = ${`scim:${tokenId}`}
+    `.execute(db);
+    expect(asSystem.rows[0]!.n).toBeGreaterThan(0);
   });
 });
