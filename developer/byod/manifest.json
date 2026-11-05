@@ -3,13 +3,13 @@
   "displayName": "BYOD Import",
   "category": "developer",
   "description": "External database schema introspection and import",
-  "version": "1.0.9",
-  "zveltioMinVersion": "1.0.0",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.100",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-byod",
   "permissions": [
-    "database",
-    "introspection"
+    "introspection",
+    "data:write"
   ],
   "i18nPrefixes": [
     "developer.byod"
@@ -37,7 +37,12 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "119ec68c83962f0029844c8082d35dc57e7858728633f9e32141bcd1f412a80e",
-    "sourceSha256": "0c08427ba5622f843c6a9b03e0e067f0cac177b9dac3314413f339765b034c6d"
-  }
+    "engineSha256": "c38aeee42ca5644503e367a67a51882c94fae52f915c6554b113c701c62095f6",
+    "sourceSha256": "2199504c4a61d98ef198f56813f0937b9ae21542a8b359b587095d619dac2759",
+    "schemaSha256": "8133989f6d9c91949bea86dd43eeb39eba916aa04d75330f1cfd193bc58706fb"
+  },
+  "collections": [
+    "byod_profiles",
+    "byod_scans"
+  ]
 }

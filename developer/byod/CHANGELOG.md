@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.0 (2026-11-05)
+
+- feat!: scan profiles and scan history are the collections `byod_profiles` and `byod_scans`, declared in `schema/collections/` and created and owned by the engine; no SQL migrations. **Upgrade step:** 2.0.0 does not read `zvd_byod_scan_profiles` or `zvd_byod_scan_history` (an extension reaches only its declared collections), so saved profiles and past scans are not carried over: recreate the profiles in Studio (BYOD Import). The 1.x tables are left in place
+- feat!: `GET/POST /profiles`, `GET/PATCH/DELETE /profiles/:id` and `GET /history` are dropped; the data API serves `byod_profiles` and `byod_scans` (no default grants), and Studio reads and writes them there. `POST /profiles/:id/run` reads the profile and writes `last_sync_at` through the data API as the caller; every scan is recorded in `byod_scans` as the caller, and a scan that cannot be recorded rolls its import back
+- feat!: the routes answer instance administrators only (`requireInstanceAdmin`), as the engine's `POST /api/collections` does: a collection is shared by every tenant, so registering one is instance-level. 1.x asked `checkPermission(uid, 'admin', '*')`, which a delegated tenant owner passes
+- feat!: `auto_sync`, `sync_interval_hours`, `next_sync_at` and `tables_skipped` are gone: nothing ever ran a scheduled scan, and nothing was ever skipped. An inactive profile answers 409 on `run`. `GET /stats` answers `imported_tables` only; the last scan and the profile count are the data API's. `database` is no longer requested; `data:write` is
+- test: an import registers the tables and records the scan, a refused scan record rolls the import back, a tenant administrator is refused
+
 ## 1.0.9 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)

@@ -1,0 +1,69 @@
+{
+  "name": "byod_scans",
+  "defaultGrants": false,
+  "fields": [
+    {
+      "name": "profile_id",
+      "type": "m2o",
+      "options": {
+        "related_collection": "byod_profiles"
+      },
+      "indexed": true
+    },
+    {
+      "name": "schema_name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "tables_found",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "tables_imported",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "tables_updated",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "required": true,
+      "options": {
+        "values": ["completed", "failed"]
+      }
+    },
+    {
+      "name": "error",
+      "type": "textarea"
+    },
+    {
+      "name": "triggered_by",
+      "type": "enum",
+      "required": true,
+      "options": {
+        "values": ["manual", "profile"]
+      }
+    }
+  ],
+  "relations": [
+    {
+      "name": "byod_scans_profile_id",
+      "type": "m2o",
+      "field": "profile_id",
+      "target": "byod_profiles",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

@@ -17,7 +17,9 @@ d('developer/byod — GET /stats', () => {
   });
 
   it('counts an imported (unmanaged) collection', async () => {
-    const { app } = await mountForTest(import.meta.dir);
+    const { app, ctx } = await mountForTest(import.meta.dir);
+    // Instance administrators only: the harness answers `requireInstanceAdmin` no.
+    ctx.internals.requireInstanceAdmin = async () => true;
     const before = await app.request('/stats');
     expect(before.status).toBe(200);
     const n0 = ((await before.json()) as { imported_tables: number }).imported_tables;
