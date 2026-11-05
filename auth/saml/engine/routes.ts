@@ -5,131 +5,64 @@ import { readMultipart, MULTIPART_REQUIRED } from '@zveltio/sdk/extension';
  * GET  /ext/auth/saml/login          — Redirect to IdP login page
  * POST /ext/auth/saml/callback       — ACS endpoint; processes SAMLResponse
  * GET  /ext/auth/saml/metadata       — SP metadata XML (register in IdP)
- * GET  /ext/auth/saml/config         — Get current IdP config (admin)
- * POST /ext/auth/saml/config         — Save IdP config (admin)
+ *
+ * The IdP configuration is the collection `saml_settings`, one row per tenant,
+ * served by the data API; `private_key` is encrypted at rest by the engine.
  */
 
 import { Hono } from 'hono';
-import { z } from 'zod';
-import { zValidator } from '@hono/zod-validator';
 import { sql } from 'kysely';
-import { createSamlInstance, validateSamlResponse, extractAssertionId } from './saml-provider.js';
+import { createSamlInstance, validateSamlResponse, extractAssertionId, type SamlIdpConfig } from './saml-provider.js';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
-import { toJsonb } from '@zveltio/sdk/extension';
 // Config schema stored in `zvd_saml_config`, one row per tenant (migration 004).
-const SamlConfigSchema = z.object({
-  enabled: z.boolean().default(false),
-  entryPoint: z.string().url('Must be a valid IdP SSO URL'),
-  issuer: z.string().min(1, 'Issuer (SP Entity ID) is required'),
-  cert: z.string().min(1, 'IdP certificate is required'),
-  callbackUrl: z.string().url('Must be a valid ACS URL'),
-  privateKey: z.string().optional(),
-  signatureAlgorithm: z.enum(['sha1', 'sha256', 'sha512']).default('sha256'),
-  wantAuthnResponseSigned: z.boolean().default(true),
-  /**
-   * Expected AudienceRestriction. Left unset it defaults to `issuer` (our SP
-   * entityID), which is what the check should compare against. Exposed only so
-   * an operator whose IdP sends a different audience string can align it —
-   * `false` turns the check off and should be a last resort.
-   */
-  audience: z.union([z.string().min(1), z.literal(false)]).optional(),
-  mapEmail: z.string().default('email'),
-  mapName: z.string().default('displayName'),
-});
+type SamlConfig = SamlIdpConfig & { enabled: boolean; mapEmail: string; mapName: string };
+
+/** The tenant the work runs as: the `tenant_id` column default's expression. */
+const OWN_TENANT = sql`COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
+                                '00000000-0000-0000-0000-000000000001'::uuid)`;
 
 /**
- * Read the SAML config, decrypting privateKey if it was stored encrypted.
- * Legacy configs without the `enc:v1:` prefix pass through unchanged so
- * a rolling encryption migration doesn't break existing tenants.
+ * The OWN tenant's `saml_settings` row, or `null` when none is saved. The row
+ * policy admits the caller's READ REACH — every firm for a god — so the tenant
+ * filter is what keeps a god in firm B off firm A's identity provider.
+ *
+ * A private key that no longer decrypts (`FIELD_ENCRYPTION_KEY` changed) comes
+ * back from `maybeDecrypt` as the ciphertext; it throws rather than sign with it.
  */
 async function getSamlConfig(
   db: any,
-  decryptSecret: (v: string) => Promise<string>,
-): Promise<z.infer<typeof SamlConfigSchema> | null> {
-  // `zvd_saml_config`, not `zv_settings`. See migration 004: `zv_settings` is an
-  // engine system table and `ctx.db` refuses it, so every read here threw.
-  let row: { config: any } | undefined;
-  try {
-    // The OWN tenant's row. The row policy admits the caller's READ REACH —
-    // every firm for a god, the descendants for a `subtree` member — so without
-    // this filter a god in firm A read, and logged in against, another firm's
-    // identity provider. The column default's expression: the row a save writes.
-    row = await db
-      .selectFrom('zvd_saml_config')
-      .select('config')
-      .where(
-        'tenant_id',
-        '=',
-        sql`COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
-                     '00000000-0000-0000-0000-000000000001'::uuid)`,
-      )
-      .executeTakeFirst();
-  } catch (err) {
-    // Do not answer "not configured" for a failure that is not that.
-    //
-    // One catch used to cover the read, the parse and the decryption alike, so a
-    // refused table, an unapproved capability and a bad key all produced the
-    // same word — which is why an extension that could not authenticate anybody
-    // looked like one nobody had set up yet.
-    console.error('[auth/saml] could not read zvd_saml_config:', err);
-    throw err;
-  }
+  maybeDecrypt: (v: unknown, encrypted: boolean) => Promise<unknown>,
+): Promise<SamlConfig | null> {
+  const row = await db
+    .selectFrom('zvd_saml_settings')
+    .selectAll()
+    .where('tenant_id', '=', OWN_TENANT)
+    .executeTakeFirst();
   if (!row) return null;
-
-  try {
-    const raw = typeof row.config === 'string' ? JSON.parse(row.config) : row.config;
-    const parsed = SamlConfigSchema.parse(raw);
-    if (parsed.privateKey) {
-      parsed.privateKey = await decryptSecret(parsed.privateKey);
+  let privateKey: string | undefined;
+  if (row.private_key) {
+    privateKey = String(await maybeDecrypt(row.private_key, true));
+    if (privateKey === row.private_key && privateKey.startsWith('enc:')) {
+      throw new Error('[auth/saml] the stored private key cannot be decrypted (FIELD_ENCRYPTION_KEY changed?)');
     }
-    return parsed;
-  } catch (err) {
-    // A row exists and cannot be used: malformed, or encrypted under a key this
-    // instance no longer holds. Still not "not configured".
-    console.error('[auth/saml] stored config is unusable:', err);
-    throw err;
   }
-}
-
-/**
- * Store the SAML config with privateKey encrypted via the engine's AES key.
- * The SP private key is used to sign SAML AuthnRequests to the IdP — any
- * leak lets an attacker impersonate this SP, which is why we don't accept
- * plaintext storage.
- */
-async function upsertSamlConfig(
-  db: any,
-  config: z.infer<typeof SamlConfigSchema>,
-  encryptSecret: (v: string) => Promise<string>,
-) {
-  const toStore = {
-    ...config,
-    privateKey: config.privateKey ? await encryptSecret(config.privateKey) : undefined,
+  return {
+    enabled: row.enabled === true,
+    entryPoint: row.entry_point,
+    issuer: row.issuer,
+    cert: row.cert,
+    callbackUrl: row.callback_url,
+    privateKey,
+    signatureAlgorithm: row.signature_algorithm || 'sha256',
+    wantAuthnResponseSigned: row.want_authn_response_signed !== false,
+    audience: row.audience_check === false ? false : row.audience || undefined,
+    mapEmail: row.map_email || 'email',
+    mapName: row.map_name || 'displayName',
   };
-  // One row per tenant, upserted on the tenant key.
-  //
-  // The read-then-write it replaces had two problems beyond the refused table:
-  // it raced itself, and `zv_settings.key` is global — no `tenant_id` — so the
-  // second company on a shared instance could not have its own identity
-  // provider. It would have overwritten the first one's.
-  //
-  // `tenant_id` is left to its column default, which reads the tenant GUC set by
-  // the surrounding transaction, so the row lands in the caller's tenant without
-  // this code naming one.
-  await db
-    .insertInto('zvd_saml_config')
-    .values({ config: toJsonb(toStore), updated_at: new Date() })
-    .onConflict((oc: any) =>
-      oc.column('tenant_id').doUpdateSet({
-        config: toJsonb(toStore),
-        updated_at: new Date(),
-      }),
-    )
-    .execute();
 }
 
 export function samlRoutes(ctx: ExtensionContext): Hono {
-  const { db, auth, checkPermission, internals } = ctx;
+  const { db, internals } = ctx;
 
   // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
   // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
@@ -142,23 +75,18 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
   if (!internals?.createBetterAuthSession) {
     throw new Error('[saml] engine internals missing createBetterAuthSession — Zveltio version mismatch');
   }
-  if (!internals.encryptSecret || !internals.decryptSecret) {
-    throw new Error('[saml] engine internals missing encryptSecret/decryptSecret — Zveltio version mismatch');
-  }
   const crossDomain = ctx.config?.crossDomainAuth ?? false;
 
-  async function requireAdmin(c: any): Promise<any> {
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (!session) return null;
-    const isAdmin = await checkPermission(session.user.id, 'admin', '*');
-    return isAdmin ? session.user : null;
-  }
+  // Every route here is public (the IdP and the browser call them before anyone
+  // is signed in): the settings are read as the system (`data:system`, audited),
+  // in the request's tenant only.
+  const readConfig = () => internals.asSystem(['saml_settings'], () => getSamlConfig(db, internals.maybeDecrypt));
 
   const router = new Hono();
 
   // GET /login — redirect user to IdP
   router.get('/login', async (c) => {
-    const config = await getSamlConfig(db, internals.decryptSecret);
+    const config = await readConfig();
     if (!config?.enabled) return c.json({ error: 'SAML SSO is not configured or disabled' }, 503);
 
     const saml = await createSamlInstance(config);
@@ -177,7 +105,7 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
 
   // POST /callback — ACS endpoint (IdP posts here)
   router.post('/callback', async (c) => {
-    const config = await getSamlConfig(db, internals.decryptSecret);
+    const config = await readConfig();
     if (!config?.enabled) return c.json({ error: 'SAML SSO is not configured or disabled' }, 503);
 
     let body: Record<string, string>;
@@ -258,12 +186,13 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
     const remoteIp = c.req.header('x-forwarded-for') ?? c.req.header('x-real-ip') ?? undefined;
     const userAgent = c.req.header('user-agent') ?? undefined;
 
-    const outcome = await db.transaction().execute(async (trx: any) => {
+    // The caller has no principal: the assertion is claimed as the system.
+    const outcome = await internals.asSystem(['saml_spent_assertions'], () => db.transaction().execute(async (trx: any) => {
       // One statement, so the check and the claim cannot interleave: a second,
       // concurrent POST of the same assertion conflicts instead of returning a
       // row. `ON CONFLICT DO NOTHING` + `RETURNING` yields zero rows for a replay.
       const claimed = await sql<{ assertion_id: string }>`
-        INSERT INTO zvd_saml_consumed_assertions (assertion_id, expires_at)
+        INSERT INTO zvd_saml_spent_assertions (assertion_id, expires_at)
         VALUES (${assertionId}, NOW() + INTERVAL '24 hours')
         ON CONFLICT (tenant_id, assertion_id) DO NOTHING
         RETURNING assertion_id
@@ -273,7 +202,7 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
       // Opportunistic sweep. Unguarded: a failure here aborts the transaction in
       // Postgres whatever JavaScript does about it, so swallowing it would take
       // down the login it was meant not to disturb.
-      await sql`DELETE FROM zvd_saml_consumed_assertions WHERE expires_at < NOW()`.execute(trx);
+      await sql`DELETE FROM zvd_saml_spent_assertions WHERE expires_at < NOW()`.execute(trx);
 
       // The account is the engine's to find or create (`provisionUser`,
       // `identity:provision`): `"user"` is refused to `ctx.db` since engine #858,
@@ -308,7 +237,7 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
         if (err?.code !== 'account_disabled') throw err;
         return { replayed: false as const, blocked: true as const, unclaimed: false as const };
       }
-    });
+    }));
 
     if (outcome.replayed) {
       console.warn(`[saml] refused a replayed assertion: ${assertionId}`);
@@ -335,7 +264,7 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
 
   // GET /metadata — SP metadata XML for IdP registration
   router.get('/metadata', async (c) => {
-    const config = await getSamlConfig(db, internals.decryptSecret);
+    const config = await readConfig();
     if (!config) return c.json({ error: 'SAML not configured' }, 503);
 
     // Build the metadata instance without `privateKey`. On 5.x
@@ -353,32 +282,5 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
   });
 
   // GET /config — read config (admin)
-  router.get('/config', async (c) => {
-    const admin = await requireAdmin(c);
-    if (!admin) return c.json({ error: 'Unauthorized' }, 401);
-
-    const config = await getSamlConfig(db, internals.decryptSecret);
-    // Never return private key to client
-    if (config) {
-      const { privateKey: _pk, ...safe } = config;
-      return c.json({ config: safe });
-    }
-    return c.json({ config: null });
-  });
-
-  // POST /config — save config (admin)
-  router.post('/config', zValidator('json', SamlConfigSchema), async (c) => {
-    const admin = await requireAdmin(c);
-    if (!admin) return c.json({ error: 'Unauthorized' }, 401);
-
-    const data = c.req.valid('json');
-    try {
-      await upsertSamlConfig(db, data, internals.encryptSecret);
-    } catch (err: any) {
-      return c.json({ error: `Cannot store privateKey: ${err.message}` }, 500);
-    }
-    return c.json({ success: true });
-  });
-
   return router;
 }

@@ -1,28 +1,52 @@
 {
-  "kind": "settings",
   "sduiSchema": 1,
   "title": "auth.saml.title",
   "subtitle": "auth.saml.subtitle",
-  "dataSource": "/ext/auth/saml/config",
-  "dataPath": "config",
-  "saveEndpoint": "/ext/auth/saml/config",
-  "info": [
-    { "label": "auth.saml.ui.sp_metadata_url", "value": "{ENGINE_URL}/ext/auth/saml/metadata" },
-    { "label": "auth.saml.ui.acs_callback_url", "value": "{ENGINE_URL}/ext/auth/saml/callback" }
-  ],
-  "sections": [
+  "resources": [
     {
-      "title": "auth.saml.section.idp",
-      "fields": [
-        { "name": "enabled", "label": "auth.saml.enable", "type": "boolean", "colSpan": 2 },
-        { "name": "entryPoint", "label": "auth.saml.ui.idp_entry_point_url", "mono": true, "colSpan": 2, "placeholder": "auth.saml.ui.https_your_idp_com_sso_saml" },
-        { "name": "issuer", "label": "auth.saml.ui.idp_issuer_entity_id", "colSpan": 2 },
-        { "name": "cert", "label": "auth.saml.ui.idp_certificate_pem", "type": "textarea", "rows": 5, "mono": true, "colSpan": 2, "placeholder": "-----BEGIN CERTIFICATE-----\n…\n-----END CERTIFICATE-----" },
-        { "name": "mapEmail", "label": "auth.saml.ui.email_attribute", "colSpan": 1 },
-        { "name": "mapName", "label": "auth.saml.ui.name_attribute", "colSpan": 1 },
-        { "name": "signatureAlgorithm", "label": "auth.saml.ui.signature_algorithm", "type": "select", "default": "sha256", "colSpan": 1, "options": [{ "value": "sha1", "label": "auth.saml.ui.sha_1" }, { "value": "sha256", "label": "auth.saml.ui.sha_256" }, { "value": "sha512", "label": "auth.saml.ui.sha_512" }] },
-        { "name": "wantAuthnResponseSigned", "label": "auth.saml.ui.require_signed_response", "type": "boolean", "colSpan": 1 }
-      ]
+      "id": "settings",
+      "label": "auth.saml.title",
+      "icon": "Settings",
+      "dataSource": "/api/data/saml_settings?limit=1",
+      "dataPath": "records",
+      "columns": [
+        { "key": "issuer", "label": "auth.saml.ui.idp_issuer_entity_id", "mono": true },
+        { "key": "enabled", "label": "auth.saml.enable", "type": "boolean" }
+      ],
+      "rowActions": [
+        { "id": "edit", "kind": "edit", "label": "common.edit" },
+        { "id": "metadata", "kind": "open", "label": "auth.saml.ui.sp_metadata_url", "icon": "ExternalLink", "endpoint": "/ext/auth/saml/metadata" },
+        { "id": "delete", "variant": "text-error", "label": "common.delete", "method": "DELETE", "endpoint": "/api/data/saml_settings/{id}", "confirm": "ext.confirmDelete" }
+      ],
+      "form": {
+        "endpoint": "/api/data/saml_settings",
+        "fields": [
+          { "name": "enabled", "label": "auth.saml.enable", "type": "boolean", "colSpan": 2 }
+        ],
+        "sections": [
+          {
+            "title": "auth.saml.section.idp",
+            "fields": [
+              { "name": "entry_point", "label": "auth.saml.ui.idp_entry_point_url", "required": true, "mono": true, "colSpan": 2, "placeholder": "auth.saml.ui.https_your_idp_com_sso_saml" },
+              { "name": "issuer", "label": "auth.saml.ui.idp_issuer_entity_id", "required": true, "colSpan": 2 },
+              { "name": "cert", "label": "auth.saml.ui.idp_certificate_pem", "type": "textarea", "required": true, "rows": 5, "mono": true, "colSpan": 2, "placeholder": "-----BEGIN CERTIFICATE-----\n…\n-----END CERTIFICATE-----" },
+              { "name": "map_email", "label": "auth.saml.ui.email_attribute" },
+              { "name": "map_name", "label": "auth.saml.ui.name_attribute" },
+              { "name": "signature_algorithm", "label": "auth.saml.ui.signature_algorithm", "type": "select", "default": "sha256", "options": [{ "value": "sha1", "label": "auth.saml.ui.sha_1" }, { "value": "sha256", "label": "auth.saml.ui.sha_256" }, { "value": "sha512", "label": "auth.saml.ui.sha_512" }] },
+              { "name": "want_authn_response_signed", "label": "auth.saml.ui.require_signed_response", "type": "boolean" }
+            ]
+          },
+          {
+            "title": "auth.saml.section.sp",
+            "fields": [
+              { "name": "callback_url", "label": "auth.saml.ui.acs_callback_url", "required": true, "mono": true, "colSpan": 2, "placeholder": "auth.saml.ui.acs_placeholder" },
+              { "name": "private_key", "label": "auth.saml.ui.private_key", "type": "textarea", "rows": 4, "mono": true, "colSpan": 2 },
+              { "name": "audience", "label": "auth.saml.ui.audience", "mono": true },
+              { "name": "audience_check", "label": "auth.saml.ui.audience_check", "type": "boolean", "default": true }
+            ]
+          }
+        ]
+      }
     }
   ]
 }
