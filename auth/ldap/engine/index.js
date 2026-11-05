@@ -4653,9 +4653,6 @@ var require_webidl2js_wrapper = __commonJS(function(exports) {
   exports.URLSearchParams = URLSearchParams;
 });
 
-// engine/index.ts
-import { join } from "path";
-
 // /zveltio-extension/node_modules/hono/dist/compose.js
 var compose = (middleware, onError, onNotFound) => {
   return (context, next) => {
@@ -7115,7 +7112,6 @@ function datetime(args) {
   return new RegExp(`^${dateSource}T(?:${timeRegex})$`);
 }
 var anyString = /^[\s\S]{0,}$/;
-var boolean = /^(?:true|false)$/i;
 var lowercase = /^[^A-Z]*$/;
 var uppercase = /^[^a-z]*$/;
 
@@ -7838,26 +7834,6 @@ var $ZodJWT = /* @__PURE__ */ $constructor("$ZodJWT", (inst, def) => {
       inst,
       continue: !def.abort
     });
-  };
-});
-var $ZodBoolean = /* @__PURE__ */ $constructor("$ZodBoolean", (inst, def) => {
-  $ZodType.init(inst, def);
-  inst._zod.pattern = boolean;
-  inst._zod.parse = (payload, _ctx) => {
-    if (def.coerce)
-      try {
-        payload.value = Boolean(payload.value);
-      } catch (_) {}
-    const input = payload.value;
-    if (typeof input === "boolean")
-      return payload;
-    payload.issues.push({
-      expected: "boolean",
-      code: "invalid_type",
-      input,
-      inst
-    });
-    return payload;
   };
 });
 var $ZodUnknown = /* @__PURE__ */ $constructor("$ZodUnknown", (inst, def) => {
@@ -9387,12 +9363,6 @@ function _isoDuration(Class, params) {
     ...normalizeParams(params)
   });
 }
-function _boolean(Class, params) {
-  return new Class({
-    type: "boolean",
-    ...normalizeParams(params)
-  });
-}
 function _unknown(Class) {
   return new Class({
     type: "unknown"
@@ -10194,9 +10164,6 @@ var stringProcessor = (schema, ctx, _json, _params) => {
     }
   }
 };
-var booleanProcessor = (_schema, _ctx, json, _params) => {
-  json.type = "boolean";
-};
 var neverProcessor = (_schema, _ctx, json, _params) => {
   json.not = {};
 };
@@ -10876,14 +10843,6 @@ var ZodJWT = /* @__PURE__ */ $constructor("ZodJWT", (inst, def) => {
   $ZodJWT.init(inst, def);
   ZodStringFormat.init(inst, def);
 });
-var ZodBoolean = /* @__PURE__ */ $constructor("ZodBoolean", (inst, def) => {
-  $ZodBoolean.init(inst, def);
-  ZodType.init(inst, def);
-  inst._zod.processJSONSchema = (ctx, json, params) => booleanProcessor(inst, ctx, json, params);
-});
-function boolean2(params) {
-  return _boolean(ZodBoolean, params);
-}
 var ZodUnknown = /* @__PURE__ */ $constructor("ZodUnknown", (inst, def) => {
   $ZodUnknown.init(inst, def);
   ZodType.init(inst, def);
@@ -17779,7 +17738,7 @@ ${err.message || (err.stack ?? "Unknown socket error")}`));
   }
 }
 
-// engine/ldap-provider.ts
+// ../zveltio-extensions/auth/ldap/engine/ldap-provider.ts
 async function ldapAuthenticate(config, username, password) {
   if (!username || !password)
     throw new Error("Username and password are required");
@@ -17819,66 +17778,44 @@ function escapeLdap(input) {
   return input.replace(/[\\*()\x00]/g, (c) => `\\${c.charCodeAt(0).toString(16).padStart(2, "0")}`);
 }
 
-// engine/routes.ts
-var LdapConfigSchema = object({
-  enabled: boolean2().default(false),
-  url: string2().min(1),
-  bindDN: string2().min(1),
-  bindPassword: string2().min(1),
-  searchBase: string2().min(1),
-  searchFilter: string2().default("(uid={{username}})"),
-  usernameAttribute: string2().default("uid"),
-  emailAttribute: string2().default("mail"),
-  nameAttribute: string2().default("cn"),
-  tlsVerify: boolean2().default(true)
-});
-var LdapConfigSaveSchema = LdapConfigSchema.extend({
-  bindPassword: string2().optional()
+// ../zveltio-extensions/auth/ldap/engine/routes.ts
+var CredentialsSchema = object({
+  username: string2().min(1),
+  password: string2().min(1)
 });
 var OWN_TENANT = sql`COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
                                 '00000000-0000-0000-0000-000000000001'::uuid)`;
 
 class LdapConfigUnreadable extends Error {
-  constructor(cause) {
-    super(`Stored LDAP configuration could not be read: ${cause?.message ?? cause}`);
+  constructor() {
+    super("The stored LDAP bind password cannot be decrypted (FIELD_ENCRYPTION_KEY changed?)");
     this.name = "LdapConfigUnreadable";
   }
 }
-var LoginSchema = object({
-  username: string2().min(1),
-  password: string2().min(1)
-});
-var TestSchema = object({
-  username: string2().min(1),
-  password: string2().min(1)
-});
-async function getLdapConfig(db, decryptSecret) {
-  const row = await db.selectFrom("zvd_ldap_config").select("config").where("tenant_id", "=", OWN_TENANT).executeTakeFirst();
+async function getLdapConfig(db, maybeDecrypt) {
+  const row = await db.selectFrom("zvd_ldap_settings").selectAll().where("tenant_id", "=", OWN_TENANT).executeTakeFirst();
   if (!row)
     return null;
-  try {
-    const raw = typeof row.config === "string" ? JSON.parse(row.config) : row.config;
-    const parsed = LdapConfigSchema.parse(raw);
-    if (parsed.bindPassword) {
-      parsed.bindPassword = await decryptSecret(parsed.bindPassword);
-    }
-    return parsed;
-  } catch (err) {
-    throw new LdapConfigUnreadable(err);
-  }
-}
-async function upsertLdapConfig(db, config, encryptSecret) {
-  const toStore = { ...config, bindPassword: await encryptSecret(config.bindPassword) };
-  const value = sql`${JSON.stringify(toStore)}::text::jsonb`;
-  await db.insertInto("zvd_ldap_config").values({ config: value }).onConflict((oc) => oc.column("tenant_id").doUpdateSet({ config: value, updated_at: new Date })).execute();
+  const bindPassword = String(await maybeDecrypt(row.bind_password, true));
+  if (bindPassword === row.bind_password && bindPassword.startsWith("enc:"))
+    throw new LdapConfigUnreadable;
+  return {
+    enabled: row.enabled === true,
+    url: row.url,
+    bindDN: row.bind_dn,
+    bindPassword,
+    searchBase: row.search_base,
+    searchFilter: row.search_filter || "(uid={{username}})",
+    usernameAttribute: row.username_attribute || "uid",
+    emailAttribute: row.email_attribute || "mail",
+    nameAttribute: row.name_attribute || "cn",
+    tlsVerify: row.tls_verify !== false
+  };
 }
 function ldapRoutes(ctx) {
-  const { db, auth, checkPermission, internals } = ctx;
+  const { db, auth, internals } = ctx;
   if (!internals?.createBetterAuthSession) {
     throw new Error("[ldap] engine internals missing createBetterAuthSession \u2014 Zveltio version mismatch");
-  }
-  if (!internals.encryptSecret || !internals.decryptSecret) {
-    throw new Error("[ldap] engine internals missing encryptSecret/decryptSecret \u2014 Zveltio version mismatch");
   }
   const crossDomain = ctx.config?.crossDomainAuth ?? false;
   function assertLdapTransportSafe(url) {
@@ -17891,24 +17828,25 @@ function ldapRoutes(ctx) {
       throw new Error(`LDAP URL "${url}" is not using ldaps:// \u2014 refusing the connection ` + `in production. Set ALLOW_INSECURE_LDAP=true to override (NOT ` + `recommended; bind credentials and user passwords cross the wire ` + `in cleartext over ldap://).`);
     }
   }
-  async function requireAdmin(c) {
+  async function adminCaller(c) {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session)
-      return null;
-    const isAdmin = await checkPermission(session.user.id, "admin", "*");
-    return isAdmin ? session.user : null;
+      return c.json({ error: "Unauthorized" }, 401);
+    if (!await internals.isTenantAdmin(session.user.id))
+      return c.json({ error: "Admin required" }, 403);
+    return session.user;
   }
   const router = new Hono2;
-  async function loadConfig(c) {
+  async function loadConfig(c, read) {
     try {
-      return { config: await getLdapConfig(db, internals.decryptSecret), error: null };
+      return { config: await read(), error: null };
     } catch (err) {
       console.error("[ldap] config unreadable:", err.message);
-      return { config: null, error: c.json({ error: err.message }, 500) };
+      return { config: null, error: c.json({ error: "LDAP configuration is unreadable" }, 500) };
     }
   }
-  router.post("/login", zValidator("json", LoginSchema), async (c) => {
-    const loaded = await loadConfig(c);
+  router.post("/login", zValidator("json", CredentialsSchema), async (c) => {
+    const loaded = await loadConfig(c, () => internals.asSystem(["ldap_settings"], () => getLdapConfig(db, internals.maybeDecrypt)));
     if (loaded.error)
       return loaded.error;
     const config = loaded.config;
@@ -17983,51 +17921,11 @@ function ldapRoutes(ctx) {
       user: { id: user.id, email: user.email, name: user.name }
     });
   });
-  router.get("/config", async (c) => {
-    const admin = await requireAdmin(c);
-    if (!admin)
-      return c.json({ error: "Unauthorized" }, 401);
-    const loaded = await loadConfig(c);
-    if (loaded.error)
-      return loaded.error;
-    if (loaded.config) {
-      const { bindPassword: _bp, ...safe } = loaded.config;
-      return c.json({ config: safe });
-    }
-    return c.json({ config: null });
-  });
-  router.post("/config", zValidator("json", LdapConfigSaveSchema), async (c) => {
-    const admin = await requireAdmin(c);
-    if (!admin)
-      return c.json({ error: "Unauthorized" }, 401);
-    const data = c.req.valid("json");
-    try {
-      assertLdapTransportSafe(data.url);
-    } catch (err) {
-      return c.json({ error: err.message }, 400);
-    }
-    let bindPassword = data.bindPassword;
-    if (!bindPassword) {
-      const loaded = await loadConfig(c);
-      if (loaded.error)
-        return loaded.error;
-      bindPassword = loaded.config?.bindPassword;
-      if (!bindPassword) {
-        return c.json({ error: "bindPassword is required \u2014 there is no stored password to keep." }, 400);
-      }
-    }
-    try {
-      await upsertLdapConfig(db, { ...data, bindPassword }, internals.encryptSecret);
-    } catch (err) {
-      return c.json({ error: `Cannot store bindPassword: ${err.message}` }, 500);
-    }
-    return c.json({ success: true });
-  });
-  router.post("/test", zValidator("json", TestSchema), async (c) => {
-    const admin = await requireAdmin(c);
-    if (!admin)
-      return c.json({ error: "Unauthorized" }, 401);
-    const loaded = await loadConfig(c);
+  router.post("/test", zValidator("json", CredentialsSchema), async (c) => {
+    const admin = await adminCaller(c);
+    if (admin instanceof Response)
+      return admin;
+    const loaded = await loadConfig(c, () => getLdapConfig(db, internals.maybeDecrypt));
     if (loaded.error)
       return loaded.error;
     const config = loaded.config;
@@ -18049,19 +17947,11 @@ function ldapRoutes(ctx) {
   return router;
 }
 
-// engine/index.ts
+// ../zveltio-extensions/auth/ldap/engine/index.ts
 var extension = {
   name: "auth/ldap",
   category: "auth",
   mountStrategy: "subapp",
-  getMigrations() {
-    return [
-      join(import.meta.dir, "migrations/001_initial.sql"),
-      join(import.meta.dir, "migrations/002_tenant_rls.sql"),
-      join(import.meta.dir, "migrations/003_tenant_scoped_unique_keys.sql"),
-      join(import.meta.dir, "migrations/004_config_own_table.sql")
-    ];
-  },
   async register(app, ctx) {
     app.route("/", ldapRoutes(ctx));
   }

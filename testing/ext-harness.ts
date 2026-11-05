@@ -168,6 +168,11 @@ const ENGINE_MEMBERS = [
   'writeValidationRuleGroup',
   // The data API's read gate: a stub would answer every caller the same.
   'checkAccess',
+  // Stands collection permissions down, in the running tenant only, and audits:
+  // a stub would run `fn` with no tenant check and no audit row.
+  'asSystem',
+  // The FIELD keyring: a stub hands an encrypted column back as `undefined`.
+  'maybeDecrypt',
   'readScope',
 ] as const;
 

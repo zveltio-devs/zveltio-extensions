@@ -18,5 +18,7 @@
   "auth.ldap.ui.name_attr": "Atributo de nombre",
   "auth.ldap.ui.search_base": "Base de búsqueda",
   "auth.ldap.ui.search_filter": "Filtro de búsqueda",
+  "auth.ldap.ui.test_password": "Contraseña",
+  "auth.ldap.ui.test_username": "Usuario",
   "auth.ldap.ui.username_attr": "Atributo de usuario"
 }
