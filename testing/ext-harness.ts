@@ -1154,8 +1154,9 @@ export async function extensionContract(engineDir: string, opts: ContractOptions
  * `secret` fields (ADR 0024).
  *
  * `app` serves `/ext/<name>/…`; `engineApp` is the engine's own (`/api/…`).
- * Call `done()` from `afterAll`: it unloads the registry row and drops the
- * declared collections.
+ * Call `done()` from `afterAll`: it unloads the registry row, drops the
+ * declared collections and gives the god seat back to the harness user, which
+ * the suite's `harness.createGodSession` took (see `seatHarnessGod`).
  */
 export async function onEngine(engineDir: string): Promise<{
   app: any;
@@ -1216,6 +1217,7 @@ export async function onEngine(engineDir: string): Promise<{
     done: async () => {
       await sql`DELETE FROM zv_extension_registry WHERE name = ${name}`.execute(db);
       for (const c of [...(manifest.collections ?? [])].reverse()) await harness.dropTestCollection(db, c);
+      await seatHarnessGod();
     },
   };
 }
