@@ -1,9 +1,15 @@
 # Changelog
 
+## 2.1.0 (2026-11-06)
+
+- feat: `bind_password` is a `secret` field (ADR 0024): encrypted at rest, served to no one on any read path, god included, and read back decrypted by this extension alone. A reader of `ldap_settings` no longer reads it, so no grant needs restricting for it. Studio's form leaves it empty when editing: leave it empty to keep the stored password, type one to replace it. Needs engine 3.0.0-beta.103
+- feat: `POST /login` and `POST /test` read the settings through the data API (`ctx.host(c).collections`, ADR 0025) instead of raw SQL: `/login` as the system (`data:system`, audited), `/test` as the caller. A bind password the instance's key cannot decrypt still answers 500 "LDAP configuration is unreadable", not "not configured"; a caller the data API refuses (`/test` without `read` on `ldap_settings`) gets the data API's answer
+- **Upgrade:** the stored `bind_password` values are already encrypted under the field key; the engine keeps them when it retypes the column
+
 ## 2.0.0 (2026-11-05)
 
 - feat!: the configuration is the collection `ldap_settings`, declared in `schema/collections/` and created and owned by the engine, one row per tenant; no SQL migrations. `bind_password` is encrypted at rest by the engine (the instance needs `FIELD_ENCRYPTION_KEY`). **Upgrade step:** 2.0.0 does not read `zvd_ldap_config`; re-enter the directory settings in Studio (LDAP / AD) before users sign in again. The 1.x tables are left in place
-- feat!: `GET`/`POST /config` are dropped; the data API serves `ldap_settings`, so who may read or change the directory settings is the engine's rules. The collection has no default grants: tenant admins (whose grant is total) administer it, other roles only when granted. A reader of `ldap_settings` reads `bind_password` (1.x never returned it): grant `read` only to the roles that administer sign-in, or deny that column
+- feat!: `GET`/`POST /config` are dropped; the data API serves `ldap_settings`, so who may read or change the directory settings is the engine's rules. The collection has no default grants: tenant admins (whose grant is total) administer it, other roles only when granted.
 - feat!: `zvd_ldap_group_mappings`, `zvd_ldap_ip_allowlist` and `zvd_ldap_login_log` are no longer created; no code read or wrote them. Sign-ins are audited by the engine (`auth.login_success`, `auth.login_failed`)
 - feat!: `POST /login` reads the settings as the system (`data:system`, audited); `POST /test` gates on the engine object `admin` and reads them as the caller. The `ldaps://` check in production now refuses at sign-in and test (503), not at save
 - chore: the `database` and `secrets` permission labels are dropped

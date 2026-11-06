@@ -7,52 +7,36 @@ import { readMultipart, MULTIPART_REQUIRED } from '@zveltio/sdk/extension';
  * GET  /ext/auth/saml/metadata       — SP metadata XML (register in IdP)
  *
  * The IdP configuration is the collection `saml_settings`, one row per tenant,
- * served by the data API; `private_key` is encrypted at rest by the engine.
+ * served by the data API; `private_key` is a `secret` field: encrypted at rest,
+ * served to no one, read back decrypted by this extension only.
  */
 
 import { Hono } from 'hono';
 import { sql } from 'kysely';
 import { createSamlInstance, validateSamlResponse, extractAssertionId, type SamlIdpConfig } from './saml-provider.js';
-import type { ExtensionContext } from '@zveltio/sdk/extension';
-// Config schema stored in `zvd_saml_config`, one row per tenant (migration 004).
+import type { ExtensionContext, HostCollections } from '@zveltio/sdk/extension';
 type SamlConfig = SamlIdpConfig & { enabled: boolean; mapEmail: string; mapName: string };
 
-/** The tenant the work runs as: the `tenant_id` column default's expression. */
-const OWN_TENANT = sql`COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
-                                '00000000-0000-0000-0000-000000000001'::uuid)`;
-
 /**
- * The OWN tenant's `saml_settings` row, or `null` when none is saved. The row
- * policy admits the caller's READ REACH — every firm for a god — so the tenant
- * filter is what keeps a god in firm B off firm A's identity provider.
- *
- * A private key that no longer decrypts (`FIELD_ENCRYPTION_KEY` changed) comes
- * back from `maybeDecrypt` as the ciphertext; it throws rather than sign with it.
+ * The OWN tenant's `saml_settings` row, or `null` when none is saved, through
+ * the data API (`host.collections`, ADR 0025), as the system: every route here
+ * is public. `private_key` is a `secret` field, which only this extension reads
+ * back, decrypted (ADR 0024); one the instance's key cannot decrypt comes back
+ * `null`, as an unset one does. The tenant match keeps the row the request's
+ * own whatever the principal reaches.
  */
-async function getSamlConfig(
-  db: any,
-  maybeDecrypt: (v: unknown, encrypted: boolean) => Promise<unknown>,
-): Promise<SamlConfig | null> {
-  const row = await db
-    .selectFrom('zvd_saml_settings')
-    .selectAll()
-    .where('tenant_id', '=', OWN_TENANT)
-    .executeTakeFirst();
+async function getSamlConfig(c: any, collections: HostCollections): Promise<SamlConfig | null> {
+  const tenant = (c.get('tenant') as { id?: string } | null | undefined)?.id;
+  const { records } = await collections.list('saml_settings', { limit: 100 });
+  const row = (records as Record<string, any>[]).find((r) => r.tenant_id === tenant);
   if (!row) return null;
-  let privateKey: string | undefined;
-  if (row.private_key) {
-    privateKey = String(await maybeDecrypt(row.private_key, true));
-    if (privateKey === row.private_key && privateKey.startsWith('enc:')) {
-      throw new Error('[auth/saml] the stored private key cannot be decrypted (FIELD_ENCRYPTION_KEY changed?)');
-    }
-  }
   return {
     enabled: row.enabled === true,
     entryPoint: row.entry_point,
     issuer: row.issuer,
     cert: row.cert,
     callbackUrl: row.callback_url,
-    privateKey,
+    privateKey: typeof row.private_key === 'string' && row.private_key !== '' ? row.private_key : undefined,
     signatureAlgorithm: row.signature_algorithm || 'sha256',
     wantAuthnResponseSigned: row.want_authn_response_signed !== false,
     audience: row.audience_check === false ? false : row.audience || undefined,
@@ -62,7 +46,7 @@ async function getSamlConfig(
 }
 
 export function samlRoutes(ctx: ExtensionContext): Hono {
-  const { db, internals } = ctx;
+  const { db, internals, host } = ctx;
 
   // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
   // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
@@ -75,18 +59,19 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
   if (!internals?.createBetterAuthSession) {
     throw new Error('[saml] engine internals missing createBetterAuthSession — Zveltio version mismatch');
   }
+  if (!host) throw new Error('[saml] engine has no route host (needs 3.0.0-beta.103) — Zveltio version mismatch');
   const crossDomain = ctx.config?.crossDomainAuth ?? false;
 
   // Every route here is public (the IdP and the browser call them before anyone
   // is signed in): the settings are read as the system (`data:system`, audited),
   // in the request's tenant only.
-  const readConfig = () => internals.asSystem(['saml_settings'], () => getSamlConfig(db, internals.maybeDecrypt));
+  const readConfig = (c: any) => internals.asSystem(['saml_settings'], () => getSamlConfig(c, host(c).collections));
 
   const router = new Hono();
 
   // GET /login — redirect user to IdP
   router.get('/login', async (c) => {
-    const config = await readConfig();
+    const config = await readConfig(c);
     if (!config?.enabled) return c.json({ error: 'SAML SSO is not configured or disabled' }, 503);
 
     const saml = await createSamlInstance(config);
@@ -105,7 +90,7 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
 
   // POST /callback — ACS endpoint (IdP posts here)
   router.post('/callback', async (c) => {
-    const config = await readConfig();
+    const config = await readConfig(c);
     if (!config?.enabled) return c.json({ error: 'SAML SSO is not configured or disabled' }, 503);
 
     let body: Record<string, string>;
@@ -264,7 +249,7 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
 
   // GET /metadata — SP metadata XML for IdP registration
   router.get('/metadata', async (c) => {
-    const config = await readConfig();
+    const config = await readConfig(c);
     if (!config) return c.json({ error: 'SAML not configured' }, 503);
 
     // Build the metadata instance without `privateKey`. On 5.x

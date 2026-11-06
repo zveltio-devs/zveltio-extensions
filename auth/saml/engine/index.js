@@ -18715,8 +18715,8 @@ var require_sax2 = __commonJS(function(exports) {
       }
       return Stream.prototype.on.call(me, ev, handler);
     };
-    var CDATAre = /^\[CDATA\[$/i;
-    var DOCTYPEre = /^DOCTYPE$/i;
+    var CDATA = "[CDATA[";
+    var DOCTYPE = "DOCTYPE";
     var XML_NAMESPACE = "http://www.w3.org/XML/1998/namespace";
     var XMLNS_NAMESPACE = "http://www.w3.org/2000/xmlns/";
     var rootNS = { xml: XML_NAMESPACE, xmlns: XMLNS_NAMESPACE };
@@ -18779,14 +18779,14 @@ var require_sax2 = __commonJS(function(exports) {
       SCRIPT: S++,
       SCRIPT_ENDING: S++
     };
-    sax.XML_ENTITIES = Object.assign(Object.create(null), {
+    sax.XML_ENTITIES = {
       amp: "&",
       gt: ">",
       lt: "<",
       quot: '"',
       apos: "'"
-    });
-    sax.ENTITIES = Object.assign(Object.create(null), {
+    };
+    sax.ENTITIES = {
       amp: "&",
       gt: ">",
       lt: "<",
@@ -19040,7 +19040,7 @@ var require_sax2 = __commonJS(function(exports) {
       clubs: 9827,
       hearts: 9829,
       diams: 9830
-    });
+    };
     Object.keys(sax.ENTITIES).forEach(function(key) {
       var e = sax.ENTITIES[key];
       var s = typeof e === "number" ? String.fromCharCode(e) : e;
@@ -19340,14 +19340,11 @@ Char: ` + parser.c;
         }
       }
       entity = entity.replace(/^0+/, "");
-      if (isNaN(num) || numStr.toLowerCase() !== entity || num < 0 || num > 1114111 || !isXmlChar(num)) {
+      if (isNaN(num) || numStr.toLowerCase() !== entity || num < 0 || num > 1114111) {
         strictFail(parser, "Invalid character entity");
         return "&" + parser.entity + ";";
       }
       return String.fromCodePoint(num);
-    }
-    function isXmlChar(num) {
-      return num === 9 || num === 10 || num === 13 || num >= 32 && num <= 55295 || num >= 57344 && num <= 65533 || num >= 65536 && num <= 1114111;
     }
     function beginWhiteSpace(parser, c) {
       if (c === "<") {
@@ -19490,12 +19487,12 @@ Char: ` + parser.c;
               parser.state = S.DOCTYPE_DTD;
               parser.doctype += "<!" + parser.sgmlDecl + c;
               parser.sgmlDecl = "";
-            } else if (CDATAre.test(parser.sgmlDecl + c)) {
+            } else if ((parser.sgmlDecl + c).toUpperCase() === CDATA) {
               emitNode(parser, "onopencdata");
               parser.state = S.CDATA;
               parser.sgmlDecl = "";
               parser.cdata = "";
-            } else if (DOCTYPEre.test(parser.sgmlDecl + c)) {
+            } else if ((parser.sgmlDecl + c).toUpperCase() === DOCTYPE) {
               parser.state = S.DOCTYPE;
               if (parser.doctype || parser.sawRoot) {
                 strictFail(parser, "Inappropriately located doctype declaration");
@@ -30120,9 +30117,9 @@ var require_lib6 = __commonJS(function(exports) {
     return types_1.SamlStatusError;
   } });
 });
-// packages/sdk/src/extension/action-refusal.ts
+// /zveltio-extension/packages/sdk/src/extension/action-refusal.ts
 var ACTION_REFUSAL = Symbol.for("zveltio.extension.action-refusal");
-// packages/sdk/src/extension/reserved-paths.ts
+// /zveltio-extension/packages/sdk/src/extension/reserved-paths.ts
 var RESERVED_PATH_SEGMENTS = Object.freeze([
   "api",
   "ext",
@@ -30135,7 +30132,7 @@ var RESERVED_PATH_SEGMENTS = Object.freeze([
   "robots.txt",
   "sitemap.xml"
 ]);
-// packages/sdk/src/extension/multipart.ts
+// /zveltio-extension/packages/sdk/src/extension/multipart.ts
 var MULTIPART_REQUIRED = { error: "Expected a multipart/form-data body." };
 async function readMultipart(c) {
   try {
@@ -34938,7 +34935,7 @@ var Hono2 = class extends Hono {
   }
 };
 
-// ../zveltio-extensions/auth/saml/engine/saml-provider.ts
+// engine/saml-provider.ts
 var import_node_saml = __toESM(require_lib6());
 function createSamlInstance(config) {
   return new import_node_saml.SAML({
@@ -34981,27 +34978,20 @@ async function validateSamlResponse(saml, body) {
   };
 }
 
-// ../zveltio-extensions/auth/saml/engine/routes.ts
-var OWN_TENANT = sql`COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
-                                '00000000-0000-0000-0000-000000000001'::uuid)`;
-async function getSamlConfig(db, maybeDecrypt) {
-  const row = await db.selectFrom("zvd_saml_settings").selectAll().where("tenant_id", "=", OWN_TENANT).executeTakeFirst();
+// engine/routes.ts
+async function getSamlConfig(c, collections) {
+  const tenant = c.get("tenant")?.id;
+  const { records } = await collections.list("saml_settings", { limit: 100 });
+  const row = records.find((r) => r.tenant_id === tenant);
   if (!row)
     return null;
-  let privateKey;
-  if (row.private_key) {
-    privateKey = String(await maybeDecrypt(row.private_key, true));
-    if (privateKey === row.private_key && privateKey.startsWith("enc:")) {
-      throw new Error("[auth/saml] the stored private key cannot be decrypted (FIELD_ENCRYPTION_KEY changed?)");
-    }
-  }
   return {
     enabled: row.enabled === true,
     entryPoint: row.entry_point,
     issuer: row.issuer,
     cert: row.cert,
     callbackUrl: row.callback_url,
-    privateKey,
+    privateKey: typeof row.private_key === "string" && row.private_key !== "" ? row.private_key : undefined,
     signatureAlgorithm: row.signature_algorithm || "sha256",
     wantAuthnResponseSigned: row.want_authn_response_signed !== false,
     audience: row.audience_check === false ? false : row.audience || undefined,
@@ -35010,15 +35000,17 @@ async function getSamlConfig(db, maybeDecrypt) {
   };
 }
 function samlRoutes(ctx) {
-  const { db, internals } = ctx;
+  const { db, internals, host } = ctx;
   if (!internals?.createBetterAuthSession) {
     throw new Error("[saml] engine internals missing createBetterAuthSession \u2014 Zveltio version mismatch");
   }
+  if (!host)
+    throw new Error("[saml] engine has no route host (needs 3.0.0-beta.103) \u2014 Zveltio version mismatch");
   const crossDomain = ctx.config?.crossDomainAuth ?? false;
-  const readConfig = () => internals.asSystem(["saml_settings"], () => getSamlConfig(db, internals.maybeDecrypt));
+  const readConfig = (c) => internals.asSystem(["saml_settings"], () => getSamlConfig(c, host(c).collections));
   const router = new Hono2;
   router.get("/login", async (c) => {
-    const config = await readConfig();
+    const config = await readConfig(c);
     if (!config?.enabled)
       return c.json({ error: "SAML SSO is not configured or disabled" }, 503);
     const saml = await createSamlInstance(config);
@@ -35028,7 +35020,7 @@ function samlRoutes(ctx) {
     return c.redirect(loginUrl);
   });
   router.post("/callback", async (c) => {
-    const config = await readConfig();
+    const config = await readConfig(c);
     if (!config?.enabled)
       return c.json({ error: "SAML SSO is not configured or disabled" }, 503);
     let body;
@@ -35108,7 +35100,7 @@ function samlRoutes(ctx) {
     return response;
   });
   router.get("/metadata", async (c) => {
-    const config = await readConfig();
+    const config = await readConfig(c);
     if (!config)
       return c.json({ error: "SAML not configured" }, 503);
     const saml = await createSamlInstance({ ...config, privateKey: undefined });
@@ -35119,7 +35111,7 @@ function samlRoutes(ctx) {
   return router;
 }
 
-// ../zveltio-extensions/auth/saml/engine/index.ts
+// engine/index.ts
 var extension = {
   name: "auth/saml",
   category: "auth",

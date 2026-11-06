@@ -41,8 +41,7 @@
     },
     {
       "name": "private_key",
-      "type": "textarea",
-      "encrypted": true
+      "type": "secret"
     },
     {
       "name": "signature_algorithm",

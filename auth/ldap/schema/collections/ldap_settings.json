@@ -31,9 +31,8 @@
     },
     {
       "name": "bind_password",
-      "type": "text",
-      "required": true,
-      "encrypted": true
+      "type": "secret",
+      "required": true
     },
     {
       "name": "search_base",

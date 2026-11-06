@@ -5,31 +5,29 @@
  * POST /ext/auth/ldap/test     — Test LDAP connection (engine object `admin`)
  *
  * The configuration is the collection `ldap_settings`, one row per tenant,
- * served by the data API; `bind_password` is encrypted at rest by the engine.
+ * served by the data API; `bind_password` is a `secret` field: encrypted at
+ * rest, served to no one, read back decrypted by this extension only.
  */
 
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
-import { sql } from 'kysely';
 import { ldapAuthenticate, type LdapConfig } from './ldap-provider.js';
-import type { ExtensionContext } from '@zveltio/sdk/extension';
+import type { ExtensionContext, HostCollections } from '@zveltio/sdk/extension';
 
 const CredentialsSchema = z.object({
   username: z.string().min(1),
   password: z.string().min(1),
 });
 
-/** The tenant the work runs as: the `tenant_id` column default's expression. */
-const OWN_TENANT = sql`COALESCE(NULLIF(current_setting('zveltio.current_tenant', true), '')::uuid,
-                                '00000000-0000-0000-0000-000000000001'::uuid)`;
-
 type Settings = LdapConfig & { enabled: boolean };
 
 /**
  * Raised when the settings row exists but cannot be used — its bind password
- * no longer decrypts (`FIELD_ENCRYPTION_KEY` changed). "Not configured" would
- * send the operator to set up what is already there.
+ * reads back empty. The field is required, so that is a value the instance's
+ * key no longer decrypts (`FIELD_ENCRYPTION_KEY` changed or missing): the engine
+ * hands such a secret back as `null`. "Not configured" would send the operator
+ * to set up what is already there.
  */
 class LdapConfigUnreadable extends Error {
   constructor() {
@@ -39,28 +37,25 @@ class LdapConfigUnreadable extends Error {
 }
 
 /**
- * The OWN tenant's `ldap_settings` row, or `null` when none is saved. The row
- * policy admits the caller's READ REACH — every firm for a god — so the tenant
- * filter is what keeps a god in firm B off firm A's directory.
+ * The OWN tenant's `ldap_settings` row, or `null` when none is saved, through
+ * the data API (`host.collections`, ADR 0025): `bind_password` is a `secret`
+ * field, which only this extension reads back, decrypted (ADR 0024). The list
+ * admits the caller's READ REACH — every firm for a god — so the tenant match
+ * is what keeps a god in firm B off firm A's directory. One row per tenant
+ * (`scope` is unique), so the page holds the own row unless the caller reaches
+ * more firms with a saved row than it lists.
  */
-async function getLdapConfig(
-  db: any,
-  maybeDecrypt: (v: unknown, encrypted: boolean) => Promise<unknown>,
-): Promise<Settings | null> {
-  const row = await db
-    .selectFrom('zvd_ldap_settings')
-    .selectAll()
-    .where('tenant_id', '=', OWN_TENANT)
-    .executeTakeFirst();
+async function getLdapConfig(c: any, collections: HostCollections): Promise<Settings | null> {
+  const tenant = (c.get('tenant') as { id?: string } | null | undefined)?.id;
+  const { records } = await collections.list('ldap_settings', { limit: 100 });
+  const row = (records as Record<string, any>[]).find((r) => r.tenant_id === tenant);
   if (!row) return null;
-  // `maybeDecrypt` hands ciphertext back unchanged when it cannot decrypt it.
-  const bindPassword = String(await maybeDecrypt(row.bind_password, true));
-  if (bindPassword === row.bind_password && bindPassword.startsWith('enc:')) throw new LdapConfigUnreadable();
+  if (typeof row.bind_password !== 'string' || row.bind_password === '') throw new LdapConfigUnreadable();
   return {
     enabled: row.enabled === true,
     url: row.url,
     bindDN: row.bind_dn,
-    bindPassword,
+    bindPassword: row.bind_password,
     searchBase: row.search_base,
     searchFilter: row.search_filter || '(uid={{username}})',
     usernameAttribute: row.username_attribute || 'uid',
@@ -71,7 +66,7 @@ async function getLdapConfig(
 }
 
 export function ldapRoutes(ctx: ExtensionContext): Hono {
-  const { db, auth, internals } = ctx;
+  const { db, auth, internals, host } = ctx;
 
   // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
   // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
@@ -85,6 +80,7 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
   if (!internals?.createBetterAuthSession) {
     throw new Error('[ldap] engine internals missing createBetterAuthSession — Zveltio version mismatch');
   }
+  if (!host) throw new Error('[ldap] engine has no route host (needs 3.0.0-beta.103) — Zveltio version mismatch');
   const crossDomain = ctx.config?.crossDomainAuth ?? false;
 
   // In production, refuse non-TLS LDAP URLs. ldap:// on port 389 carries
@@ -128,6 +124,12 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
     try {
       return { config: await read(), error: null };
     } catch (err) {
+      // The data API refused the caller (`/test` without a read grant on
+      // `ldap_settings`): its answer, not "unreadable".
+      const status = (err as { status?: number }).status;
+      if (typeof status === 'number' && status >= 400 && status < 500) {
+        return { config: null, error: c.json({ error: (err as Error).message }, status) };
+      }
       // The detail is the operator's, in the log: `/login` answers anyone.
       console.error('[ldap] config unreadable:', (err as Error).message);
       return { config: null, error: c.json({ error: 'LDAP configuration is unreadable' }, 500) };
@@ -139,7 +141,7 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
     // The caller has no principal yet: the settings are read as the system
     // (`data:system`, audited), in the request's tenant only.
     const loaded = await loadConfig(c, () =>
-      internals.asSystem(['ldap_settings'], () => getLdapConfig(db, internals.maybeDecrypt)),
+      internals.asSystem(['ldap_settings'], () => getLdapConfig(c, host(c).collections)),
     );
     if (loaded.error) return loaded.error;
     const config = loaded.config;
@@ -262,7 +264,7 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
     if (admin instanceof Response) return admin;
 
     // As the caller: the settings are read under the caller's own grants.
-    const loaded = await loadConfig(c, () => getLdapConfig(db, internals.maybeDecrypt));
+    const loaded = await loadConfig(c, () => getLdapConfig(c, host(c).collections));
     if (loaded.error) return loaded.error;
     const config = loaded.config;
     if (!config) return c.json({ error: 'LDAP not configured' }, 503);

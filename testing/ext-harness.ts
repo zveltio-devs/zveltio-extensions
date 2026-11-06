@@ -132,6 +132,8 @@ const capsP = import(join(ENGINE_LIB, 'capabilities.js'));
 const broadcastP = import(join(ENGINE_LIB, 'broadcast.js'));
 const registerP = import(join(ENGINE_LIB, 'register.js'));
 const internalsP = import(join(ENGINE_LIB, 'internals.js'));
+const actionsP = import(join(ENGINE_LIB, 'actions.js'));
+const problemP = import(join(ENGINE_LIB, '..', 'problem.js'));
 const tenancyP = import(join(ENGINE_LIB, '..', 'tenancy', 'index.js'));
 const ddlP = import(join(ENGINE_LIB, '..', 'data', 'index.js'));
 const engineHandleP = import(join(ENGINE_LIB, '..', 'engine-handle.js'));
@@ -205,7 +207,12 @@ async function productionWiring(
   extDir: string,
   extName: string,
   ext: any,
-): Promise<{ extName: string; allowedTables: Set<string>; capabilities: readonly string[] }> {
+): Promise<{
+  extName: string;
+  allowedTables: Set<string>;
+  capabilities: readonly string[];
+  manifest: Record<string, unknown> | null;
+}> {
   const { buildAllowedTables, EXTENSION_TABLE_GRANTS } = (await registerP) as any;
   const paths: string[] = typeof ext?.getMigrations === 'function' ? ext.getMigrations() : [];
   let allowedTables = new Set<string>();
@@ -226,13 +233,14 @@ async function productionWiring(
     // prefix rules alone — which are the ones that matter here.
   }
   let capabilities: readonly string[] = [];
+  let manifest: Record<string, unknown> | null = null;
   try {
-    const manifest = JSON.parse(readFileSync(join(extDir, 'manifest.json'), 'utf8'));
-    capabilities = Array.isArray(manifest?.permissions) ? manifest.permissions : [];
+    manifest = JSON.parse(readFileSync(join(extDir, 'manifest.json'), 'utf8'));
+    capabilities = Array.isArray(manifest?.permissions) ? (manifest.permissions as string[]) : [];
   } catch {
     /* a manifest that will not parse fails its own check, one test up */
   }
-  return { extName, allowedTables, capabilities };
+  return { extName, allowedTables, capabilities, manifest };
 }
 
 const DB_URL = process.env.TEST_DATABASE_URL ?? '';
@@ -414,7 +422,12 @@ async function makeCtx(
     grants?: ReadonlyArray<{ resource: string; action: string }>;
   },
   publicRoutes?: any[],
-  wiring?: { extName?: string; allowedTables?: Set<string>; capabilities?: readonly string[] },
+  wiring?: {
+    extName?: string;
+    allowedTables?: Set<string>;
+    capabilities?: readonly string[];
+    manifest?: Record<string, unknown> | null;
+  },
 ): Promise<any> {
   const services = new Map<string, unknown>();
   const session: Session = opts.authed
@@ -544,7 +557,7 @@ async function makeCtx(
     },
   );
 
-  return {
+  const ctx: any = {
     db: restrictedDb,
     // `adminDb` is the deliberate cross-tenant handle. Production gates it on
     // the `db:admin` capability; an extension without it gets the restricted
@@ -748,6 +761,14 @@ async function makeCtx(
     env: {},
     log: console,
   };
+  // The engine's own route host (ADR 0025), over this bag's data API: as the
+  // caller, which answers what the stubbed `listRecords` / `readRecord` answer.
+  // `asSystem` does not switch it here — no request passed the engine's gate —
+  // so a route's system read is proven on the engine's real chain instead.
+  const { routeCollections, routeHost } = (await actionsP) as any;
+  const routes = routeCollections(wiring?.manifest ?? null);
+  ctx.host = (c: unknown) => routeHost(c, extName, routes, ctx.internals);
+  return ctx;
 }
 
 /**
@@ -786,6 +807,10 @@ async function tenantApp(tenant?: string, transaction = false, userId?: string):
   const { Hono } = (await honoP) as any;
   const { runWithDomain, withTenantIsolation, DEFAULT_TENANT_ID } = (await tenancyP) as any;
   const app = new Hono();
+  // As the engine sets it on every extension's sub-app (`register.ts`): a thrown
+  // refusal (`problem(…)`, the data API's through `host.collections`) answers
+  // with its own status, not a 500.
+  app.onError(((await problemP) as any).problemOnError);
   const id = tenant ?? DEFAULT_TENANT_ID;
   // The tenant manager runs on the pool only the engine's boot hands it.
   if (transaction) await engineUsers();
@@ -1117,4 +1142,80 @@ export async function extensionContract(engineDir: string, opts: ContractOptions
       expect([500, 502, 504]).not.toContain(res.status);
     });
   });
+}
+
+/**
+ * The extension loaded the way the engine loads it — manifest, declared
+ * collections, the packed bundle, `finalizeExtensionLoad` — behind the engine's
+ * own `/ext/*` chain: session prefetch, the tenant from the request's subdomain,
+ * the auth gate that admits a public route. What `mountForTest` cannot give: a
+ * route's `ctx.host(c)` acting as the gate's principal, or as the extension
+ * inside `ctx.internals.asSystem` (ADR 0025), with the owner reveal of its
+ * `secret` fields (ADR 0024).
+ *
+ * `app` serves `/ext/<name>/…`; `engineApp` is the engine's own (`/api/…`).
+ * Call `done()` from `afterAll`: it unloads the registry row and drops the
+ * declared collections.
+ */
+export async function onEngine(engineDir: string): Promise<{
+  app: any;
+  engineApp: any;
+  db: any;
+  sql: any;
+  harness: any;
+  done: () => Promise<void>;
+}> {
+  const mod = (p: string) => import(join(ENGINE_SRC, p));
+  const extDir = dirname(engineDir);
+  const manifest = JSON.parse(readFileSync(join(extDir, 'manifest.json'), 'utf8'));
+  const name: string = manifest.name;
+  const { sql } = await import(join(ENGINE_SRC, '..', 'node_modules', 'kysely', 'dist', 'index.js'));
+  const { Hono } = (await honoP) as any;
+  const harness = await mod('testing/app-harness.js');
+  const { finalizeExtensionLoad } = await mod('lib/extensions/register.js');
+  const { buildExtensionInternals } = await mod('lib/extensions/internals.js');
+  const { ManifestSchema } = await mod('lib/extensions/manifest-schema.js');
+  const { invalidateActivationCache } = await mod('lib/extensions/activation.js');
+  const { getAuth } = await mod('lib/auth.js');
+  const { sessionPrefetch } = await mod('middleware/session-prefetch.js');
+  const { tenantMiddleware } = await mod('middleware/tenant.js');
+  const { tenantMembershipMiddleware } = await mod('middleware/tenant-membership.js');
+  const { extensionAuthGate } = await mod('middleware/extension-auth-gate.js');
+  const { createRequestScopedDb } = await mod('lib/tenancy/index.js');
+  const { toJsonb } = await mod('lib/jsonb.js');
+
+  const { app: engineApp, db } = await harness.getTestApp();
+  await applyDeclared(name, extDir, manifest);
+  const app = new Hono();
+  app.use('/ext/*', sessionPrefetch(getAuth(), db));
+  app.use('/ext/*', tenantMiddleware);
+  app.use('/ext/*', tenantMembershipMiddleware(getAuth(), createRequestScopedDb(db)));
+  app.use('/ext/*', extensionAuthGate(getAuth(), db));
+  const parsed = ManifestSchema.parse(manifest);
+  await sql`DELETE FROM zv_extension_registry WHERE name = ${name}`.execute(db);
+  await sql`INSERT INTO zv_extension_registry (name, display_name, tenant_id, is_installed, is_enabled, manifest)
+            VALUES (${name}, ${name}, NULL, true, true, ${toJsonb(parsed)})`.execute(db);
+  const ctx = { db, auth: getAuth(), internals: buildExtensionInternals() };
+  const loader = {
+    loaded: new Map(),
+    modules: new Map(),
+    lastLoadError: new Map(),
+    extDirs: new Map(),
+    forgetExtensionMessages: () => {},
+    ctx,
+  };
+  const ext = (await import(join(engineDir, 'index.js'))).default;
+  await finalizeExtensionLoad(loader, ext, name, extDir, app, ctx, parsed, new Set());
+  invalidateActivationCache();
+  return {
+    app,
+    engineApp,
+    db,
+    sql,
+    harness,
+    done: async () => {
+      await sql`DELETE FROM zv_extension_registry WHERE name = ${name}`.execute(db);
+      for (const c of [...(manifest.collections ?? [])].reverse()) await harness.dropTestCollection(db, c);
+    },
+  };
 }
