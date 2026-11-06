@@ -1,0 +1,203 @@
+{
+  "name": "efactura_invoices",
+  "fields": [
+    {
+      "name": "invoice_number",
+      "type": "text",
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "invoice_date",
+      "type": "date",
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "due_date",
+      "type": "date"
+    },
+    {
+      "name": "currency",
+      "type": "text",
+      "required": true,
+      "defaultValue": "RON"
+    },
+    {
+      "name": "seller_name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "seller_cui",
+      "type": "text",
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "seller_reg_com",
+      "type": "text"
+    },
+    {
+      "name": "seller_address",
+      "type": "text"
+    },
+    {
+      "name": "seller_city",
+      "type": "text"
+    },
+    {
+      "name": "seller_county",
+      "type": "text"
+    },
+    {
+      "name": "seller_country",
+      "type": "text",
+      "defaultValue": "RO"
+    },
+    {
+      "name": "seller_iban",
+      "type": "text"
+    },
+    {
+      "name": "seller_bank",
+      "type": "text"
+    },
+    {
+      "name": "buyer_name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "buyer_cui",
+      "type": "text"
+    },
+    {
+      "name": "buyer_address",
+      "type": "text"
+    },
+    {
+      "name": "buyer_city",
+      "type": "text"
+    },
+    {
+      "name": "buyer_county",
+      "type": "text"
+    },
+    {
+      "name": "buyer_country",
+      "type": "text",
+      "defaultValue": "RO"
+    },
+    {
+      "name": "lines",
+      "type": "json",
+      "required": true,
+      "defaultValue": []
+    },
+    {
+      "name": "subtotal",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "vat_total",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "total",
+      "type": "decimal",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "required": true,
+      "indexed": true,
+      "defaultValue": "draft",
+      "writtenBy": "actions",
+      "options": {
+        "values": [
+          "draft",
+          "xml_generated",
+          "submitting",
+          "submitted",
+          "accepted",
+          "rejected"
+        ]
+      }
+    },
+    {
+      "name": "anaf_index",
+      "type": "text",
+      "indexed": true,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "anaf_state",
+      "type": "text",
+      "writtenBy": "actions"
+    },
+    {
+      "name": "anaf_download_id",
+      "type": "text",
+      "writtenBy": "actions"
+    },
+    {
+      "name": "anaf_response",
+      "type": "textarea",
+      "writtenBy": "actions"
+    },
+    {
+      "name": "submitted_at",
+      "type": "datetime",
+      "writtenBy": "actions"
+    },
+    {
+      "name": "source_invoice_id",
+      "type": "uuid",
+      "unique": true,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "storno_of",
+      "type": "m2o",
+      "unique": true,
+      "writtenBy": "actions",
+      "options": {
+        "related_collection": "efactura_invoices"
+      }
+    },
+    {
+      "name": "storno_reason",
+      "type": "textarea",
+      "writtenBy": "actions"
+    }
+  ],
+  "relations": [
+    {
+      "name": "efactura_invoices_storno_of",
+      "type": "m2o",
+      "field": "storno_of",
+      "target": "efactura_invoices",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "validation": [
+    {
+      "field": "currency",
+      "rule": "custom",
+      "config": {
+        "expression": "value.matches(\"^[A-Z]{3}$\")"
+      },
+      "message": "An ISO 4217 three-letter currency code, in capitals."
+    }
+  ]
+}

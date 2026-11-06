@@ -3,33 +3,85 @@
   "title": "compliance.ro.efactura.title",
   "subtitle": "compliance.ro.efactura.subtitle",
   "newLabel": "compliance.ro.efactura.btn.newInvoice",
+  "pageActions": [
+    {
+      "id": "sync",
+      "label": "compliance.ro.efactura.btn.syncMessages",
+      "icon": "RefreshCw",
+      "method": "POST",
+      "endpoint": "/ext/compliance/ro/efactura/actions/syncMessages",
+      "body": {}
+    }
+  ],
   "resources": [
     {
       "id": "invoices",
-      "dataSource": "/ext/compliance/ro/efactura",
-      "dataPath": "invoices",
+      "label": "compliance.ro.efactura.tab.invoices",
+      "icon": "Receipt",
+      "dataSource": "/api/data/efactura_invoices?sort=invoice_date&order=desc&limit=500",
+      "dataPath": "records",
       "filters": [
         {
           "param": "status",
           "options": [
-            { "value": "all", "label": "common.filter.all" },
-            { "value": "draft", "label": "compliance.ro.efactura.status.draft" },
-            { "value": "xml_generated", "label": "compliance.ro.efactura.status.xmlGenerated" },
-            { "value": "submitted", "label": "compliance.ro.efactura.status.submitted" },
-            { "value": "accepted", "label": "compliance.ro.efactura.status.accepted" },
-            { "value": "rejected", "label": "compliance.ro.efactura.status.rejected" }
+            {
+              "value": "all",
+              "label": "common.filter.all"
+            },
+            {
+              "value": "draft",
+              "label": "compliance.ro.efactura.status.draft"
+            },
+            {
+              "value": "xml_generated",
+              "label": "compliance.ro.efactura.status.xmlGenerated"
+            },
+            {
+              "value": "submitting",
+              "label": "compliance.ro.efactura.status.submitting"
+            },
+            {
+              "value": "submitted",
+              "label": "compliance.ro.efactura.status.submitted"
+            },
+            {
+              "value": "accepted",
+              "label": "compliance.ro.efactura.status.accepted"
+            },
+            {
+              "value": "rejected",
+              "label": "compliance.ro.efactura.status.rejected"
+            }
           ]
         }
       ],
       "columns": [
-        { "key": "invoice_number", "label": "common.col.number", "type": "mono" },
-        { "key": "invoice_date", "label": "common.col.date", "type": "date" },
-        { "key": "buyer_name", "label": "compliance.ro.efactura.col.buyer" },
+        {
+          "key": "invoice_number",
+          "label": "common.col.number",
+          "type": "mono"
+        },
+        {
+          "key": "invoice_date",
+          "label": "common.col.date",
+          "type": "date"
+        },
+        {
+          "key": "buyer_name",
+          "label": "compliance.ro.efactura.col.buyer"
+        },
         {
           "key": "total",
           "label": "common.col.total",
           "type": "currency",
-          "currency": { "codeKey": "currency" }
+          "currency": {
+            "codeKey": "currency"
+          }
+        },
+        {
+          "key": "anaf_index",
+          "label": "compliance.ro.efactura.col.anafIndex",
+          "type": "mono"
         },
         {
           "key": "status",
@@ -39,32 +91,71 @@
             "colors": {
               "draft": "badge-warning",
               "xml_generated": "badge-info",
+              "submitting": "badge-ghost",
               "submitted": "badge-primary",
               "accepted": "badge-success",
               "rejected": "badge-error"
+            },
+            "labels": {
+              "draft": "compliance.ro.efactura.status.draft",
+              "xml_generated": "compliance.ro.efactura.status.xmlGenerated",
+              "submitting": "compliance.ro.efactura.status.submitting",
+              "submitted": "compliance.ro.efactura.status.submitted",
+              "accepted": "compliance.ro.efactura.status.accepted",
+              "rejected": "compliance.ro.efactura.status.rejected"
             }
           }
         },
-        { "key": "anaf_index", "label": "compliance.ro.efactura.col.anafIndex", "type": "mono" }
+        {
+          "key": "anaf_state",
+          "label": "compliance.ro.efactura.col.anafState",
+          "type": "mono"
+        }
       ],
       "rowActions": [
+        {
+          "id": "edit",
+          "kind": "edit",
+          "label": "common.edit",
+          "visibleWhen": {
+            "field": "status",
+            "equals": "draft"
+          }
+        },
         {
           "id": "generateXml",
           "label": "compliance.ro.efactura.btn.generateXml",
           "icon": "FileText",
           "method": "POST",
-          "endpoint": "/ext/compliance/ro/efactura/{id}/generate-xml",
-          "visibleWhen": { "field": "status", "equals": "draft" }
+          "endpoint": "/ext/compliance/ro/efactura/actions/generateXml",
+          "body": {
+            "id": "{id}"
+          },
+          "visibleWhen": {
+            "field": "status",
+            "in": [
+              "draft",
+              "xml_generated"
+            ]
+          }
         },
         {
           "id": "downloadXml",
           "kind": "download",
           "label": "common.download",
           "icon": "Download",
-          "endpoint": "/ext/compliance/ro/efactura/{id}/xml",
+          "endpoint": "/api/data/efactura_files?invoice_id[eq]={id}&limit=1",
+          "field": "xml",
+          "filename": "factura_{invoice_number}.xml",
           "visibleWhen": {
             "field": "status",
-            "in": ["xml_generated", "submitted", "accepted", "rejected"]
+            "in": [
+              "xml_generated",
+              "submitting",
+              "submitted",
+              "accepted",
+              "rejected"
+            ]
           }
         },
         {
@@ -72,9 +163,110 @@
           "label": "common.send",
           "icon": "Send",
           "method": "POST",
-          "endpoint": "/ext/compliance/ro/efactura/{id}/submit",
+          "endpoint": "/ext/compliance/ro/efactura/actions/submit",
+          "body": {
+            "id": "{id}"
+          },
           "confirm": "compliance.ro.efactura.confirmSend",
-          "visibleWhen": { "field": "status", "equals": "xml_generated" }
+          "visibleWhen": {
+            "field": "status",
+            "equals": "xml_generated"
+          }
+        },
+        {
+          "id": "checkStatus",
+          "label": "compliance.ro.efactura.btn.checkStatus",
+          "icon": "RefreshCw",
+          "method": "POST",
+          "endpoint": "/ext/compliance/ro/efactura/actions/checkStatus",
+          "body": {
+            "id": "{id}"
+          },
+          "visibleWhen": {
+            "field": "status",
+            "in": [
+              "submitted",
+              "accepted",
+              "rejected"
+            ]
+          }
+        },
+        {
+          "id": "archive",
+          "kind": "open",
+          "label": "compliance.ro.efactura.btn.archive",
+          "icon": "Archive",
+          "endpoint": "/ext/compliance/ro/efactura/invoices/{id}/archive",
+          "visibleWhen": {
+            "field": "status",
+            "in": [
+              "accepted",
+              "rejected"
+            ]
+          }
+        },
+        {
+          "id": "renderPdf",
+          "label": "compliance.ro.efactura.btn.renderPdf",
+          "icon": "FileType",
+          "method": "POST",
+          "endpoint": "/ext/compliance/ro/efactura/actions/renderPdf",
+          "body": {
+            "id": "{id}"
+          },
+          "visibleWhen": {
+            "field": "status",
+            "in": [
+              "xml_generated",
+              "submitting",
+              "submitted",
+              "accepted",
+              "rejected"
+            ]
+          }
+        },
+        {
+          "id": "pdf",
+          "kind": "open",
+          "label": "compliance.ro.efactura.btn.pdf",
+          "icon": "FileDown",
+          "endpoint": "/ext/compliance/ro/efactura/invoices/{id}/pdf",
+          "visibleWhen": {
+            "field": "status",
+            "in": [
+              "xml_generated",
+              "submitting",
+              "submitted",
+              "accepted",
+              "rejected"
+            ]
+          }
+        },
+        {
+          "id": "storno",
+          "label": "compliance.ro.efactura.btn.storno",
+          "icon": "Undo2",
+          "method": "POST",
+          "endpoint": "/ext/compliance/ro/efactura/actions/storno",
+          "body": {
+            "id": "{id}"
+          },
+          "prompt": {
+            "fields": [
+              {
+                "name": "reason",
+                "label": "compliance.ro.efactura.ui.storno_reason",
+                "required": true
+              }
+            ]
+          },
+          "visibleWhen": {
+            "field": "status",
+            "in": [
+              "submitted",
+              "accepted"
+            ]
+          }
         },
         {
           "id": "delete",
@@ -82,13 +274,16 @@
           "variant": "text-error",
           "label": "common.delete",
           "method": "DELETE",
-          "endpoint": "/ext/compliance/ro/efactura/{id}",
+          "endpoint": "/api/data/efactura_invoices/{id}",
           "confirm": "compliance.ro.efactura.confirmDelete",
-          "visibleWhen": { "field": "status", "equals": "draft" }
+          "visibleWhen": {
+            "field": "status",
+            "equals": "draft"
+          }
         }
       ],
       "form": {
-        "endpoint": "/ext/compliance/ro/efactura",
+        "endpoint": "/api/data/efactura_invoices",
         "fields": [
           {
             "name": "invoice_number",
@@ -189,15 +384,213 @@
           "addLabel": "compliance.ro.efactura.btn.addLine",
           "min": 1,
           "columns": [
-            { "name": "description", "label": "common.col.description", "required": true },
-            { "name": "quantity", "label": "compliance.ro.efactura.col.qty", "type": "number", "default": 1 },
-            { "name": "unit", "label": "compliance.ro.efactura.col.unit", "default": "BUC" },
-            { "name": "unit_price", "label": "common.col.price", "type": "number", "default": 0 },
-            { "name": "vat_rate", "label": "compliance.ro.efactura.col.vatPercent", "type": "number", "default": 19 },
-            { "name": "vat_amount", "label": "compliance.ro.efactura.col.vat", "type": "number", "default": 0 },
-            { "name": "line_total", "label": "common.col.total", "type": "number", "default": 0 }
+            {
+              "name": "description",
+              "label": "common.col.description",
+              "required": true
+            },
+            {
+              "name": "quantity",
+              "label": "compliance.ro.efactura.col.qty",
+              "type": "number",
+              "default": 1
+            },
+            {
+              "name": "unit",
+              "label": "compliance.ro.efactura.col.unit",
+              "default": "BUC"
+            },
+            {
+              "name": "unit_price",
+              "label": "common.col.price",
+              "type": "number",
+              "default": 0
+            },
+            {
+              "name": "vat_rate",
+              "label": "compliance.ro.efactura.col.vatPercent",
+              "type": "number",
+              "default": 19
+            },
+            {
+              "name": "vat_amount",
+              "label": "compliance.ro.efactura.col.vat",
+              "type": "number",
+              "default": 0
+            },
+            {
+              "name": "line_total",
+              "label": "common.col.total",
+              "type": "number",
+              "default": 0
+            }
           ]
         }
+      }
+    },
+    {
+      "id": "messages",
+      "label": "compliance.ro.efactura.tab.messages",
+      "icon": "Inbox",
+      "dataSource": "/api/data/efactura_messages?sort=data_creare&order=desc&limit=500",
+      "dataPath": "records",
+      "columns": [
+        {
+          "key": "data_creare",
+          "label": "common.col.date",
+          "type": "mono"
+        },
+        {
+          "key": "tip",
+          "label": "compliance.ro.efactura.col.type"
+        },
+        {
+          "key": "id_solicitare",
+          "label": "compliance.ro.efactura.col.anafIndex",
+          "type": "mono"
+        },
+        {
+          "key": "detalii",
+          "label": "compliance.ro.efactura.col.details"
+        },
+        {
+          "key": "downloaded_at",
+          "label": "compliance.ro.efactura.col.downloaded",
+          "type": "date"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "download",
+          "label": "compliance.ro.efactura.btn.fetchArchive",
+          "icon": "CloudDownload",
+          "method": "POST",
+          "endpoint": "/ext/compliance/ro/efactura/actions/downloadMessage",
+          "body": {
+            "id": "{id}"
+          }
+        },
+        {
+          "id": "archive",
+          "kind": "open",
+          "label": "compliance.ro.efactura.btn.archive",
+          "icon": "Archive",
+          "endpoint": "/ext/compliance/ro/efactura/messages/{id}/archive"
+        }
+      ]
+    },
+    {
+      "id": "connection",
+      "label": "efactura.settings.title",
+      "icon": "KeyRound",
+      "dataSource": "/api/data/efactura_settings?limit=1",
+      "dataPath": "records",
+      "columns": [
+        {
+          "key": "environment",
+          "label": "efactura.settings.environment"
+        },
+        {
+          "key": "seller_cif",
+          "label": "efactura.settings.sellerCif",
+          "type": "mono"
+        },
+        {
+          "key": "token_expires_at",
+          "label": "compliance.ro.efactura.col.tokenExpires",
+          "type": "date"
+        },
+        {
+          "key": "last_verified_at",
+          "label": "compliance.ro.efactura.col.lastVerified",
+          "type": "date"
+        },
+        {
+          "key": "last_error",
+          "label": "compliance.ro.efactura.col.lastError"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "edit",
+          "kind": "edit",
+          "label": "common.edit"
+        },
+        {
+          "id": "connect",
+          "kind": "open",
+          "label": "compliance.ro.efactura.btn.connect",
+          "icon": "LogIn",
+          "endpoint": "/ext/compliance/ro/efactura/oauth/start"
+        },
+        {
+          "id": "verify",
+          "label": "compliance.ro.efactura.btn.verify",
+          "icon": "Play",
+          "method": "POST",
+          "endpoint": "/ext/compliance/ro/efactura/actions/verify",
+          "body": {
+            "id": "{id}"
+          }
+        }
+      ],
+      "form": {
+        "endpoint": "/api/data/efactura_settings",
+        "sections": [
+          {
+            "title": "efactura.settings.env",
+            "fields": [
+              {
+                "name": "environment",
+                "label": "efactura.settings.environment",
+                "type": "select",
+                "colSpan": 1,
+                "default": "test",
+                "options": [
+                  {
+                    "value": "test",
+                    "label": "efactura.settings.envTest"
+                  },
+                  {
+                    "value": "prod",
+                    "label": "efactura.settings.envProd"
+                  }
+                ]
+              },
+              {
+                "name": "seller_cif",
+                "label": "efactura.settings.sellerCif",
+                "mono": true,
+                "colSpan": 1
+              }
+            ]
+          },
+          {
+            "title": "efactura.settings.oauth",
+            "fields": [
+              {
+                "name": "callback_url",
+                "label": "efactura.settings.callbackUrl",
+                "mono": true,
+                "colSpan": 2,
+                "placeholder": "efactura.settings.callbackHint"
+              },
+              {
+                "name": "client_id",
+                "label": "efactura.settings.clientId",
+                "mono": true,
+                "colSpan": 2
+              },
+              {
+                "name": "client_secret",
+                "label": "efactura.settings.clientSecret",
+                "type": "password",
+                "colSpan": 2,
+                "placeholder": "efactura.settings.leaveBlank"
+              }
+            ]
+          }
+        ]
       }
     }
   ]

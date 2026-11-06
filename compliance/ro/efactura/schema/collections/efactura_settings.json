@@ -1,0 +1,79 @@
+{
+  "name": "efactura_settings",
+  "defaultGrants": false,
+  "fields": [
+    {
+      "name": "scope",
+      "type": "enum",
+      "required": true,
+      "unique": true,
+      "defaultValue": "tenant",
+      "options": {
+        "values": [
+          "tenant"
+        ]
+      }
+    },
+    {
+      "name": "environment",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "test",
+      "options": {
+        "values": [
+          "test",
+          "prod"
+        ]
+      }
+    },
+    {
+      "name": "seller_cif",
+      "type": "text"
+    },
+    {
+      "name": "client_id",
+      "type": "text"
+    },
+    {
+      "name": "client_secret",
+      "type": "secret"
+    },
+    {
+      "name": "callback_url",
+      "type": "url"
+    },
+    {
+      "name": "oauth_state",
+      "type": "secret"
+    },
+    {
+      "name": "oauth_state_expires_at",
+      "type": "datetime"
+    },
+    {
+      "name": "access_token",
+      "type": "secret",
+      "writtenBy": "actions"
+    },
+    {
+      "name": "refresh_token",
+      "type": "secret",
+      "writtenBy": "actions"
+    },
+    {
+      "name": "token_expires_at",
+      "type": "datetime",
+      "writtenBy": "actions"
+    },
+    {
+      "name": "last_verified_at",
+      "type": "datetime",
+      "writtenBy": "actions"
+    },
+    {
+      "name": "last_error",
+      "type": "textarea",
+      "writtenBy": "actions"
+    }
+  ]
+}
