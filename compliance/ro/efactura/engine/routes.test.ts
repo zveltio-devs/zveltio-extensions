@@ -3,8 +3,12 @@
 // `/ext` chain does around them (the session, the tenant, the public-route
 // gate) is the contract test's; this proves the state handshake.
 import { describe, expect, it } from 'bun:test';
-import { Hono } from 'hono';
-import { efacturaRoutes } from './routes';
+import { join } from 'node:path';
+
+// The packed bundle, and hono by path: a bare 'hono' resolves to its .d.ts under this tsconfig.
+const ENGINE = join(import.meta.dir, '../../../../../zveltio/packages/engine/src');
+const { Hono } = await import(join(ENGINE, '../node_modules/hono/dist/index.js'));
+const ext = (await import(join(import.meta.dir, 'index.js'))).default;
 
 type Row = Record<string, any>;
 
@@ -33,11 +37,11 @@ function setup(rows: Row[], files: Row[] = []) {
     },
   };
   const app = new Hono();
-  app.use('*', async (c, next) => {
+  app.use('*', async (c: any, next: () => Promise<void>) => {
     c.set('tenant' as never, { id: c.req.header('x-tenant') ?? 't1' } as never);
     await next();
   });
-  app.route('/', efacturaRoutes(ctx as never));
+  ext.register(app, ctx as never);
   return { app, queued, asSystem, rows };
 }
 
