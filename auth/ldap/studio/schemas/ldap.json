@@ -29,7 +29,7 @@
             "fields": [
               { "name": "url", "label": "auth.ldap.ui.ldap_url", "required": true, "mono": true, "colSpan": 2, "placeholder": "auth.ldap.ui.ldap_ldap_example_com_389" },
               { "name": "bind_dn", "label": "auth.ldap.ui.bind_dn", "required": true, "mono": true },
-              { "name": "bind_password", "label": "auth.ldap.ui.bind_password", "type": "password", "required": true },
+              { "name": "bind_password", "label": "auth.ldap.ui.bind_password", "type": "password" },
               { "name": "tls_verify", "label": "auth.ldap.section.tls", "type": "boolean", "colSpan": 2 }
             ]
           },

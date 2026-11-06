@@ -1,10 +1,16 @@
 # Changelog
 
+## 2.1.0 (2026-11-06)
+
+- feat: `private_key` is a `secret` field (ADR 0024): encrypted at rest, served to no one on any read path, god included, and read back decrypted by this extension alone. A reader of `saml_settings` no longer reads it, so no grant needs restricting for it. Studio's form leaves it empty when editing: leave it empty to keep the stored key, type one to replace it. A stored key the instance's key cannot decrypt reads as unset (the engine logs it) instead of failing the request. Needs engine 3.0.0-beta.103
+- feat: `/login`, `/callback` and `/metadata` read the settings through the data API (`ctx.host(c).collections`, ADR 0025) as the system (`data:system`, audited) instead of raw SQL
+- **Upgrade:** the stored `private_key` values are already encrypted under the field key; the engine keeps them when it retypes the column
+
 ## 2.0.0 (2026-11-05)
 
 - feat!: the identity-provider configuration is the collection `saml_settings`, declared in `schema/collections/` and created and owned by the engine, one row per tenant; no SQL migrations. `private_key` is encrypted at rest by the engine (the instance needs `FIELD_ENCRYPTION_KEY`). `audience` `false` is now `audience_check: false`. **Upgrade step:** 2.0.0 does not read `zvd_saml_config`; re-enter the IdP settings in Studio (SAML SSO) before users sign in again. The 1.x tables are left in place
 - feat!: replay protection is the collection `saml_spent_assertions` (a new name: the 1.x table `zvd_saml_consumed_assertions` stays where it is, and an assertion spent under 1.x is not remembered by 2.0.0; the assertion's own validity window, minutes at most IdPs, bounds that gap)
-- feat!: `GET`/`POST /config` are dropped; the data API serves `saml_settings`, so who may read or change it is the engine's rules. The collection has no default grants: tenant admins (whose grant is total) administer it, other roles only when granted. A reader of `saml_settings` reads `private_key` (1.x never returned it): grant `read` only to the roles that administer sign-in, or deny that column
+- feat!: `GET`/`POST /config` are dropped; the data API serves `saml_settings`, so who may read or change it is the engine's rules. The collection has no default grants: tenant admins (whose grant is total) administer it, other roles only when granted.
 - feat!: `/login`, `/callback` and `/metadata` read the settings as the system (`data:system`, audited per request), in the request's tenant only; `/callback` claims the assertion the same way
 - feat!: `zvd_saml_login_log`, `zvd_saml_idp_metadata` and `zvd_saml_attribute_mappings` are no longer created; no code read or wrote them
 - fix: the Studio page sends the ACS callback URL, which 1.x required on save and its form never had, so a save from Studio was refused
