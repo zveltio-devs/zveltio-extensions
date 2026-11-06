@@ -32,7 +32,7 @@ registration** and is not comfortably changed afterwards.
 The address is:
 
 ```
-https://YOUR-DOMAIN/admin/anaf/callback
+https://YOUR-DOMAIN/ext/compliance/ro/efactura/oauth/callback
 ```
 
 replacing `YOUR-DOMAIN` with the address you reach Zveltio at. It must be the
@@ -61,7 +61,7 @@ The secret is usually shown only once. Save it immediately, somewhere safe.
 
 ## Step 3 — Fill it in inside Zveltio
 
-Open **ANAF Connection** from the menu.
+Open **e-Factura RO** from the menu, tab **ANAF connection**, and press **New** (or **Edit** on the existing row).
 
 | Field | What to enter |
 |---|---|
@@ -73,10 +73,24 @@ Open **ANAF Connection** from the menu.
 
 Press **Save**.
 
-The secret is never displayed again after saving — not even to you. It is
-encrypted in the database. When you come back to the screen you only see that it
-is set. If you leave it empty on a re-save, the previous one is kept; you type it
-again only if you want to change it.
+The secret is never displayed again after saving — not even to you, nor to the
+instance administrator. It is encrypted in the database and only the e-Factura
+extension reads it back. If you leave it empty on a re-save, the previous one is
+kept; you type it again only if you want to change it.
+
+The instance needs `FIELD_ENCRYPTION_KEY` set: without it the secret is refused.
+
+---
+
+## Step 3b — Let Zveltio reach ANAF
+
+Zveltio's extensions reach no address on the internet until an administrator
+approves it. e-Factura asks for three ANAF hosts: `logincert.anaf.ro` (sign-in),
+`api.anaf.ro` (submission, state, messages) and `webservicesp.anaf.ro` (the
+official PDF). The instance administrator approves them once, under
+**Extensions → e-Factura RO → Approve capabilities** (`POST
+/api/marketplace/compliance/ro/efactura/approve-capabilities`). Until then every
+ANAF action fails with "egress not approved".
 
 ---
 
@@ -86,7 +100,10 @@ Press **Connect to ANAF**. You are sent to their portal, where you sign with the
 certificate — **which has to be physically attached to the computer you are
 pressing from**, not to the server. Your browser makes the signature, not Zveltio.
 
-After signing you are brought back and the connection is active.
+After signing, ANAF brings you back to a page that says the sign-in was received.
+Close it and reload e-Factura: the connection row shows when the token expires,
+and **Last error** says what went wrong if it did not work. A sign-in must be
+finished within ten minutes of pressing the button.
 
 ---
 
@@ -108,7 +125,7 @@ reasons.
 
 ## From here on
 
-Every issued invoice automatically gets an e-Factura draft. You open it, generate
+With `finance/invoicing` installed, the `fromInvoice` action (`POST /ext/compliance/ro/efactura/actions/fromInvoice` with the `invoice_id`) drafts the e-Factura of an issued invoice; otherwise you fill the invoice in on the **Invoices** tab. You open it, generate
 the XML, check it — the check is done by ANAF itself and costs nothing — and then
 you submit it.
 
@@ -144,8 +161,9 @@ From that moment every submission has fiscal effect.
 registered one. Compare them character for character, including `https://` and any
 trailing `/`.
 
-**"The ANAF token has expired"** — press **Renew token**. If that does not work,
-reconnect from Step 4.
+**"The ANAF token has expired"** — Zveltio renews the token by itself while the
+refresh token is valid. If it says there is no refresh token, reconnect from
+Step 4.
 
 **XML validation says `nok`** — the problem is in the invoice data, not the
 connection. ANAF's messages name the missing field. The most frequent: the county

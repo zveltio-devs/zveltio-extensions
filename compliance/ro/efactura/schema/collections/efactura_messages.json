@@ -1,0 +1,43 @@
+{
+  "name": "efactura_messages",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "anaf_id",
+      "type": "text",
+      "required": true,
+      "unique": true
+    },
+    {
+      "name": "tip",
+      "type": "text",
+      "indexed": true
+    },
+    {
+      "name": "cif",
+      "type": "text"
+    },
+    {
+      "name": "data_creare",
+      "type": "text",
+      "indexed": true
+    },
+    {
+      "name": "id_solicitare",
+      "type": "text",
+      "indexed": true
+    },
+    {
+      "name": "detalii",
+      "type": "textarea"
+    },
+    {
+      "name": "archive",
+      "type": "textarea"
+    },
+    {
+      "name": "downloaded_at",
+      "type": "datetime"
+    }
+  ]
+}

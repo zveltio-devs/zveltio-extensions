@@ -2,14 +2,14 @@
   "name": "compliance/ro/efactura",
   "displayName": "e-Factura RO",
   "category": "compliance/ro",
-  "description": "Romanian e-Invoice (e-Factura) integration with ANAF — generate, validate, and submit UBL XML invoices",
-  "version": "1.1.1",
-  "zveltioMinVersion": "1.0.0",
+  "description": "Romanian e-Invoice (e-Factura): build the UBL XML (CIUS-RO), submit it to ANAF, follow its state and keep ANAF's signed answer",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.103",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-ro-efactura",
   "permissions": [
-    "database",
-    "secrets"
+    "data:write",
+    "data:system"
   ],
   "i18nPrefixes": [
     "compliance.ro.efactura",
@@ -22,12 +22,6 @@
         "label": "e-Factura RO",
         "icon": "receipt",
         "schema": "schemas/efactura.json"
-      },
-      {
-        "path": "/admin/compliance/ro/efactura/anaf",
-        "label": "efactura.settings.title",
-        "icon": "KeyRound",
-        "schema": "schemas/anaf.json"
       }
     ],
     "navGroup": "compliance"
@@ -44,11 +38,502 @@
     "bundled": true,
     "bundlePeers": false
   },
+  "optionalDependencies": [
+    {
+      "name": "finance/invoicing",
+      "minVersion": "2.3.0"
+    }
+  ],
+  "collections": [
+    "efactura_invoices",
+    "efactura_files",
+    "efactura_messages",
+    "efactura_settings"
+  ],
+  "publicRoutes": [
+    "/oauth/callback"
+  ],
+  "actions": [
+    {
+      "name": "generateXml",
+      "permission": {
+        "resource": "efactura_invoices",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "efactura_invoices",
+        "efactura_files"
+      ],
+      "writes": [
+        "efactura_invoices",
+        "efactura_files"
+      ]
+    },
+    {
+      "name": "submit",
+      "permission": {
+        "resource": "efactura_invoices",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "efactura_invoices",
+        "efactura_files"
+      ],
+      "writes": [
+        "efactura_invoices"
+      ],
+      "enqueues": [
+        "submit"
+      ]
+    },
+    {
+      "name": "checkStatus",
+      "permission": {
+        "resource": "efactura_invoices",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "efactura_invoices"
+      ],
+      "writes": [],
+      "enqueues": [
+        "checkStatus"
+      ]
+    },
+    {
+      "name": "renderPdf",
+      "permission": {
+        "resource": "efactura_invoices",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "efactura_invoices",
+        "efactura_files"
+      ],
+      "writes": [],
+      "enqueues": [
+        "renderPdf"
+      ]
+    },
+    {
+      "name": "storno",
+      "permission": {
+        "resource": "efactura_invoices",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        }
+      },
+      "reads": [
+        "efactura_invoices"
+      ],
+      "writes": [
+        "efactura_invoices"
+      ]
+    },
+    {
+      "name": "fromInvoice",
+      "permission": {
+        "resource": "efactura_invoices",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "invoice_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "invoice_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "efactura_invoices",
+        "invoices",
+        "invoice_lines"
+      ],
+      "writes": [
+        "efactura_invoices"
+      ]
+    },
+    {
+      "name": "verify",
+      "permission": {
+        "resource": "efactura_settings",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "efactura_settings"
+      ],
+      "writes": [],
+      "enqueues": [
+        "connect"
+      ]
+    },
+    {
+      "name": "syncMessages",
+      "permission": {
+        "resource": "efactura_messages",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60
+          },
+          "filter": {
+            "type": "string",
+            "enum": [
+              "E",
+              "T",
+              "P",
+              "R"
+            ]
+          }
+        }
+      },
+      "reads": [],
+      "writes": [],
+      "enqueues": [
+        "syncMessages"
+      ]
+    },
+    {
+      "name": "downloadMessage",
+      "permission": {
+        "resource": "efactura_messages",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "efactura_messages"
+      ],
+      "writes": [],
+      "enqueues": [
+        "downloadMessage"
+      ]
+    }
+  ],
+  "jobs": [
+    {
+      "name": "connect",
+      "input": {
+        "type": "object",
+        "required": [
+          "settings_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "settings_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          }
+        }
+      },
+      "reads": [
+        "efactura_settings"
+      ],
+      "writes": [
+        "efactura_settings"
+      ],
+      "egress": [
+        "logincert.anaf.ro",
+        "api.anaf.ro"
+      ],
+      "retry": {
+        "limit": 0,
+        "backoff": true
+      },
+      "timeoutSeconds": 120,
+      "fromPublicRoutes": [
+        "/oauth/callback"
+      ]
+    },
+    {
+      "name": "submit",
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "efactura_invoices",
+        "efactura_files",
+        "efactura_settings"
+      ],
+      "writes": [
+        "efactura_invoices",
+        "efactura_settings"
+      ],
+      "egress": [
+        "logincert.anaf.ro",
+        "api.anaf.ro"
+      ],
+      "retry": {
+        "limit": 0,
+        "backoff": true
+      },
+      "timeoutSeconds": 180
+    },
+    {
+      "name": "checkStatus",
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "efactura_invoices",
+        "efactura_files",
+        "efactura_settings"
+      ],
+      "writes": [
+        "efactura_invoices",
+        "efactura_files",
+        "efactura_settings"
+      ],
+      "egress": [
+        "logincert.anaf.ro",
+        "api.anaf.ro"
+      ],
+      "retry": {
+        "limit": 2,
+        "backoff": true
+      },
+      "timeoutSeconds": 120
+    },
+    {
+      "name": "renderPdf",
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "efactura_files"
+      ],
+      "writes": [
+        "efactura_files"
+      ],
+      "egress": [
+        "webservicesp.anaf.ro"
+      ],
+      "retry": {
+        "limit": 2,
+        "backoff": true
+      },
+      "timeoutSeconds": 120
+    },
+    {
+      "name": "syncMessages",
+      "input": {
+        "type": "object",
+        "required": [
+          "days"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60
+          },
+          "filter": {
+            "type": "string",
+            "enum": [
+              "E",
+              "T",
+              "P",
+              "R"
+            ]
+          }
+        }
+      },
+      "reads": [
+        "efactura_messages",
+        "efactura_settings"
+      ],
+      "writes": [
+        "efactura_messages",
+        "efactura_settings"
+      ],
+      "egress": [
+        "logincert.anaf.ro",
+        "api.anaf.ro"
+      ],
+      "retry": {
+        "limit": 2,
+        "backoff": true
+      },
+      "timeoutSeconds": 300
+    },
+    {
+      "name": "downloadMessage",
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "efactura_messages",
+        "efactura_settings"
+      ],
+      "writes": [
+        "efactura_messages",
+        "efactura_settings"
+      ],
+      "egress": [
+        "logincert.anaf.ro",
+        "api.anaf.ro"
+      ],
+      "retry": {
+        "limit": 2,
+        "backoff": true
+      },
+      "timeoutSeconds": 120
+    }
+  ],
   "integrity": {
-    "engineSha256": "92ef3fc2abe4d27002cc307d533fca046a662f1e95413538562b4e9ca8b3cfda",
-    "sourceSha256": "816d941b02e6d61e1f27ce56ea0fb54970af2c69a00023bc5bcca7ea9b5b8b8b"
-  },
-  "resources": [
-    "efactura"
-  ]
+    "engineSha256": "1ade83425072b4eec09a529cd61e1714c00ebffbc47ab3715db3446d622c3b02",
+    "sourceSha256": "7be958b65499e54ef2a348c23173fa2fe3ed71ae2aea358d97c6fa19ec09af14",
+    "schemaSha256": "0464790281533982881507e76fd72a43966cb12a850991f64eab8d1f3621c180",
+    "jobsSha256": "28e4bc4dd91a11d21702cf30820cbc4676b8595853e4f0f41156c386e9561565"
+  }
 }

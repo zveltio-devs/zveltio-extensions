@@ -1,0 +1,40 @@
+{
+  "name": "efactura_files",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "invoice_id",
+      "type": "m2o",
+      "required": true,
+      "unique": true,
+      "options": {
+        "related_collection": "efactura_invoices"
+      }
+    },
+    {
+      "name": "xml",
+      "type": "textarea",
+      "required": true
+    },
+    {
+      "name": "pdf",
+      "type": "textarea"
+    },
+    {
+      "name": "archive",
+      "type": "textarea"
+    }
+  ],
+  "relations": [
+    {
+      "name": "efactura_files_invoice_id",
+      "type": "m2o",
+      "field": "invoice_id",
+      "target": "efactura_invoices",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}
