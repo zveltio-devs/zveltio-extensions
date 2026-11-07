@@ -1,5 +1,11 @@
 {
+  "integrations.migrators.action.discover": "Objekte aktualisieren",
+  "integrations.migrators.action.fetch": "Zeilen abrufen",
+  "integrations.migrators.action.import": "In Sammlung importieren",
+  "integrations.migrators.col.error": "Fehler",
   "integrations.migrators.col.object": "Objekt",
+  "integrations.migrators.col.objectsAt": "Objekte geprüft",
+  "integrations.migrators.col.objectsError": "Objektfehler",
   "integrations.migrators.col.rows": "Zeilen",
   "integrations.migrators.col.source": "Quelle",
   "integrations.migrators.confirm.deleteConnection": "Diese Verbindung löschen? Das gespeicherte Token wird zerstört.",
@@ -12,6 +18,7 @@
   "integrations.migrators.ph.token": "pat-… / secret_… / privates App-Token",
   "integrations.migrators.subtitle": "Daten aus HubSpot, Notion oder Airtable übernehmen",
   "integrations.migrators.tab.connections": "Verbindungen",
+  "integrations.migrators.tab.fetches": "Abrufe",
   "integrations.migrators.tab.runs": "Importe",
   "integrations.migrators.title": "Datenmigrationen"
 }

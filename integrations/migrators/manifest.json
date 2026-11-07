@@ -2,19 +2,29 @@
   "name": "integrations/migrators",
   "displayName": "Data Migrators",
   "category": "integrations",
-  "description": "Import your data from HubSpot, Notion and Airtable into Zveltio collections — encrypted connections, field mapping preview, audited runs",
-  "version": "1.0.7",
-  "zveltioMinVersion": "1.0.0",
+  "description": "Import your data from HubSpot, Notion and Airtable into Zveltio collections, through the data API as the importing user",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.103",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-migrators",
   "permissions": [
-    "database",
-    "network",
-    "secrets"
+    "data:write",
+    "data:system"
   ],
   "i18nPrefixes": [
     "integrations.migrators"
   ],
+  "studio": {
+    "navGroup": "developer",
+    "pages": [
+      {
+        "path": "/admin/integrations/migrators",
+        "label": "Data Migrators",
+        "icon": "Import",
+        "schema": "schemas/migrators.json"
+      }
+    ]
+  },
   "contributes": {
     "engine": true,
     "studio": true
@@ -26,19 +36,150 @@
     "bundled": true,
     "bundlePeers": false
   },
+  "collections": [
+    "migrator_connections",
+    "migrator_fetches",
+    "migrator_runs"
+  ],
+  "actions": [
+    {
+      "name": "discover",
+      "permission": {
+        "resource": "migrator_connections",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "connection_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "connection_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "migrator_connections"
+      ],
+      "enqueues": [
+        "discover"
+      ]
+    },
+    {
+      "name": "fetch",
+      "permission": {
+        "resource": "migrator_fetches",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "connection_id",
+          "object"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "connection_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "object": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        }
+      },
+      "reads": [
+        "migrator_connections"
+      ],
+      "writes": [
+        "migrator_fetches"
+      ],
+      "enqueues": [
+        "fetch"
+      ]
+    }
+  ],
+  "jobs": [
+    {
+      "name": "discover",
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "migrator_connections"
+      ],
+      "writes": [
+        "migrator_connections"
+      ],
+      "egress": [
+        "api.hubapi.com",
+        "api.notion.com",
+        "api.airtable.com"
+      ],
+      "retry": {
+        "limit": 2,
+        "backoff": true
+      },
+      "timeoutSeconds": 120
+    },
+    {
+      "name": "fetch",
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "migrator_connections",
+        "migrator_fetches"
+      ],
+      "writes": [
+        "migrator_fetches"
+      ],
+      "egress": [
+        "api.hubapi.com",
+        "api.notion.com",
+        "api.airtable.com"
+      ],
+      "retry": {
+        "limit": 2,
+        "backoff": true
+      },
+      "timeoutSeconds": 300
+    }
+  ],
   "integrity": {
-    "engineSha256": "083fcd5565209819d15144f682cccb98b6f9c0275b5aa6fdb31d88d153abe109",
-    "sourceSha256": "a757342cad833378e0a94684596b1a3f1d33d3575f924ac6589a9f8800b3648b"
-  },
-  "studio": {
-    "navGroup": "developer",
-    "pages": [
-      {
-        "path": "/admin/integrations/migrators",
-        "label": "Data Migrators",
-        "icon": "Import",
-        "schema": "schemas/migrators.json"
-      }
-    ]
+    "engineSha256": "2fef64978c2366e25947a92f7a583327d49a19b7e1cc018e3a96b6ae0cf01706",
+    "sourceSha256": "8e5deca24e43989dae0b712a9d42d5e64e0cf898c9dbbe7c3bcb98db7d6770b9",
+    "schemaSha256": "39d7d5a7147c9978ae1cb396f15244587b211a96d646cf80c773b8e8ca0de0b0",
+    "jobsSha256": "7fa330571e26ec7746437b3b4da5a17003232d186a32c31aaf9c0f8515510201"
   }
 }

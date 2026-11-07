@@ -1,5 +1,11 @@
 {
+  "integrations.migrators.action.discover": "Odśwież obiekty",
+  "integrations.migrators.action.fetch": "Pobierz wiersze",
+  "integrations.migrators.action.import": "Importuj do kolekcji",
+  "integrations.migrators.col.error": "Błąd",
   "integrations.migrators.col.object": "Object",
+  "integrations.migrators.col.objectsAt": "Obiekty sprawdzone",
+  "integrations.migrators.col.objectsError": "Błąd obiektów",
   "integrations.migrators.col.rows": "Wiersze",
   "integrations.migrators.col.source": "Źródło",
   "integrations.migrators.confirm.deleteConnection": "Usunąć to połączenie? Zapisany token zostanie zniszczony.",
@@ -12,6 +18,7 @@
   "integrations.migrators.ph.token": "pat-… / secret_… / token aplikacji prywatnej",
   "integrations.migrators.subtitle": "Bring your data in from HubSpot, Notion or Airtable",
   "integrations.migrators.tab.connections": "Połączenia",
+  "integrations.migrators.tab.fetches": "Pobrania",
   "integrations.migrators.tab.runs": "Importy",
   "integrations.migrators.title": "Migratory danych"
 }

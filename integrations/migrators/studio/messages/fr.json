@@ -1,5 +1,11 @@
 {
+  "integrations.migrators.action.discover": "Actualiser les objets",
+  "integrations.migrators.action.fetch": "Récupérer les lignes",
+  "integrations.migrators.action.import": "Importer dans la collection",
+  "integrations.migrators.col.error": "Erreur",
   "integrations.migrators.col.object": "Objet",
+  "integrations.migrators.col.objectsAt": "Objets vérifiés",
+  "integrations.migrators.col.objectsError": "Erreur des objets",
   "integrations.migrators.col.rows": "Lignes",
   "integrations.migrators.col.source": "Source",
   "integrations.migrators.confirm.deleteConnection": "Supprimer cette connexion ? Son jeton stocké sera détruit.",
@@ -12,6 +18,7 @@
   "integrations.migrators.ph.token": "pat-… / secret_… / jeton d'application privée",
   "integrations.migrators.subtitle": "Importez vos données depuis HubSpot, Notion ou Airtable",
   "integrations.migrators.tab.connections": "Connexions",
+  "integrations.migrators.tab.fetches": "Récupérations",
   "integrations.migrators.tab.runs": "Imports",
   "integrations.migrators.title": "Migrateurs de données"
 }

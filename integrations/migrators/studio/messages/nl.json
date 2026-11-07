@@ -1,5 +1,11 @@
 {
+  "integrations.migrators.action.discover": "Objecten vernieuwen",
+  "integrations.migrators.action.fetch": "Rijen ophalen",
+  "integrations.migrators.action.import": "Importeren in collectie",
+  "integrations.migrators.col.error": "Fout",
   "integrations.migrators.col.object": "Object",
+  "integrations.migrators.col.objectsAt": "Objecten gecontroleerd",
+  "integrations.migrators.col.objectsError": "Objectfout",
   "integrations.migrators.col.rows": "Rijen",
   "integrations.migrators.col.source": "Bron",
   "integrations.migrators.confirm.deleteConnection": "Deze verbinding verwijderen? Het opgeslagen token wordt vernietigd.",
@@ -12,6 +18,7 @@
   "integrations.migrators.ph.token": "pat-… / secret_… / token voor privé-app",
   "integrations.migrators.subtitle": "Bring your data in from HubSpot, Notion or Airtable",
   "integrations.migrators.tab.connections": "Verbindingen",
+  "integrations.migrators.tab.fetches": "Ophaalacties",
   "integrations.migrators.tab.runs": "Imports",
   "integrations.migrators.title": "Gegevensmigraties"
 }

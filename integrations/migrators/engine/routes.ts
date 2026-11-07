@@ -1,259 +1,101 @@
-/**
- * integrations/migrators — routes.
- *
- * The adoption path from HubSpot / Notion / Airtable into Zveltio collections:
- *   POST /connections        — save a source + API token (AES-256-GCM at rest)
- *   GET  /connections        — list (tokens never leave the server)
- *   DELETE /connections/:id
- *   GET  /connections/:id/objects — what the source can export
- *   POST /preview            — first rows + inferred fields for mapping review
- *   POST /run                — import into an EXISTING collection (v1); only
- *                              columns present on the target receive data,
- *                              everything else is reported as skipped.
- */
-
-import { Hono } from 'hono';
-import { zValidator } from '@hono/zod-validator';
-import { z } from 'zod';
-import { sql } from 'kysely';
+import { type Context, Hono } from 'hono';
+import { HTTPException } from 'hono/http-exception';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
-import { ADAPTERS } from './adapters.js';
+import { FETCHES, RUNS } from './migrators.js';
 
-// biome-ignore lint/suspicious/noExplicitAny: dual-kysely brand guard (see analytics/quality)
-type Db = any;
-// biome-ignore lint/suspicious/noExplicitAny: Hono context
-type Ctx = any;
+// The import: a fetch's rows into a collection, every row through the data API
+// as the caller (`ctx.internals.createRecord`), as data/import does (owner
+// decision 2026-11-03, B1). A row lands only where the caller may create one,
+// with the target's validation, column rules, hooks and webhooks. Nothing here
+// decides who may import what.
 
-// ── Token encryption ────────────────────────────────────────────────────────
-// Delegated to the host (`secrets` capability). This used to read
-// FIELD_ENCRYPTION_KEY from the environment and run its own AES-256-GCM, which
-// meant holding the key that protects EVERY extension's encrypted data — and
-// having the `secrets` capability whether or not the manifest declared it.
-//
-// The host reads the old `enc1:` envelope, so tokens already stored keep
-// working; anything re-saved comes back in the engine's standard format.
+type Row = Record<string, unknown>;
 
-// biome-ignore lint/suspicious/noExplicitAny: ctx.internals is engine-typed
-type Internals = any;
-
-function encryptToken(internals: Internals, plain: string): Promise<string> {
-  return internals.encryptSecret(plain);
+/**
+ * Thrown, not returned: the engine's tenant middleware rolls the request's
+ * transaction back on a handler error and still sends this response, so no row
+ * of a refused import is kept.
+ */
+function refuse(status: number, body: Row, c: Context): never {
+  throw new HTTPException(status as 400, { res: c.json(body, status as 400) });
 }
 
-function decryptToken(internals: Internals, stored: string): Promise<string> {
-  return internals.decryptSecret(stored);
-}
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-const IDENT = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
-
-/** Source field name → safe snake_case column name. */
-function toColumn(field: string): string {
-  const c = field
-    .trim()
-    .replace(/[^a-zA-Z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .toLowerCase();
-  return /^[a-z_]/.test(c) ? c : `f_${c}`;
-}
-
-// biome-ignore lint/suspicious/noExplicitAny: source values are untyped
-function inferType(values: any[]): string {
-  const present = values.filter((v) => v !== null && v !== undefined && v !== '');
-  if (present.length === 0) return 'text';
-  if (present.every((v) => typeof v === 'boolean')) return 'boolean';
-  if (present.every((v) => typeof v === 'number')) return 'numeric';
-  if (present.every((v) => typeof v === 'string' && !Number.isNaN(Date.parse(v)) && /\d{4}-\d{2}-\d{2}/.test(v))) {
-    return 'timestamptz';
-  }
-  return 'text';
-}
-
-const RunSchema = z.object({
-  connection_id: z.string().uuid(),
-  object: z.string().min(1).max(300),
-  target_collection: z.string().regex(/^zvd_[a-z0-9_]+$/, 'target must be a zvd_* collection table'),
-  limit: z.number().int().min(1).max(1000).default(1000),
-});
+const isPlainObject = (v: unknown): v is Row => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 export function migratorRoutes(ctx: ExtensionContext): Hono {
-  const { db, auth, checkPermission } = ctx;
-
+  const { internals } = ctx;
   const app = new Hono();
 
-  // Imports move whole datasets — admin only.
-  app.use('*', async (c, next) => {
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (!session) return c.json({ error: 'Unauthorized' }, 401);
-    if (!(await checkPermission(session.user.id, 'admin', '*').catch(() => false))) {
-      return c.json({ error: 'Forbidden' }, 403);
+  /**
+   * POST /fetches/:id/import `{ target_collection, mapping? }` — all or nothing.
+   * `mapping` is `{ "<source field>": "<target field>" }`; without it each
+   * source field goes to the field the fetch inferred for it (`columns`). A
+   * source field mapped to "" or left out is skipped. A row the data API refuses
+   * with 422 is reported and the rest are still checked (up to 100); any other
+   * refusal stops there. Either way nothing is kept.
+   */
+  app.post('/fetches/:id/import', async (c) => {
+    const body = (await c.req.json().catch(() => null)) as Row | null;
+    const target = typeof body?.target_collection === 'string' ? body.target_collection.replace(/^zvd_/, '') : '';
+    if (!/^[a-z_][a-z0-9_]*$/.test(target)) return c.json({ error: 'target_collection must be a collection name' }, 400);
+    if (body?.mapping !== undefined && !isPlainObject(body.mapping)) {
+      return c.json({ error: 'mapping must be an object of source field to target field' }, 400);
     }
-    c.set('user', session.user);
-    return next();
-  });
 
-  const userId = (c: Ctx) => (c.get('user') as { id: string }).id;
+    const found = await internals.readRecord(c, FETCHES, c.req.param('id'));
+    if (found.status !== 200) return c.json(found.body as Row, found.status as 404);
+    const f = found.body as Row;
+    if (f.status !== 'ready') return c.json({ error: `The fetch is ${String(f.status)}, not ready` }, 409);
 
-  async function loadConnection(c: Ctx, id: string) {
-    const row = await sql<{ id: string; source: string; token_enc: string }>`
-      SELECT id::text, source, token_enc FROM zv_migrator_connections WHERE id = ${id}
-    `.execute(db);
-    return row.rows[0] ?? null;
-  }
+    const columns = (f.columns as { source_field: string; column: string }[] | null) ?? [];
+    const known = new Set(columns.map((col) => col.source_field));
+    const unknown = Object.keys((body?.mapping as Row | undefined) ?? {}).filter((s) => !known.has(s));
+    if (unknown.length) return c.json({ error: `mapping names fields the fetch does not have: ${unknown.join(', ')}` }, 400);
 
-  app.get('/connections', async (c) => {
-    const rows = await sql<{ id: string; source: string; name: string; created_at: string }>`
-      SELECT id::text, source, name, created_at FROM zv_migrator_connections ORDER BY created_at DESC
-    `.execute(db);
-    return c.json({ connections: rows.rows });
-  });
+    // Once per fetch: a repeated request (a retry, a second click) would import every row again.
+    // ponytail: two requests at the same instant both pass; a lock needs a fetch write the route may not make (writtenBy).
+    const done = await internals.listRecords(c, RUNS, { limit: 1, count: 'none', filter: { fetch_id: { eq: f.id } } });
+    if (done.status !== 200) return c.json(done.body as Row, done.status as 403);
+    if (((done.body as { records?: Row[] }).records ?? []).length) {
+      return c.json({ error: 'This fetch is already imported' }, 409);
+    }
+    const mapping: Record<string, string> = body?.mapping
+      ? Object.fromEntries(Object.entries(body.mapping).filter(([, t]) => typeof t === 'string' && t))
+      : Object.fromEntries(columns.map((col) => [col.source_field, col.column]));
+    const targets = Object.values(mapping);
+    if (new Set(targets).size !== targets.length) return c.json({ error: 'mapping names a target field twice' }, 400);
+    const skipped = columns.map((col) => col.source_field).filter((s) => !Object.hasOwn(mapping, s));
 
-  app.post(
-    '/connections',
-    zValidator(
-      'json',
-      z.object({
-        source: z.enum(['hubspot', 'notion', 'airtable']),
-        name: z.string().min(1).max(120),
-        token: z.string().min(8).max(4096),
-      }),
-    ),
-    async (c) => {
-      const { source, name, token } = c.req.valid('json');
-      let enc: string;
-      try {
-        enc = await encryptToken(ctx.internals, token);
-      } catch (e) {
-        return c.json({ error: e instanceof Error ? e.message : 'encryption unavailable' }, 500);
+    const ids: string[] = [];
+    const errors: { row: number; status: number; error: unknown }[] = [];
+    for (const [i, raw] of ((f.rows as Row[] | null) ?? []).entries()) {
+      const row: Row = {};
+      for (const [from, to] of Object.entries(mapping)) {
+        if (raw[from] !== undefined && raw[from] !== null) row[to] = raw[from];
       }
-      const row = await sql<{ id: string }>`
-        INSERT INTO zv_migrator_connections (source, name, token_enc, created_by)
-        VALUES (${source}, ${name}, ${enc}, ${userId(c)})
-        RETURNING id::text
-      `.execute(db);
-      return c.json({ connection: { id: row.rows[0]?.id, source, name } }, 201);
-    },
-  );
-
-  app.delete('/connections/:id', async (c) => {
-    await sql`DELETE FROM zv_migrator_connections WHERE id = ${c.req.param('id')}`.execute(db);
-    return c.json({ success: true });
-  });
-
-  app.get('/connections/:id/objects', async (c) => {
-    const conn = await loadConnection(c, c.req.param('id'));
-    if (!conn) return c.json({ error: 'Connection not found' }, 404);
-    try {
-      const objects = await ADAPTERS[conn.source]!.listObjects(await decryptToken(ctx.internals, conn.token_enc));
-      return c.json({ source: conn.source, objects });
-    } catch (e) {
-      return c.json({ error: e instanceof Error ? e.message : 'source error' }, 502);
-    }
-  });
-
-  app.post(
-    '/preview',
-    zValidator('json', z.object({ connection_id: z.string().uuid(), object: z.string().min(1).max(300) })),
-    async (c) => {
-      const { connection_id, object } = c.req.valid('json');
-      const conn = await loadConnection(c, connection_id);
-      if (!conn) return c.json({ error: 'Connection not found' }, 404);
-      try {
-        const { fields, rows } = await ADAPTERS[conn.source]!.fetchRows(await decryptToken(ctx.internals, conn.token_enc), object, 10);
-        const columns = fields.map((f) => ({
-          source_field: f,
-          column: toColumn(f),
-          type: inferType(rows.map((r) => r[f])),
-        }));
-        return c.json({ source: conn.source, object, columns, sample: rows.slice(0, 10) });
-      } catch (e) {
-        return c.json({ error: e instanceof Error ? e.message : 'source error' }, 502);
+      if (Object.keys(row).length === 0) continue;
+      const answer = await internals.createRecord(c, target, row);
+      if (answer.status >= 200 && answer.status < 300) {
+        ids.push(String((answer.body as Row).id));
+        continue;
       }
-    },
-  );
-
-  app.post('/run', zValidator('json', RunSchema), async (c) => {
-    const { connection_id, object, target_collection, limit } = c.req.valid('json');
-    const conn = await loadConnection(c, connection_id);
-    if (!conn) return c.json({ error: 'Connection not found' }, 404);
-    if (!IDENT.test(target_collection)) return c.json({ error: 'invalid target' }, 400);
-
-    // Target must be an existing collection table; import fills the columns
-    // that exist and reports the rest as skipped (v1 — no auto-DDL). Its columns
-    // come from the engine (`introspectTable`): `ctx.db` refuses
-    // `information_schema` since engine #858, which made every run a 500.
-    // Named with or without the `zvd_` prefix.
-    const collection = target_collection.startsWith('zvd_')
-      ? target_collection.slice(4)
-      : target_collection;
-    if (!IDENT.test(collection)) return c.json({ error: 'invalid target' }, 400);
-    const table: string = ctx.DDLManager.getTableName(collection);
-    const targetCols = new Set(
-      ((await ctx.DDLManager.introspectTable(db, collection)) as Array<{ name: string }>).map(
-        (f) => f.name,
-      ),
-    );
-    if (targetCols.size === 0) {
-      return c.json({ error: `Collection table "${target_collection}" does not exist — create the collection first` }, 400);
+      errors.push({ row: i + 1, status: answer.status, error: answer.body });
+      if (answer.status !== 422) refuse(answer.status, { error: 'Import refused', errors }, c);
+      if (errors.length >= 100) break;
     }
+    if (errors.length) refuse(422, { error: 'Import has invalid rows; nothing was imported', errors }, c);
 
-    const runRow = await sql<{ id: string }>`
-      INSERT INTO zv_migrator_runs (connection_id, source, source_object, target_collection, created_by)
-      VALUES (${connection_id}, ${conn.source}, ${object}, ${target_collection}, ${userId(c)})
-      RETURNING id::text
-    `.execute(db);
-    const runId = runRow.rows[0]!.id;
-
-    try {
-      const { fields, rows } = await ADAPTERS[conn.source]!.fetchRows(await decryptToken(ctx.internals, conn.token_enc), object, limit);
-      const mapping = fields
-        .map((f) => ({ f, col: toColumn(f) }))
-        .filter(({ col }) => targetCols.has(col) && IDENT.test(col));
-      const skipped = fields.filter((f) => !mapping.some((m) => m.f === f));
-
-      // The imported rows and the run's `completed` stamp go together. A run
-      // stamped completed over a half-imported table is a migration nobody
-      // re-runs — the operator reads `imported_rows` and moves on, while the
-      // rows that never landed are gone with no second attempt coming.
-      let imported = 0;
-      await db.transaction().execute(async (trx) => {
-        for (const row of rows) {
-          const cols = mapping.filter(({ f }) => row[f] !== undefined && row[f] !== null);
-          if (cols.length === 0) continue;
-          const colSql = sql.join(cols.map(({ col }) => sql.ref(col)), sql`, `);
-          const valSql = sql.join(cols.map(({ f }) => sql`${row[f]}`), sql`, `);
-          await sql`INSERT INTO ${sql.table(table)} (${colSql}) VALUES (${valSql})`.execute(trx);
-          imported++;
-        }
-
-        await sql`
-          UPDATE zv_migrator_runs
-          SET status = 'completed', total_rows = ${rows.length}, imported_rows = ${imported}, completed_at = NOW()
-          WHERE id = ${runId}
-        `.execute(trx);
-      });
-      return c.json({ run_id: runId, status: 'completed', total_rows: rows.length, imported_rows: imported, skipped_fields: skipped });
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      // The `.catch(() => undefined)` that used to hang off this statement is
-      // gone. If the run failed on a SQL error the surrounding transaction is
-      // already aborted and the stamp cannot land — but a migration that failed
-      // and says nothing is one the operator believes succeeded, which is the
-      // worst of the three outcomes. Let it surface.
-      await sql`
-        UPDATE zv_migrator_runs SET status = 'failed', error = ${msg}, completed_at = NOW() WHERE id = ${runId}
-      `.execute(db);
-      return c.json({ run_id: runId, status: 'failed', error: msg }, 502);
-    }
-  });
-
-  app.get('/runs', async (c) => {
-    const rows = await sql<Record<string, unknown>>`
-      SELECT id::text, source, source_object, target_collection, status, total_rows, imported_rows, error, created_at, completed_at
-      FROM zv_migrator_runs ORDER BY created_at DESC LIMIT 50
-    `.execute(db);
-    return c.json({ runs: rows.rows });
+    const run = await internals.createRecord(c, RUNS, {
+      fetch_id: f.id,
+      source: f.source,
+      source_object: f.object,
+      target_collection: target,
+      imported_rows: ids.length,
+      skipped_fields: skipped,
+      record_ids: ids,
+    });
+    if (run.status !== 201) refuse(run.status, { error: 'Could not record the import', detail: run.body }, c);
+    return c.json({ run: run.body, imported_rows: ids.length, skipped_fields: skipped }, 201);
   });
 
   return app;
