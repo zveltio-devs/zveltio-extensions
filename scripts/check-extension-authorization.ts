@@ -67,6 +67,10 @@ const ALLOWLIST: Record<string, string> = {
   // claim before it queues a job.
   'billing/engine/index.ts': 'Stripe webhook, authenticated by the Stripe-Signature HMAC',
   'sms/engine/routes.ts': 'Twilio status callback, authenticated by the X-Twilio-Signature HMAC',
+  // `POST /webhooks/receive`: a third party's delivery, authenticated by the
+  // HMAC-SHA256 under the webhook's own secret; it writes nothing and queues the
+  // `receive` job.
+  'integrations/api-connector/engine/routes.ts': 'incoming webhook, authenticated by the per-webhook HMAC',
 };
 
 /** Any helper that represents an authorization decision. */

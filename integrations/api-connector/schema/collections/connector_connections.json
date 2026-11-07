@@ -1,0 +1,27 @@
+{
+  "name": "connector_connections",
+  "defaultGrants": false,
+  "fields": [
+    { "name": "name", "type": "text", "required": true },
+    { "name": "base_url", "type": "url", "required": true },
+    {
+      "name": "auth_type",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "none",
+      "options": { "values": ["none", "api_key", "bearer", "basic", "oauth2"] }
+    },
+    { "name": "auth_header", "type": "text" },
+    { "name": "auth_username", "type": "text" },
+    { "name": "auth_secret", "type": "secret" },
+    { "name": "token_url", "type": "url" },
+    { "name": "scope", "type": "text" },
+    { "name": "default_headers", "type": "json" },
+    { "name": "is_active", "type": "boolean", "required": true, "defaultValue": true },
+    { "name": "retry_count", "type": "integer", "required": true, "defaultValue": 3 },
+    { "name": "timeout_ms", "type": "integer", "required": true, "defaultValue": 30000 },
+    { "name": "access_token", "type": "secret", "writtenBy": "actions" },
+    { "name": "refresh_token", "type": "secret", "writtenBy": "actions" },
+    { "name": "token_expires_at", "type": "datetime", "writtenBy": "actions" }
+  ]
+}

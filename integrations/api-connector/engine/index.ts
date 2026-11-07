@@ -1,26 +1,22 @@
 import type { ZveltioExtension } from '@zveltio/sdk/extension';
-import { join } from 'path';
-import { repairUnsignedIncomingWebhooksAtLoad } from './incoming-webhooks.js';
-import { apiConnectorRoutes } from './routes.js';
+import { connectorActions } from './actions.js';
+import { connectorRoutes } from './routes.js';
 
+// Connections, endpoints, the call log, incoming webhooks and their events are
+// collections this extension declares in `schema/collections/` (manifest
+// `collections`); the engine creates them, owns their rules and serves them
+// through the data API. A call is the `execute` action; the HTTP request is a
+// job in the engine's Deno runner (`jobs.ts`, ADR 0022), toward the hosts the
+// operator bound to the `api` egress slot (ADR 0026).
 const extension: ZveltioExtension = {
   name: 'integrations/api-connector',
   category: 'integrations',
-  // S3-01: sub-app mounted at /ext/integrations/api-connector by the engine.
   mountStrategy: 'subapp',
 
-  getMigrations() {
-    return [
-      join(import.meta.dir, 'migrations/001_initial.sql'),
-      join(import.meta.dir, 'migrations/002_tenant_rls.sql'),
-      join(import.meta.dir, 'migrations/003_tenant_scoped_unique_keys.sql'),
-      join(import.meta.dir, 'migrations/004_jsonb_unwrap_string.sql'),
-    ];
-  },
+  actions: connectorActions,
 
   async register(app, ctx) {
-    await repairUnsignedIncomingWebhooksAtLoad(ctx.db, ctx.internals.maybeEncrypt);
-    app.route('/', apiConnectorRoutes(ctx));
+    app.route('/', connectorRoutes(ctx));
   },
 };
 

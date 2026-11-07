@@ -1,539 +1,61 @@
 import { Hono } from 'hono';
-import type { Context } from 'hono';
-import { zValidator } from '@hono/zod-validator';
-import { z } from 'zod';
-import { sql } from 'kysely';
 import type { ExtensionContext } from '@zveltio/sdk/extension';
-import { permissionGate } from '@zveltio/sdk/extension';
-import { generateIncomingWebhookSecret } from './incoming-webhooks.js';
+import { WEBHOOKS, hmacHex, sameText } from './connector.js';
 
-const ALLOWED_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;
+// What a route still does: the incoming-webhook receiver, which has no
+// principal. Connections, endpoints, calls and the event log are the data API
+// and the `execute` action.
 
-/**
- * SSRF protection comes from the engine now, through `ctx.internals`.
- *
- * What used to be here was a literal-hostname blocklist: it compared the string
- * in the URL against `localhost`, `127.`, `10.`, `192.168.`, `169.254.` and a
- * few more. That stops an attacker who types the address and nobody else. It
- * does not stop a hostname the attacker controls that RESOLVES to
- * 169.254.169.254, nor `http://2852039166/`, nor a public host that answers 302
- * pointing at the metadata service — `fetch` follows redirects, and the check
- * had already been made on the original URL.
- *
- * The engine replaced exactly this guard with a DNS-aware one that re-validates
- * every redirect hop, and exposed it on `ctx.internals` with a comment naming
- * this extension as the reason. It was never adopted. Threading the engine's
- * version in as a parameter, rather than importing it, because these helpers
- * are module-level and the context arrives at `apiConnectorRoutes`.
- */
-type SafeFetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
+type Row = Record<string, any>;
 
-// Exponential backoff retry
-async function fetchWithRetry(safeFetch: SafeFetch, url: string, options: RequestInit, maxRetries: number, timeoutMs: number): Promise<{ res: Response | null; retries: number; error: string | null }> {
-  let lastError: string | null = null;
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    if (attempt > 0) {
-      await new Promise(r => setTimeout(r, Math.min(1000 * Math.pow(2, attempt - 1), 16000)));
-    }
-    try {
-      const res = await safeFetch(url, { ...options, signal: AbortSignal.timeout(timeoutMs) });
-      // Only retry on 5xx
-      if (res.status >= 500 && attempt < maxRetries) {
-        lastError = `HTTP ${res.status}`;
-        continue;
-      }
-      return { res, retries: attempt, error: null };
-    } catch (e: any) {
-      lastError = e.message;
-    }
-  }
-  return { res: null, retries: maxRetries, error: lastError };
-}
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Resolve OAuth2 token (with refresh if expired)
-/**
- * `token_url` is attacker-reachable in the same way `base_url` is: it is stored
- * on the connection and fetched by the server. Both calls below were on bare
- * `fetch`, so the guard that did exist never applied to them at all.
- */
-async function resolveOAuth2Token(safeFetch: SafeFetch, dbh: any, connectionId: string, authConfig: any): Promise<string> {
-  const cached = await sql`SELECT * FROM zvd_api_oauth_tokens WHERE connection_id = ${connectionId}`.execute(dbh);
-  if (cached.rows.length) {
-    const tok = cached.rows[0] as any;
-    const isExpired = tok.expires_at && new Date(tok.expires_at) < new Date(Date.now() + 60000);
-    if (!isExpired) return tok.access_token;
-    // Try refresh
-    if (tok.refresh_token && authConfig.token_url) {
-      try {
-        const res = await safeFetch(authConfig.token_url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: tok.refresh_token, client_id: authConfig.client_id ?? '', client_secret: authConfig.client_secret ?? '' }),
-        });
-        if (res.ok) {
-          const data = await res.json() as any;
-          const expiresAt = data.expires_in ? new Date(Date.now() + data.expires_in * 1000).toISOString() : null;
-          await sql`
-            UPDATE zvd_api_oauth_tokens SET access_token = ${data.access_token}, refresh_token = ${data.refresh_token ?? tok.refresh_token},
-              expires_at = ${expiresAt}, updated_at = NOW()
-            WHERE connection_id = ${connectionId}
-          `.execute(dbh);
-          return data.access_token;
-        }
-      } catch {}
-    }
-  }
-  // Client credentials flow
-  if (authConfig.token_url && authConfig.client_id) {
-    const res = await safeFetch(authConfig.token_url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ grant_type: 'client_credentials', client_id: authConfig.client_id, client_secret: authConfig.client_secret ?? '', scope: authConfig.scope ?? '' }),
-    });
-    if (res.ok) {
-      const data = await res.json() as any;
-      const expiresAt = data.expires_in ? new Date(Date.now() + data.expires_in * 1000).toISOString() : null;
-      await sql`
-        INSERT INTO zvd_api_oauth_tokens (connection_id, access_token, refresh_token, expires_at)
-        VALUES (${connectionId}, ${data.access_token}, ${data.refresh_token ?? null}, ${expiresAt})
-        ON CONFLICT (connection_id) DO UPDATE SET access_token = EXCLUDED.access_token, refresh_token = EXCLUDED.refresh_token, expires_at = EXCLUDED.expires_at, updated_at = NOW()
-      `.execute(dbh);
-      return data.access_token;
-    }
-    throw new Error('OAuth2 token request failed');
-  }
-  return authConfig.access_token ?? '';
-}
-
-/** HMAC-SHA256 of `body` under `secret`, hex — the shape senders put in the header. */
-/**
- * The response body as the jsonb the log column holds. A JSON body is kept as
- * JSON; anything else — HTML, plain text, a body cut at the 10 000-character
- * cap — is kept as a JSON string. Binding the raw text instead was refused by
- * Postgres (22P02) on `pg` whenever the body was not JSON, and stored as a
- * string scalar either way on Bun.SQL.
- */
-function logBody(text: string): string {
-  if (text.length <= 10_000) {
-    try {
-      return JSON.stringify(JSON.parse(text));
-    } catch {
-      /* not JSON */
-    }
-  }
-  return JSON.stringify(text.slice(0, 10_000));
-}
-
-async function hmacHex(secret: string, body: string): Promise<string> {
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw',
-    enc.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  );
-  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(body));
-  return Array.from(new Uint8Array(sig))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-/**
- * Constant-time comparison of two hex strings.
- *
- * `a === b` returns at the first differing character, which leaks how much of a
- * forged signature was right — enough, over many attempts, to build one a byte
- * at a time. The length is compared first because returning early there leaks
- * only the length, which the algorithm already fixes at 64 characters.
- */
-function secretsMatch(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
-
-export function apiConnectorRoutes(ctx: ExtensionContext): Hono {
-  const { db, auth } = ctx;
-  // The engine's DNS-aware SSRF guards. `safeFetch` re-validates every redirect
-  // hop; `assertPublicUrl` resolves the hostname before deciding, so a name that
-  // points at 169.254.169.254 is refused whatever it is spelled.
-  const { safeFetch, assertPublicUrl, maybeEncrypt, maybeDecrypt } = ctx.internals;
-
-  // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
-  // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
-  // a handler is therefore already RLS-scoped — there is one spelling, so there
-  // is none to forget.
-
+export function connectorRoutes(ctx: ExtensionContext): Hono {
+  const { host, internals } = ctx;
   const app = new Hono();
 
-  // The incoming-webhook RECEIVER (`POST /webhooks/receive/:path`) is a public
-  // endpoint IdPs/third parties call with no session — its authenticity comes
-  // from the per-webhook HMAC verified in the handler. It must bypass BOTH the
-  // session guard and the RBAC gate below (which are `app.use('*')` and would
-  // otherwise 401/403 every external delivery). `c.req.path` is the FULL path
-  // under the /ext/integrations/api-connector mount, so match the segment
-  // anywhere. (The engine's fail-closed /ext gate also allows it via the
-  // manifest `publicRoutes` declaration.)
-  const isPublicWebhook = (c: Context) => c.req.path.includes('/webhooks/receive/');
-
-  app.use('*', async (c, next) => {
-    if (isPublicWebhook(c)) return next();
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (!session) return c.json({ error: 'Unauthorized' }, 401);
-    c.set('user', session.user);
-    await next();
-  });
-
-  app.use('*', async (c, next) => {
-    if (isPublicWebhook(c)) return next();
-    return permissionGate(ctx, 'api-connector')(c, next);
-  });
-
-  // ── Connections ────────────────────────────────────────────────
-  app.get('/connections', async (c) => {
-    const rows = await sql`SELECT id, name, base_url, auth_type, is_active, retry_count, timeout_ms, created_at FROM zvd_api_connections ORDER BY name`.execute(db);
-    return c.json({ data: rows.rows });
-  });
-
-  app.get('/connections/:id', async (c) => {
-    const row = await sql`SELECT id, name, base_url, auth_type, is_active, retry_count, timeout_ms, created_at FROM zvd_api_connections WHERE id = ${c.req.param('id')}`.execute(db);
-    if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
-    const endpoints = await sql`SELECT id, name, method, path, is_active FROM zvd_api_endpoints WHERE connection_id = ${c.req.param('id')} ORDER BY name`.execute(db);
-    return c.json({ data: { ...(row.rows[0] as any), endpoints: endpoints.rows } });
-  });
-
-  app.post('/connections', zValidator('json', z.object({
-    name: z.string().min(1),
-    base_url: z.string().url(),
-    auth_type: z.enum(['none','api_key','bearer','basic','oauth2']).default('none'),
-    auth_config: z.record(z.string(), z.any()).default({}),
-    default_headers: z.record(z.string(), z.string()).default({}),
-    retry_count: z.number().int().min(0).max(5).default(3),
-    timeout_ms: z.number().int().min(1000).max(120000).default(30000),
-  })), async (c) => {
-    const user = c.get('user') as any;
-    const d = c.req.valid('json');
-    try { await assertPublicUrl(d.base_url); } catch (e: any) {
-      return c.json({ error: e.message }, 400);
-    }
-    const row = await sql`
-      INSERT INTO zvd_api_connections (name, base_url, auth_type, auth_config, headers, default_headers, retry_count, timeout_ms, created_by)
-      VALUES (${d.name}, ${d.base_url}, ${d.auth_type}, ${JSON.stringify(d.auth_config)}::text::jsonb, ${JSON.stringify(d.default_headers)}::text::jsonb, ${JSON.stringify(d.default_headers)}::text::jsonb, ${d.retry_count}, ${d.timeout_ms}, ${user.id})
-      RETURNING id, name, base_url, auth_type, is_active, retry_count, timeout_ms, created_at
-    `.execute(db);
-    return c.json({ data: row.rows[0] }, 201);
-  });
-
-  app.patch('/connections/:id', zValidator('json', z.object({
-    name: z.string().optional(),
-    auth_config: z.record(z.string(), z.any()).optional(),
-    default_headers: z.record(z.string(), z.string()).optional(),
-    is_active: z.boolean().optional(),
-    retry_count: z.number().int().min(0).max(5).optional(),
-    timeout_ms: z.number().int().optional(),
-  })), async (c) => {
-    const d = c.req.valid('json');
-    const row = await sql`
-      UPDATE zvd_api_connections SET
-        name = COALESCE(${d.name ?? null}, name),
-        auth_config = COALESCE(${d.auth_config ? JSON.stringify(d.auth_config) : null}::text::jsonb, auth_config),
-        default_headers = COALESCE(${d.default_headers ? JSON.stringify(d.default_headers) : null}::text::jsonb, default_headers),
-        is_active = COALESCE(${d.is_active ?? null}, is_active),
-        retry_count = COALESCE(${d.retry_count ?? null}, retry_count),
-        timeout_ms = COALESCE(${d.timeout_ms ?? null}, timeout_ms),
-        updated_at = NOW()
-      WHERE id = ${c.req.param('id')} RETURNING id, name, base_url, auth_type, is_active
-    `.execute(db);
-    if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
-    return c.json({ data: row.rows[0] });
-  });
-
-  app.delete('/connections/:id', async (c) => {
-    await sql`DELETE FROM zvd_api_connections WHERE id = ${c.req.param('id')}`.execute(db);
-    return c.json({ success: true });
-  });
-
-  // Health check
-  app.post('/connections/:id/health-check', async (c) => {
-    const conn = await sql`SELECT * FROM zvd_api_connections WHERE id = ${c.req.param('id')}`.execute(db);
-    if (!conn.rows.length) return c.json({ error: 'Not found' }, 404);
-    const connection = conn.rows[0] as any;
-    const startedAt = Date.now();
-    try {
-      const res = await safeFetch(connection.base_url, {
-        method: 'HEAD',
-        signal: AbortSignal.timeout(5000),
-      });
-      const duration_ms = Date.now() - startedAt;
-      return c.json({ data: { healthy: res.status < 500, status: res.status, duration_ms } });
-    } catch (e: any) {
-      return c.json({ data: { healthy: false, error: e.message, duration_ms: Date.now() - startedAt } });
-    }
-  });
-
-  // ── Endpoints ──────────────────────────────────────────────────
-  app.get('/connections/:id/endpoints', async (c) => {
-    const rows = await sql`SELECT * FROM zvd_api_endpoints WHERE connection_id = ${c.req.param('id')} ORDER BY name`.execute(db);
-    return c.json({ data: rows.rows });
-  });
-
-  app.post('/connections/:id/endpoints', zValidator('json', z.object({
-    name: z.string().min(1),
-    method: z.enum(ALLOWED_METHODS),
-    path: z.string().min(1),
-    description: z.string().optional(),
-    default_body: z.string().optional(),
-    default_headers: z.record(z.string(), z.string()).default({}),
-    response_mapping: z.record(z.string(), z.string()).default({}),
-  })), async (c) => {
-    const user = c.get('user') as any;
-    const d = c.req.valid('json');
-    const row = await sql`
-      INSERT INTO zvd_api_endpoints (connection_id, name, method, path, description, default_body, default_headers, response_mapping, created_by)
-      VALUES (${c.req.param('id')}, ${d.name}, ${d.method}, ${d.path}, ${d.description ?? null},
-        ${d.default_body ?? null}, ${JSON.stringify(d.default_headers)}::text::jsonb, ${JSON.stringify(d.response_mapping)}::text::jsonb, ${user.id})
-      RETURNING *
-    `.execute(db);
-    return c.json({ data: row.rows[0] }, 201);
-  });
-
-  app.patch('/endpoints/:id', zValidator('json', z.object({
-    name: z.string().optional(),
-    method: z.enum(ALLOWED_METHODS).optional(),
-    path: z.string().optional(),
-    description: z.string().optional(),
-    is_active: z.boolean().optional(),
-  })), async (c) => {
-    const d = c.req.valid('json');
-    const row = await sql`
-      UPDATE zvd_api_endpoints SET
-        name = COALESCE(${d.name ?? null}, name),
-        method = COALESCE(${d.method ?? null}, method),
-        path = COALESCE(${d.path ?? null}, path),
-        description = COALESCE(${d.description ?? null}, description),
-        is_active = COALESCE(${d.is_active ?? null}, is_active),
-        updated_at = NOW()
-      WHERE id = ${c.req.param('id')} RETURNING *
-    `.execute(db);
-    if (!row.rows.length) return c.json({ error: 'Not found' }, 404);
-    return c.json({ data: row.rows[0] });
-  });
-
-  app.delete('/endpoints/:id', async (c) => {
-    await sql`DELETE FROM zvd_api_endpoints WHERE id = ${c.req.param('id')}`.execute(db);
-    return c.json({ success: true });
-  });
-
-  // ── Execute with retry + OAuth2 ────────────────────────────────
-  app.post('/endpoints/:id/execute', zValidator('json', z.object({
-    path_params: z.record(z.string(), z.string()).default({}),
-    query_params: z.record(z.string(), z.string()).default({}),
-    body: z.any().optional(),
-    headers: z.record(z.string(), z.string()).default({}),
-  })), async (c) => {
-    const user = c.get('user') as any;
-    const d = c.req.valid('json');
-    const ep = await sql`
-      SELECT e.*, conn.base_url, conn.auth_type, conn.auth_config,
-        conn.default_headers AS conn_default_headers,
-        conn.retry_count, conn.timeout_ms
-      FROM zvd_api_endpoints e
-      JOIN zvd_api_connections conn ON conn.id = e.connection_id
-      WHERE e.id = ${c.req.param('id')} AND conn.is_active = true AND e.is_active = true
-    `.execute(db);
-    if (!ep.rows.length) return c.json({ error: 'Endpoint not found or connection inactive' }, 404);
-    const endpoint = ep.rows[0] as any;
-    // Build URL
-    let path = endpoint.path;
-    for (const [k, v] of Object.entries(d.path_params)) {
-      path = path.replace(`{${k}}`, encodeURIComponent(v as string));
-    }
-    const qs = new URLSearchParams(d.query_params as Record<string, string>).toString();
-    const url = endpoint.base_url.replace(/\/$/, '') + path + (qs ? `?${qs}` : '');
-    // Build headers
-    // `conn.default_headers` used to be selected under the same name as
-    // `e.default_headers`, so it overwrote the endpoint's own headers in the
-    // row, and the endpoint side read a `default_headers_ep` column that no
-    // query produces: an endpoint's default headers were never sent.
-    // A value written before migration 004 may still be a JSON string.
-    const asObject = (v: unknown) => (typeof v === 'string' ? JSON.parse(v || '{}') : (v ?? {}));
-    const connHeaders = asObject(endpoint.conn_default_headers);
-    const epHeaders = asObject(endpoint.default_headers);
-    const authConfig = asObject(endpoint.auth_config);
-    const headers: Record<string, string> = { 'Content-Type': 'application/json', ...connHeaders, ...epHeaders, ...d.headers };
-
-    if (endpoint.auth_type === 'bearer') {
-      headers['Authorization'] = `Bearer ${authConfig.token}`;
-    } else if (endpoint.auth_type === 'api_key') {
-      headers[authConfig.header ?? 'X-API-Key'] = authConfig.key;
-    } else if (endpoint.auth_type === 'basic') {
-      headers['Authorization'] = `Basic ${btoa(`${authConfig.username}:${authConfig.password}`)}`;
-    } else if (endpoint.auth_type === 'oauth2') {
-      try {
-        const token = await resolveOAuth2Token(safeFetch, db, endpoint.connection_id, authConfig);
-        headers['Authorization'] = `Bearer ${token}`;
-      } catch (e: any) {
-        return c.json({ error: 'OAuth2 token error: ' + e.message }, 502);
-      }
-    }
-
-    const startedAt = Date.now();
-    const { res, retries, error: fetchError } = await fetchWithRetry(safeFetch, url, {
-      method: endpoint.method,
-      headers,
-      body: ['GET', 'HEAD'].includes(endpoint.method) ? undefined : JSON.stringify(d.body),
-    }, endpoint.retry_count ?? 3, endpoint.timeout_ms ?? 30000);
-
-    const duration_ms = Date.now() - startedAt;
-    const status_code = res?.status ?? 0;
-    const response_body = res ? await res.text() : '';
-
-    await sql`
-      INSERT INTO zvd_api_logs (endpoint_id, user_id, url, method, request_body, response_status, response_body, duration_ms, error_message, retry_count)
-      VALUES (${endpoint.id}, ${user.id}, ${url}, ${endpoint.method},
-        ${d.body ? JSON.stringify(d.body) : null}::text::jsonb, ${status_code},
-        ${logBody(response_body)}::text::jsonb, ${duration_ms}, ${fetchError}, ${retries})
-    `.execute(db);
-
-    if (fetchError) return c.json({ error: fetchError }, 502);
-    let parsed: any = response_body;
-    try { parsed = JSON.parse(response_body); } catch {}
-    return c.json({ data: parsed, status: status_code, duration_ms, retries });
-  });
-
-  // ── Logs ───────────────────────────────────────────────────────
-  app.get('/connections/:id/logs', async (c) => {
-    const { limit = '50', page = '1' } = c.req.query();
-    const lim = Math.min(+limit, 200);
-    const offset = (Math.max(1, +page) - 1) * lim;
-    const rows = await sql`
-      SELECT l.*, e.name as endpoint_name, e.method, e.path
-      FROM zvd_api_logs l
-      JOIN zvd_api_endpoints e ON e.id = l.endpoint_id
-      WHERE e.connection_id = ${c.req.param('id')}
-      ORDER BY l.created_at DESC LIMIT ${lim} OFFSET ${offset}
-    `.execute(db);
-    return c.json({ data: rows.rows });
-  });
-
-  // ── Incoming Webhooks ──────────────────────────────────────────
-  app.get('/webhooks', async (c) => {
-    const rows = await sql`SELECT w.*, COUNT(e.id) as event_count FROM zvd_incoming_webhooks w LEFT JOIN zvd_webhook_events e ON e.webhook_id = w.id GROUP BY w.id ORDER BY w.name`.execute(db);
-    return c.json({ data: rows.rows });
-  });
-
-  app.post('/webhooks', zValidator('json', z.object({
-    name: z.string().min(1),
-    endpoint_path: z.string().min(1).regex(/^\/[a-z0-9\-_\/]+$/),
-    description: z.string().optional(),
-    secret: z.string().optional(),
-    connection_id: z.string().uuid().optional(),
-  })), async (c) => {
-    const user = c.get('user') as any;
-    const d = c.req.valid('json');
-    // Always sign incoming deliveries — same contract as engine outbound webhooks.
-    const secret = d.secret ?? generateIncomingWebhookSecret();
-
-    // Encrypted at rest, for the same reason the engine encrypts the secret on
-    // its OUTBOUND webhooks: this value is what separates a genuine delivery
-    // from a forged one, so anyone who can read the database can forge
-    // deliveries into this system. In clear, the signature check would verify
-    // only that the sender had read access.
-    //
-    // `maybeEncrypt` throws when FIELD_ENCRYPTION_KEY is unset rather than
-    // downgrading quietly — the engine's posture on every field an operator
-    // marked sensitive. Refusing the create is the honest outcome; the
-    // alternative is a webhook that looks signed and is not.
-    let storedSecret: string;
-    try {
-      storedSecret = (await maybeEncrypt(secret, true)) as string;
-    } catch (e: any) {
-      return c.json(
-        { error: `Cannot store a webhook signing secret: ${e?.message ?? String(e)}` },
-        500,
-      );
-    }
-
-    const row = await sql`
-      INSERT INTO zvd_incoming_webhooks (name, endpoint_path, description, secret, connection_id, created_by)
-      VALUES (${d.name}, ${d.endpoint_path}, ${d.description ?? null}, ${storedSecret}, ${d.connection_id ?? null}, ${user.id})
-      RETURNING *
-    `.execute(db);
-    const created = row.rows[0] as Record<string, unknown>;
-    return c.json(
-      {
-        data: { ...created, secret: '••••••••' },
-        secret,
-        _secret_shown_once: true,
-      },
-      201,
-    );
-  });
-
-  app.delete('/webhooks/:id', async (c) => {
-    await sql`DELETE FROM zvd_incoming_webhooks WHERE id = ${c.req.param('id')}`.execute(db);
-    return c.json({ success: true });
-  });
-
-  // Receive incoming webhook (public endpoint - no auth)
-  app.post('/webhooks/receive/:path{.+}', async (c) => {
-    const path = '/' + c.req.param('path');
-    const webhook = await sql`SELECT * FROM zvd_incoming_webhooks WHERE endpoint_path = ${path} AND is_active = true`.execute(db);
-    if (!webhook.rows.length) return c.json({ error: 'Webhook not found' }, 404);
-    const w = webhook.rows[0] as { id: string; secret?: string | null };
-    // Unsigned receive was SEC-04b: knowing the path was enough. repairUnsigned…
-    // backfills legacy rows at load; anything still missing a secret is refused.
-    if (!w.secret) {
-      return c.json({ error: 'Webhook has no signing secret configured' }, 401);
-    }
+  // POST /webhooks/receive?id=<webhook id> — public (manifest `publicRoutes`),
+  // authenticated by the HMAC-SHA256 of the raw body under the webhook's secret,
+  // in `x-hub-signature-256` or `x-webhook-signature` (hex, `sha256=` optional).
+  // The webhook is read as the system (`data:system`, audited) and must belong to
+  // the request's tenant; the delivery is stored by the `receive` job.
+  app.post('/webhooks/receive', async (c) => {
+    const id = c.req.query('id') ?? '';
     const sig = c.req.header('x-hub-signature-256') ?? c.req.header('x-webhook-signature');
     if (!sig) return c.json({ error: 'Missing signature' }, 401);
-    const rawBody = await c.req.text();
-    // WebCrypto rather than `node:crypto`, which would be the only `node:*`
-    // import across all 57 extensions — the engine signs its own webhooks this
-    // way, and keeping extensions off node builtins is what leaves the runtime
-    // question (worker isolation, WASM) open rather than foreclosed.
-    // Decrypted per request. `maybeDecrypt` passes through anything without the
-    // `enc:v1:` prefix, so rows written before this column was encrypted keep
-    // verifying instead of breaking on upgrade.
-    const signingSecret = (await maybeDecrypt(w.secret, true)) as string;
-    const expected = await hmacHex(signingSecret, rawBody);
-    const provided = (sig.startsWith('sha256=') ? sig.slice(7) : sig).toLowerCase();
-    if (!secretsMatch(provided, expected)) {
-      return c.json({ error: 'Invalid signature' }, 401);
-    }
-    let payload: unknown = {};
-    try {
-      payload = JSON.parse(rawBody);
-    } catch {
-      payload = {};
-    }
-    const headers: Record<string, string> = {};
-    c.req.raw.headers.forEach((v, k) => { headers[k] = v; });
-    // The event and the receipt stamp on the webhook. `last_received_at` is what
-    // an operator checks to decide whether an integration is alive, so a stamp
-    // written without the event says the webhook is delivering while nothing is
-    // stored, and an event stored without the stamp makes a working integration
-    // look dead. The sender is told 200 either way and will not retry.
-    await db.transaction().execute(async (trx) => {
-      await sql`
-        INSERT INTO zvd_webhook_events (webhook_id, payload, headers, source_ip)
-        VALUES (${w.id}, ${JSON.stringify(payload)}::text::jsonb, ${JSON.stringify(headers)}::text::jsonb, ${c.req.header('x-forwarded-for') ?? null})
-      `.execute(trx);
-      await sql`UPDATE zvd_incoming_webhooks SET last_received_at = NOW() WHERE id = ${w.id}`.execute(trx);
-    });
-    return c.json({ received: true });
-  });
+    const raw = await c.req.text();
+    const tenant = (c.get('tenant' as never) as { id?: string } | null | undefined)?.id;
 
-  app.get('/webhooks/:id/events', async (c) => {
-    const { limit = '50' } = c.req.query();
-    const lim = Math.min(+limit, 200);
-    const rows = await sql`
-      SELECT * FROM zvd_webhook_events WHERE webhook_id = ${c.req.param('id')} ORDER BY received_at DESC LIMIT ${lim}
-    `.execute(db);
-    return c.json({ data: rows.rows });
+    const answer = await internals.asSystem(
+      [WEBHOOKS],
+      async () => {
+        // One answer for unknown, foreign, inactive and forged: an unsigned caller learns nothing.
+        const refused = { status: 401 as const, body: { error: 'Invalid signature' } };
+        const w = UUID.test(id) ? ((await host(c).collections.read(WEBHOOKS, id)) as Row | null) : null;
+        if (!w || !tenant || w.tenant_id !== tenant || !w.is_active || !w.secret) return refused;
+        const provided = (sig.startsWith('sha256=') ? sig.slice(7) : sig).toLowerCase();
+        if (!sameText(provided, await hmacHex(String(w.secret), raw))) return refused;
+        let payload: unknown = {};
+        try {
+          payload = JSON.parse(raw);
+        } catch {
+          /* not JSON: stored as {} */
+        }
+        const headers: Record<string, string> = {};
+        c.req.raw.headers.forEach((v, k) => {
+          headers[k] = v;
+        });
+        await internals.enqueue!(c, 'receive', {
+          webhook_id: w.id,
+          payload,
+          headers,
+          ...(c.req.header('x-forwarded-for') ? { source_ip: c.req.header('x-forwarded-for')!.slice(0, 512) } : {}),
+        });
+        return { status: 200 as const, body: { received: true } };
+      },
+      { reason: 'incoming webhook delivery' },
+    );
+    return c.json(answer.body, answer.status);
   });
 
   return app;

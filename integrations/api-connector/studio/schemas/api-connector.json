@@ -2,74 +2,165 @@
   "sduiSchema": 1,
   "title": "integrations.api-connector.title",
   "subtitle": "integrations.api-connector.subtitle",
-  "newLabel": "integrations.api-connector.btn.new",
+  "newLabel": "common.new",
   "resources": [
     {
       "id": "connections",
       "label": "integrations.api-connector.tab.connections",
-      "dataSource": "/ext/integrations/api-connector/connections",
-      "dataPath": "data",
-      "layout": "cards",
-      "card": {
-        "title": "name",
-        "badge": "auth_type",
-        "subtitle": "base_url"
-      },
+      "icon": "Plug",
+      "dataSource": "/api/data/connector_connections?sort=name&limit=500",
+      "dataPath": "records",
       "columns": [
         {
           "key": "name",
           "label": "common.col.name"
+        },
+        {
+          "key": "base_url",
+          "label": "integrations.api-connector.ui.base_url",
+          "type": "mono"
+        },
+        {
+          "key": "auth_type",
+          "label": "integrations.api-connector.ui.auth"
+        },
+        {
+          "key": "is_active",
+          "label": "integrations.api-connector.col.active",
+          "type": "boolean"
         }
       ],
       "rowActions": [
         {
+          "id": "edit",
+          "kind": "edit",
+          "label": "common.edit"
+        },
+        {
           "id": "delete",
-          "label": "common.delete",
+          "icon": "Trash2",
           "variant": "text-error",
+          "label": "common.delete",
           "method": "DELETE",
-          "endpoint": "/ext/integrations/api-connector/connections/{id}",
-          "confirm": "ext.confirmDelete"
+          "endpoint": "/api/data/connector_connections/{id}",
+          "confirm": "integrations.api-connector.confirmDeleteConnection"
         }
       ],
       "form": {
-        "endpoint": "/ext/integrations/api-connector/connections",
-        "fields": [
+        "endpoint": "/api/data/connector_connections",
+        "sections": [
           {
-            "name": "name",
-            "label": "common.col.name",
-            "required": true,
-            "colSpan": 2
+            "title": "integrations.api-connector.section.connection",
+            "fields": [
+              {
+                "name": "name",
+                "label": "common.col.name",
+                "required": true,
+                "colSpan": 1
+              },
+              {
+                "name": "is_active",
+                "label": "integrations.api-connector.col.active",
+                "type": "boolean",
+                "default": true,
+                "colSpan": 1
+              },
+              {
+                "name": "base_url",
+                "label": "integrations.api-connector.ui.base_url",
+                "mono": true,
+                "required": true,
+                "colSpan": 2,
+                "placeholder": "integrations.api-connector.ui.base_url_hint"
+              },
+              {
+                "name": "retry_count",
+                "label": "integrations.api-connector.ui.retry_count",
+                "type": "number",
+                "default": 3,
+                "colSpan": 1
+              },
+              {
+                "name": "timeout_ms",
+                "label": "integrations.api-connector.ui.timeout_ms",
+                "type": "number",
+                "default": 30000,
+                "colSpan": 1
+              },
+              {
+                "name": "default_headers",
+                "label": "integrations.api-connector.ui.headers_json",
+                "type": "json",
+                "mono": true,
+                "rows": 3,
+                "colSpan": 2,
+                "default": "{}"
+              }
+            ]
           },
           {
-            "name": "base_url",
-            "label": "integrations.api-connector.ui.base_url",
-            "mono": true,
-            "required": true,
-            "colSpan": 2,
-            "placeholder": "integrations.api-connector.ui.https_api_example_com"
-          },
-          {
-            "name": "auth_type",
-            "label": "integrations.api-connector.ui.auth",
-            "type": "select",
-            "default": "none",
-            "colSpan": 2,
-            "options": [
+            "title": "integrations.api-connector.ui.auth",
+            "fields": [
               {
-                "value": "none",
-                "label": "integrations.api-connector.ui.none"
+                "name": "auth_type",
+                "label": "integrations.api-connector.ui.auth",
+                "type": "select",
+                "default": "none",
+                "colSpan": 2,
+                "options": [
+                  {
+                    "value": "none",
+                    "label": "integrations.api-connector.auth.none"
+                  },
+                  {
+                    "value": "api_key",
+                    "label": "integrations.api-connector.auth.api_key"
+                  },
+                  {
+                    "value": "bearer",
+                    "label": "integrations.api-connector.auth.bearer"
+                  },
+                  {
+                    "value": "basic",
+                    "label": "integrations.api-connector.auth.basic"
+                  },
+                  {
+                    "value": "oauth2",
+                    "label": "integrations.api-connector.auth.oauth2"
+                  }
+                ]
               },
               {
-                "value": "bearer",
-                "label": "integrations.api-connector.ui.bearer_token"
+                "name": "auth_username",
+                "label": "integrations.api-connector.ui.username",
+                "mono": true,
+                "colSpan": 1
               },
               {
-                "value": "basic",
-                "label": "integrations.api-connector.ui.basic_auth"
+                "name": "auth_header",
+                "label": "integrations.api-connector.ui.auth_header",
+                "mono": true,
+                "colSpan": 1,
+                "placeholder": "integrations.api-connector.ui.auth_header_hint"
               },
               {
-                "value": "oauth2",
-                "label": "integrations.api-connector.ui.oauth_2_0"
+                "name": "auth_secret",
+                "label": "integrations.api-connector.ui.secret",
+                "type": "password",
+                "colSpan": 2,
+                "placeholder": "integrations.api-connector.ui.leave_blank"
+              },
+              {
+                "name": "token_url",
+                "label": "integrations.api-connector.ui.token_url",
+                "mono": true,
+                "colSpan": 1
+              },
+              {
+                "name": "scope",
+                "label": "integrations.api-connector.ui.scope",
+                "mono": true,
+                "colSpan": 1
               }
             ]
           }
@@ -77,30 +168,304 @@
       }
     },
     {
-      "id": "webhooks",
-      "label": "integrations.api-connector.tab.webhooks",
-      "dataSource": "/ext/integrations/api-connector/webhooks",
-      "dataPath": "data",
+      "id": "endpoints",
+      "label": "integrations.api-connector.tab.endpoints",
+      "icon": "Route",
+      "dataSource": "/api/data/connector_endpoints?sort=name&limit=500",
+      "dataPath": "records",
       "columns": [
         {
           "key": "name",
           "label": "common.col.name"
         },
         {
-          "key": "slug",
-          "label": "integrations.api-connector.col.url",
-          "type": "mono",
-          "template": "{ENGINE_URL}/api/webhook/{slug}"
+          "key": "method",
+          "label": "integrations.api-connector.ui.method",
+          "type": "mono"
         },
         {
+          "key": "path",
+          "label": "integrations.api-connector.ui.path",
+          "type": "mono"
+        },
+        {
+          "key": "is_active",
+          "label": "integrations.api-connector.col.active",
+          "type": "boolean"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "run",
+          "icon": "Play",
+          "label": "integrations.api-connector.action.run",
+          "method": "POST",
+          "endpoint": "/ext/integrations/api-connector/actions/execute",
+          "body": {
+            "endpoint_id": "{id}"
+          }
+        },
+        {
+          "id": "edit",
+          "kind": "edit",
+          "label": "common.edit"
+        },
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "DELETE",
+          "endpoint": "/api/data/connector_endpoints/{id}",
+          "confirm": "integrations.api-connector.confirmDeleteEndpoint"
+        }
+      ],
+      "form": {
+        "endpoint": "/api/data/connector_endpoints",
+        "fields": [
+          {
+            "name": "connection_id",
+            "label": "integrations.api-connector.col.connection",
+            "type": "relation",
+            "required": true,
+            "colSpan": 2,
+            "relation": {
+              "dataSource": "/api/data/connector_connections?sort=name&limit=500",
+              "dataPath": "records",
+              "valueKey": "id",
+              "labelKey": "name"
+            }
+          },
+          {
+            "name": "name",
+            "label": "common.col.name",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "method",
+            "label": "integrations.api-connector.ui.method",
+            "type": "select",
+            "default": "GET",
+            "colSpan": 1,
+            "options": [
+              {
+                "value": "GET",
+                "label": "GET"
+              },
+              {
+                "value": "POST",
+                "label": "POST"
+              },
+              {
+                "value": "PUT",
+                "label": "PUT"
+              },
+              {
+                "value": "PATCH",
+                "label": "PATCH"
+              },
+              {
+                "value": "DELETE",
+                "label": "DELETE"
+              }
+            ]
+          },
+          {
+            "name": "path",
+            "label": "integrations.api-connector.ui.path",
+            "mono": true,
+            "required": true,
+            "colSpan": 2,
+            "placeholder": "integrations.api-connector.ui.path_hint"
+          },
+          {
+            "name": "description",
+            "label": "integrations.api-connector.ui.description",
+            "type": "textarea",
+            "rows": 2,
+            "colSpan": 2
+          },
+          {
+            "name": "default_headers",
+            "label": "integrations.api-connector.ui.headers_json",
+            "type": "json",
+            "mono": true,
+            "rows": 3,
+            "colSpan": 2,
+            "default": "{}"
+          },
+          {
+            "name": "is_active",
+            "label": "integrations.api-connector.col.active",
+            "type": "boolean",
+            "default": true,
+            "colSpan": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": "calls",
+      "label": "integrations.api-connector.tab.calls",
+      "icon": "History",
+      "dataSource": "/api/data/connector_calls?sort=created_at&order=desc&limit=500",
+      "dataPath": "records",
+      "columns": [
+        {
           "key": "created_at",
-          "label": "common.col.created",
+          "label": "integrations.api-connector.col.time",
           "type": "date"
+        },
+        {
+          "key": "url",
+          "label": "integrations.api-connector.col.url",
+          "type": "mono"
+        },
+        {
+          "key": "status",
+          "label": "common.col.status",
+          "type": "badge",
+          "badge": {
+            "colors": {
+              "pending": "badge-warning",
+              "running": "badge-ghost",
+              "succeeded": "badge-success",
+              "failed": "badge-error"
+            },
+            "labels": {
+              "pending": "integrations.api-connector.status.pending",
+              "running": "integrations.api-connector.status.running",
+              "succeeded": "integrations.api-connector.status.succeeded",
+              "failed": "integrations.api-connector.status.failed"
+            }
+          }
+        },
+        {
+          "key": "response_status",
+          "label": "integrations.api-connector.col.http_status"
+        },
+        {
+          "key": "duration_ms",
+          "label": "integrations.api-connector.col.duration"
+        },
+        {
+          "key": "error",
+          "label": "integrations.api-connector.col.error"
+        }
+      ]
+    },
+    {
+      "id": "webhooks",
+      "label": "integrations.api-connector.tab.webhooks",
+      "icon": "Webhook",
+      "dataSource": "/api/data/connector_webhooks?sort=name&limit=500",
+      "dataPath": "records",
+      "columns": [
+        {
+          "key": "name",
+          "label": "common.col.name"
+        },
+        {
+          "key": "id",
+          "label": "integrations.api-connector.col.url",
+          "type": "mono",
+          "template": "{ENGINE_URL}/ext/integrations/api-connector/webhooks/receive?id={id}"
+        },
+        {
+          "key": "is_active",
+          "label": "integrations.api-connector.col.active",
+          "type": "boolean"
         },
         {
           "key": "last_received_at",
           "label": "integrations.api-connector.col.lastReceived",
           "type": "date"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "edit",
+          "kind": "edit",
+          "label": "common.edit"
+        },
+        {
+          "id": "delete",
+          "icon": "Trash2",
+          "variant": "text-error",
+          "label": "common.delete",
+          "method": "DELETE",
+          "endpoint": "/api/data/connector_webhooks/{id}",
+          "confirm": "integrations.api-connector.confirmDeleteWebhook"
+        }
+      ],
+      "form": {
+        "endpoint": "/api/data/connector_webhooks",
+        "fields": [
+          {
+            "name": "name",
+            "label": "common.col.name",
+            "required": true,
+            "colSpan": 1
+          },
+          {
+            "name": "is_active",
+            "label": "integrations.api-connector.col.active",
+            "type": "boolean",
+            "default": true,
+            "colSpan": 1
+          },
+          {
+            "name": "secret",
+            "label": "integrations.api-connector.ui.signing_secret",
+            "type": "password",
+            "required": true,
+            "colSpan": 2,
+            "placeholder": "integrations.api-connector.ui.signing_secret_hint"
+          },
+          {
+            "name": "connection_id",
+            "label": "integrations.api-connector.col.connection",
+            "type": "relation",
+            "colSpan": 2,
+            "relation": {
+              "dataSource": "/api/data/connector_connections?sort=name&limit=500",
+              "dataPath": "records",
+              "valueKey": "id",
+              "labelKey": "name"
+            }
+          },
+          {
+            "name": "description",
+            "label": "integrations.api-connector.ui.description",
+            "type": "textarea",
+            "rows": 2,
+            "colSpan": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "events",
+      "label": "integrations.api-connector.tab.events",
+      "icon": "Inbox",
+      "dataSource": "/api/data/connector_webhook_events?sort=created_at&order=desc&limit=500",
+      "dataPath": "records",
+      "columns": [
+        {
+          "key": "created_at",
+          "label": "integrations.api-connector.col.time",
+          "type": "date"
+        },
+        {
+          "key": "source_ip",
+          "label": "integrations.api-connector.col.source_ip",
+          "type": "mono"
+        },
+        {
+          "key": "payload",
+          "label": "integrations.api-connector.col.payload",
+          "type": "json"
         }
       ]
     }
