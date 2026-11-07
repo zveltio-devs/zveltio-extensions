@@ -1,0 +1,65 @@
+{
+  "name": "connector_endpoints",
+  "defaultGrants": false,
+  "fields": [
+    {
+      "name": "connection_id",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "connector_connections"
+      }
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "method",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "GET",
+      "options": {
+        "values": [
+          "GET",
+          "POST",
+          "PUT",
+          "PATCH",
+          "DELETE"
+        ]
+      }
+    },
+    {
+      "name": "path",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "description",
+      "type": "textarea"
+    },
+    {
+      "name": "default_headers",
+      "type": "json"
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "connector_endpoints_connection_id",
+      "type": "m2o",
+      "field": "connection_id",
+      "target": "connector_connections",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

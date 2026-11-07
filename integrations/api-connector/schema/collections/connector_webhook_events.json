@@ -1,0 +1,39 @@
+{
+  "name": "connector_webhook_events",
+  "defaultGrants": false,
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "webhook_id",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "connector_webhooks"
+      }
+    },
+    {
+      "name": "payload",
+      "type": "json"
+    },
+    {
+      "name": "headers",
+      "type": "json"
+    },
+    {
+      "name": "source_ip",
+      "type": "text"
+    }
+  ],
+  "relations": [
+    {
+      "name": "connector_webhook_events_webhook_id",
+      "type": "m2o",
+      "field": "webhook_id",
+      "target": "connector_webhooks",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

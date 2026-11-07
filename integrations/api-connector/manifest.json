@@ -2,20 +2,17 @@
   "name": "integrations/api-connector",
   "displayName": "API Connector",
   "category": "integrations",
-  "description": "No-code HTTP integrations — connect external REST APIs with field mapping, retry logic and execution logs",
-  "version": "1.0.11",
-  "zveltioMinVersion": "1.0.0",
+  "description": "No-code HTTP integrations: call external REST APIs on hosts the operator allows, with retries, OAuth2 and a call log; receive signed incoming webhooks",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.104",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-api-connector",
   "permissions": [
-    "database"
+    "data:system"
   ],
   "i18nPrefixes": [
     "integrations.api-connector",
     "integrations.apiConnector"
-  ],
-  "publicRoutes": [
-    "/webhooks/receive/*"
   ],
   "studio": {
     "pages": [
@@ -40,11 +37,159 @@
     "bundled": true,
     "bundlePeers": false
   },
+  "collections": [
+    "connector_connections",
+    "connector_endpoints",
+    "connector_calls",
+    "connector_webhooks",
+    "connector_webhook_events"
+  ],
+  "publicRoutes": [
+    "/webhooks/receive"
+  ],
+  "actions": [
+    {
+      "name": "execute",
+      "permission": {
+        "resource": "connector_calls",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "endpoint_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "endpoint_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "path_params": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 4096
+            }
+          },
+          "query_params": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 4096
+            }
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 4096
+            }
+          },
+          "body": {
+            "type": [
+              "object",
+              "array"
+            ]
+          }
+        }
+      },
+      "reads": [
+        "connector_endpoints",
+        "connector_connections"
+      ],
+      "writes": [
+        "connector_calls"
+      ],
+      "enqueues": [
+        "call"
+      ]
+    }
+  ],
+  "jobs": [
+    {
+      "name": "call",
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "connector_calls",
+        "connector_endpoints",
+        "connector_connections"
+      ],
+      "writes": [
+        "connector_calls",
+        "connector_connections"
+      ],
+      "egressSlots": [
+        "api"
+      ],
+      "retry": {
+        "limit": 0,
+        "backoff": true
+      },
+      "timeoutSeconds": 900
+    },
+    {
+      "name": "receive",
+      "input": {
+        "type": "object",
+        "required": [
+          "webhook_id",
+          "payload",
+          "headers"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "webhook_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payload": {},
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 4096
+            }
+          },
+          "source_ip": {
+            "type": "string",
+            "maxLength": 512
+          }
+        }
+      },
+      "reads": [
+        "connector_webhooks"
+      ],
+      "writes": [
+        "connector_webhook_events",
+        "connector_webhooks"
+      ],
+      "fromPublicRoutes": [
+        "/webhooks/receive"
+      ],
+      "retry": {
+        "limit": 5,
+        "backoff": true
+      },
+      "timeoutSeconds": 60
+    }
+  ],
   "integrity": {
-    "engineSha256": "4fdc7fc31bf5dca5aa6fc7f63db0c1ad37036ffe2ac319459124fabce57ebc9f",
-    "sourceSha256": "2324eb126393c6c4aa162a38eeddd3f98a4349bf79c50d59f1100200e67568c9"
-  },
-  "resources": [
-    "api-connector"
-  ]
+    "engineSha256": "d2a9ab8d749f8f5d9171982b8cec941f1eb2db7b4b362e02c68efaa205deddab",
+    "sourceSha256": "43f6c12764716a4a8921a3ec223c35344774df68f2cbdd5301a098e6e0a32964",
+    "schemaSha256": "1125f732350f1b0ab661b5a7ac2848ca737dad7057e8db8f0683276bcc79b8fc",
+    "jobsSha256": "5f1ecd9c95de5d1dab245c8db5f9ef30167a5722f96a27a0053ecbe51cde2426"
+  }
 }

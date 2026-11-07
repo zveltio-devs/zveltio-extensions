@@ -1,0 +1,85 @@
+{
+  "name": "connector_calls",
+  "defaultGrants": false,
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "endpoint_id",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "connector_endpoints"
+      }
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "pending",
+      "options": {
+        "values": [
+          "pending",
+          "running",
+          "succeeded",
+          "failed"
+        ]
+      }
+    },
+    {
+      "name": "path_params",
+      "type": "json"
+    },
+    {
+      "name": "query_params",
+      "type": "json"
+    },
+    {
+      "name": "request_headers",
+      "type": "json"
+    },
+    {
+      "name": "request_body",
+      "type": "json"
+    },
+    {
+      "name": "url",
+      "type": "text"
+    },
+    {
+      "name": "response_status",
+      "type": "integer"
+    },
+    {
+      "name": "response_body",
+      "type": "textarea"
+    },
+    {
+      "name": "duration_ms",
+      "type": "integer"
+    },
+    {
+      "name": "retries",
+      "type": "integer"
+    },
+    {
+      "name": "error",
+      "type": "textarea"
+    },
+    {
+      "name": "finished_at",
+      "type": "datetime"
+    }
+  ],
+  "relations": [
+    {
+      "name": "connector_calls_endpoint_id",
+      "type": "m2o",
+      "field": "endpoint_id",
+      "target": "connector_endpoints",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

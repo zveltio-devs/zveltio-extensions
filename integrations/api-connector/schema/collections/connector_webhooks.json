@@ -1,0 +1,50 @@
+{
+  "name": "connector_webhooks",
+  "defaultGrants": false,
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "description",
+      "type": "textarea"
+    },
+    {
+      "name": "secret",
+      "type": "secret",
+      "required": true
+    },
+    {
+      "name": "connection_id",
+      "type": "m2o",
+      "options": {
+        "related_collection": "connector_connections"
+      }
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "required": true,
+      "defaultValue": true
+    },
+    {
+      "name": "last_received_at",
+      "type": "datetime",
+      "writtenBy": "actions"
+    }
+  ],
+  "relations": [
+    {
+      "name": "connector_webhooks_connection_id",
+      "type": "m2o",
+      "field": "connection_id",
+      "target": "connector_connections",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}
