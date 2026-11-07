@@ -1,0 +1,29 @@
+{
+  "name": "sms_messages",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "provider",
+      "type": "enum",
+      "required": true,
+      "options": {
+        "values": ["twilio", "vonage"]
+      }
+    },
+    { "name": "to_number", "type": "text", "required": true, "indexed": true },
+    { "name": "from_number", "type": "text" },
+    { "name": "body", "type": "textarea", "required": true },
+    {
+      "name": "status",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "pending",
+      "options": {
+        "values": ["pending", "sending", "sent", "delivered", "failed"]
+      }
+    },
+    { "name": "provider_message_id", "type": "text", "indexed": true },
+    { "name": "error", "type": "textarea" },
+    { "name": "sent_at", "type": "datetime" }
+  ]
+}

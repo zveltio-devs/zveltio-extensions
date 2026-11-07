@@ -1,23 +1,20 @@
 import type { ZveltioExtension } from '@zveltio/sdk/extension';
-import { join } from 'path';
+import { smsActions } from './actions.js';
 import { smsRoutes } from './routes.js';
 
+// The messages, the templates and the provider settings are collections this
+// extension declares in `schema/collections/` (manifest `collections`); the
+// engine creates them, owns their rules and serves them through the data API.
+// Sending is the `send` action; the provider call is a job in the engine's Deno
+// runner (`jobs.ts`, ADR 0022).
 const extension: ZveltioExtension = {
   name: 'sms',
   category: 'sms',
-  // S3-01: per-extension sub-app mounted at /ext/sms by the engine.
   mountStrategy: 'subapp',
 
-  getMigrations() {
-    return [
-      join(import.meta.dir, 'migrations/001_sms.sql'),
-      join(import.meta.dir, 'migrations/002_tenant_rls.sql'),
-    ];
-  },
+  actions: smsActions,
 
   async register(app, ctx) {
-    // Sub-app — engine mounts us at /ext/sms; routes inside smsRoutes are
-    // already relative (/send, /messages, /templates, /webhook/twilio, /stats).
     app.route('/', smsRoutes(ctx));
   },
 };
