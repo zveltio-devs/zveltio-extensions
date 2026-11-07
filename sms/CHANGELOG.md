@@ -1,5 +1,31 @@
 # Changelog
 
+## 2.0.0 (2026-11-07)
+
+Rebuilt on the engine's extension model (phase D): no own tables, no own SQL,
+no authorization of its own.
+
+- **Breaking.** The messages, templates and provider settings are the declared
+  collections `sms_messages`, `sms_templates` and `sms_settings`, served by the
+  data API under the engine's rules. The 1.x tables `zv_sms_messages` and
+  `zv_sms_templates` are left as they are and no longer read.
+- **Breaking.** Sending is the `send` action (`POST /ext/sms/actions/send`,
+  permission `execute` on `sms_messages`): it records the message as `pending`
+  and queues the `deliver` job, which calls Twilio or Vonage from the engine's
+  Deno runner. The routes `/send`, `/messages`, `/templates` and `/stats` are
+  gone.
+- **Breaking.** Credentials live per tenant in `sms_settings` (the auth token
+  and the API secret are `secret` fields, never served by the data API), no
+  longer in `ZVELTIO_EXT_SMS_*` variables. An administrator approves the
+  egress capabilities `egress:api.twilio.com` and `egress:rest.nexmo.com`.
+- A message is sent at most once: `deliver` claims it as `sending` and is
+  never retried. A provider refusal leaves it `failed` with the reason; a
+  network failure leaves it `sending` with "outcome unknown".
+- Twilio's status callback (`/webhook/twilio`) checks the signature with the
+  request tenant's auth token and queues `deliveryStatus`, which only moves a
+  message forward (`sent`, `delivered`, `failed`). When the status callback URL
+  is saved, each message asks Twilio to report to it.
+
 ## 1.0.7 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)

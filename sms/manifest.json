@@ -2,27 +2,17 @@
   "name": "sms",
   "displayName": "SMS / Push Notifications",
   "category": "sms",
-  "description": "Send SMS via Twilio or Vonage with templates and delivery tracking",
-  "version": "1.0.7",
-  "zveltioMinVersion": "1.0.0",
+  "description": "Send SMS through Twilio or Vonage, with templates and delivery reports",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.103",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-sms",
   "permissions": [
-    "database"
+    "data:system"
   ],
   "i18nPrefixes": [
     "sms"
   ],
-  "publicRoutes": [
-    "/webhook/twilio"
-  ],
-  "engine": {
-    "entry": "engine/index.js",
-    "format": "esm",
-    "target": "bun",
-    "bundled": true,
-    "bundlePeers": false
-  },
   "studio": {
     "pages": [
       {
@@ -39,8 +29,153 @@
     "studio": true,
     "fieldTypes": []
   },
+  "engine": {
+    "entry": "engine/index.js",
+    "format": "esm",
+    "target": "bun",
+    "bundled": true,
+    "bundlePeers": false
+  },
+  "collections": [
+    "sms_messages",
+    "sms_templates",
+    "sms_settings"
+  ],
+  "publicRoutes": [
+    "/webhook/twilio"
+  ],
+  "actions": [
+    {
+      "name": "send",
+      "permission": {
+        "resource": "sms_messages",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "to"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "twilio",
+              "vonage"
+            ]
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 1600
+          },
+          "template_id": {
+            "type": "string",
+            "maxLength": 36
+          },
+          "variables": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "reads": [
+        "sms_templates"
+      ],
+      "writes": [
+        "sms_messages"
+      ],
+      "enqueues": [
+        "deliver"
+      ]
+    }
+  ],
+  "jobs": [
+    {
+      "name": "deliver",
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "sms_messages",
+        "sms_settings"
+      ],
+      "writes": [
+        "sms_messages"
+      ],
+      "egress": [
+        "api.twilio.com",
+        "rest.nexmo.com"
+      ],
+      "retry": {
+        "limit": 0,
+        "backoff": true
+      },
+      "timeoutSeconds": 60
+    },
+    {
+      "name": "deliveryStatus",
+      "input": {
+        "type": "object",
+        "required": [
+          "sid",
+          "status"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "sid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "status": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32
+          },
+          "error": {
+            "type": "string",
+            "maxLength": 32
+          }
+        }
+      },
+      "reads": [
+        "sms_messages"
+      ],
+      "writes": [
+        "sms_messages"
+      ],
+      "fromPublicRoutes": [
+        "/webhook/twilio"
+      ],
+      "retry": {
+        "limit": 5,
+        "backoff": true
+      },
+      "timeoutSeconds": 60
+    }
+  ],
   "integrity": {
-    "engineSha256": "6362a3001396f2b56e714593506389ec81ec101009a38280b1f179199c3db9ac",
-    "sourceSha256": "3dc815035c99ba2a0b3abfe4f9cd12c72114363d9826487e6e992758c5b0be73"
+    "engineSha256": "8bf4b45a0b9b530e2f0bfd2ce9c200c0e285d2cdbf2fd822e535056d0bf9f03d",
+    "sourceSha256": "1d13cac1c674b483a6c610cccc3c093eaec118d2f1c5dafd4d6e1073dade5a7b",
+    "schemaSha256": "008ecadd651cee6e625769812a988f69f9b0e9e6cca59e409ce759b789970d14",
+    "jobsSha256": "51253f77a7d71cbb1a2f0cb6d337af004db4766ad4cd3b1e12937c05395b2de6"
   }
 }

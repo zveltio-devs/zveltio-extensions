@@ -1,0 +1,16 @@
+{
+  "name": "sms_templates",
+  "fields": [
+    { "name": "name", "type": "text", "required": true },
+    { "name": "body", "type": "textarea", "required": true },
+    {
+      "name": "provider",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "twilio",
+      "options": {
+        "values": ["twilio", "vonage"]
+      }
+    }
+  ]
+}
