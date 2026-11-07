@@ -1,0 +1,23 @@
+{
+  "name": "sms_settings",
+  "defaultGrants": false,
+  "fields": [
+    {
+      "name": "scope",
+      "type": "enum",
+      "required": true,
+      "unique": true,
+      "defaultValue": "tenant",
+      "options": {
+        "values": ["tenant"]
+      }
+    },
+    { "name": "twilio_account_sid", "type": "text" },
+    { "name": "twilio_auth_token", "type": "secret" },
+    { "name": "twilio_from_number", "type": "text" },
+    { "name": "twilio_webhook_url", "type": "url" },
+    { "name": "vonage_api_key", "type": "text" },
+    { "name": "vonage_api_secret", "type": "secret" },
+    { "name": "vonage_from_number", "type": "text" }
+  ]
+}

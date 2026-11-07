@@ -61,6 +61,12 @@ const ALLOWLIST: Record<string, string> = {
   // (`validateSamlResponse`); it writes only the spent-assertion claim (as the
   // system) and the session the engine creates.
   'auth/saml/engine/routes.ts': 'SAML assertion consumer, authenticated by the IdP signature',
+  // Their one write route is a provider's webhook (`POST /webhook/stripe`,
+  // `POST /webhook/twilio`): no principal calls it, the provider's HMAC under
+  // the tenant's secret is the check, and the route writes at most the event's
+  // claim before it queues a job.
+  'billing/engine/index.ts': 'Stripe webhook, authenticated by the Stripe-Signature HMAC',
+  'sms/engine/routes.ts': 'Twilio status callback, authenticated by the X-Twilio-Signature HMAC',
 };
 
 /** Any helper that represents an authorization decision. */
@@ -80,7 +86,7 @@ const AUTHORIZATION = [
 ];
 
 /** A route that changes state. GET/HEAD alone never trip this gate. */
-const WRITE_ROUTE = /\b(?:app|router)\s*\.\s*(?:post|put|patch|delete)\s*\(/i;
+const WRITE_ROUTE = /\b(?:app|router|routes)\s*\.\s*(?:post|put|patch|delete)\s*\(/i;
 
 /**
  * Strip comments so a docstring ABOUT permissions is not mistaken for one.

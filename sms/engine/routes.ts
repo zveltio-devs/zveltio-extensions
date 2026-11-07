@@ -1,195 +1,74 @@
-import { Hono } from 'hono';
-import { zValidator } from '@hono/zod-validator';
-import { z } from 'zod';
-import { SmsManager } from './lib/sms-manager.js';
-import type { ExtensionContext } from '@zveltio/sdk/extension';
+import { type Context, Hono } from 'hono';
+import type { ExtensionContext, HostCollections } from '@zveltio/sdk/extension';
+import { SETTINGS, twilioSignature } from './sms.js';
 
-export function smsRoutes(ctx: ExtensionContext): Hono<{ Variables: { user: any } }> {
-  const { db, auth, checkPermission } = ctx;
+// What a route still does: Twilio's status callback, which has no principal.
+// Sending, the log and the templates are the data API and the `send` action.
 
-  // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
-  // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
-  // a handler is therefore already RLS-scoped — there is one spelling, so there
-  // is none to forget.
+type Row = Record<string, any>;
 
-
-  async function requireAdmin(c: any): Promise<any | null> {
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (!session) return null;
-    if (!(await checkPermission(session.user.id, 'admin', '*'))) return null;
-    return session.user;
+/** The request's tenant's settings row (a list as the system admits every tenant's). */
+async function ownSettings(c: Context, collections: HostCollections): Promise<Row | null> {
+  const tenant = (c.get('tenant') as { id?: string } | null | undefined)?.id;
+  if (!tenant) return null;
+  // `tenant_id` is not a filter field, so the match is here, page by page.
+  for (let page = 1; ; page++) {
+    const { records } = await collections.list(SETTINGS, { sort: 'id', limit: 100, page, count: 'none' });
+    const own = (records as Row[]).find((r) => r.tenant_id === tenant);
+    if (own) return own;
+    if ((records as Row[]).length < 100) return null;
   }
+}
 
-  const app = new Hono<{ Variables: { user: any } }>();
+function sameText(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let d = 0;
+  for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return d === 0;
+}
 
-  // Initialize manager
-  SmsManager.init(db, ctx.config.vars);
+export function smsRoutes(ctx: ExtensionContext): Hono {
+  const { host, internals } = ctx;
+  const app = new Hono();
 
-  // Admin middleware for all except webhook
-  app.use('/send', async (c, next) => {
-    const user = await requireAdmin(c);
-    if (!user) return c.json({ error: 'Unauthorized' }, 401);
-    c.set('user', user);
-    await next();
-  });
-  app.use('/messages*', async (c, next) => {
-    const user = await requireAdmin(c);
-    if (!user) return c.json({ error: 'Unauthorized' }, 401);
-    c.set('user', user);
-    await next();
-  });
-  app.use('/templates*', async (c, next) => {
-    const user = await requireAdmin(c);
-    if (!user) return c.json({ error: 'Unauthorized' }, 401);
-    c.set('user', user);
-    await next();
-  });
-  app.use('/stats', async (c, next) => {
-    const user = await requireAdmin(c);
-    if (!user) return c.json({ error: 'Unauthorized' }, 401);
-    c.set('user', user);
-    await next();
-  });
-
-  // POST /send — send SMS immediately
-  app.post(
-    '/send',
-    zValidator(
-      'json',
-      z.object({
-        provider: z.enum(['twilio', 'vonage']).default('twilio'),
-        to: z.string().min(1),
-        body: z.string().optional(),
-        template_id: z.string().uuid().optional(),
-        variables: z.record(z.string(), z.string()).optional(),
-      }),
-    ),
-    async (c) => {
-      const data = c.req.valid('json');
-      try {
-        const result = await SmsManager.send(data);
-        return c.json({ success: true, ...result }, 201);
-      } catch (err: any) {
-        return c.json({ error: err.message ?? 'Send failed' }, 500);
-      }
-    },
-  );
-
-  // GET /messages — list with pagination + filter
-  app.get('/messages', async (c) => {
-    const { page = '1', limit = '50', status } = c.req.query();
-    const parsedLimit = Math.min(parseInt(limit) || 50, 200);
-    const offset = (parseInt(page) - 1) * parsedLimit;
-
-    let query = (db as any)
-      .selectFrom('zv_sms_messages')
-      .selectAll()
-      .orderBy('created_at', 'desc')
-      .limit(parsedLimit)
-      .offset(offset);
-
-    if (status) query = query.where('status', '=', status);
-
-    const messages = await query.execute();
-    return c.json({ messages });
-  });
-
-  // GET /templates — list templates
-  app.get('/templates', async (c) => {
-    const templates = await (db as any)
-      .selectFrom('zv_sms_templates')
-      .selectAll()
-      .orderBy('created_at', 'desc')
-      .execute();
-    return c.json({ templates });
-  });
-
-  // POST /templates — create template
-  app.post(
-    '/templates',
-    zValidator(
-      'json',
-      z.object({
-        name: z.string().min(1),
-        body: z.string().min(1),
-        provider: z.enum(['twilio', 'vonage']).default('twilio'),
-      }),
-    ),
-    async (c) => {
-      const data = c.req.valid('json');
-      const template = await (db as any)
-        .insertInto('zv_sms_templates')
-        .values(data)
-        .returningAll()
-        .executeTakeFirst();
-      return c.json({ template }, 201);
-    },
-  );
-
-  // POST /webhook/twilio — receive delivery status from Twilio (no session
-  // auth by design; authenticity comes from the X-Twilio-Signature HMAC,
-  // mirroring the Stripe webhook's HMAC check in billing).
+  // POST /webhook/twilio — public (manifest `publicRoutes`), authenticated by
+  // the X-Twilio-Signature HMAC under the tenant's auth token. The tenant is the
+  // request's (its subdomain, else the default one), and the signed URL names it.
+  // The settings are read as the system (`data:system`, audited); the report
+  // itself is recorded by the `deliveryStatus` job.
   app.post('/webhook/twilio', async (c) => {
-    // `ZVELTIO_EXT_SMS_TWILIO_AUTH_TOKEN` — the host's slice of the environment,
-    // not `process.env`, which in-process is the ENGINE's environment entire.
-    const authToken = ctx.config.vars.TWILIO_AUTH_TOKEN ?? '';
-    if (!authToken) {
-      // 503 for the same reason as the Stripe webhook in `billing`: Twilio still
-      // retries, but an unconfigured instance stops reporting itself as broken.
-      return c.json({ error: 'Webhook not configured' }, 503);
-    }
-
-    const body = await c.req.formData().catch(() => null);
-    if (!body) return c.json({ error: 'Invalid form data' }, 400);
-
-    // Twilio signs HMAC-SHA1(authToken, url + concat(sorted params as key+value)),
-    // base64. The URL must be the PUBLIC one Twilio requested; behind a proxy
-    // the Host header differs, so operators can pin it with TWILIO_WEBHOOK_URL.
-    const url = ctx.config.vars.TWILIO_WEBHOOK_URL ?? c.req.url;
+    const signature = c.req.header('x-twilio-signature') ?? '';
+    if (!signature) return c.json({ error: 'Missing X-Twilio-Signature' }, 400);
+    const form = await c.req.formData().catch(() => null);
+    if (!form) return c.json({ error: 'Invalid form data' }, 400);
     const params: [string, string][] = [];
-    body.forEach((v, k) => {
+    form.forEach((v, k) => {
       if (typeof v === 'string') params.push([k, v]);
     });
-    params.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-    const payload = url + params.map(([k, v]) => k + v).join('');
-    const { createHmac, timingSafeEqual } = await import('node:crypto');
-    const expected = createHmac('sha1', authToken).update(payload).digest();
-    const given = Buffer.from(c.req.header('x-twilio-signature') ?? '', 'base64');
-    if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
-      return c.json({ error: 'Invalid signature' }, 403);
-    }
+    const field = (k: string) => params.find(([n]) => n === k)?.[1];
 
-    const messageSid = body.get('MessageSid') as string | null;
-    const messageStatus = body.get('MessageStatus') as string | null;
-
-    if (!messageSid || !messageStatus) {
-      return c.json({ error: 'Missing MessageSid or MessageStatus' }, 400);
-    }
-
-    // Map Twilio status to our status
-    const statusMap: Record<string, string> = {
-      delivered: 'delivered',
-      failed: 'failed',
-      undelivered: 'failed',
-      sent: 'sent',
-      queued: 'pending',
-      sending: 'pending',
-    };
-    const mappedStatus = statusMap[messageStatus] ?? messageStatus;
-
-    await db
-      .updateTable('zv_sms_messages')
-      .set({ status: mappedStatus })
-      .where('provider_message_id', '=', messageSid)
-      .execute();
-
-    return c.text('OK');
-  });
-
-  // GET /stats — counts by status last 7 days
-  app.get('/stats', async (c) => {
-    const stats = await SmsManager.getStats();
-    return c.json({ stats });
+    const answer = await internals.asSystem(
+      [SETTINGS],
+      async () => {
+        const s = await ownSettings(c, host(c).collections);
+        // The same answer as a bad signature: an unsigned caller learns nothing
+        // about which tenants have Twilio configured.
+        if (!s?.twilio_auth_token) return { status: 403 as const, body: { error: 'Invalid signature' } };
+        // Behind a proxy the request URL is not the one Twilio signed: the
+        // configured public URL is.
+        const url = s.twilio_webhook_url ? String(s.twilio_webhook_url) : c.req.url;
+        const expected = await twilioSignature(String(s.twilio_auth_token), url, params);
+        if (!sameText(expected, signature)) return { status: 403 as const, body: { error: 'Invalid signature' } };
+        const sid = field('MessageSid');
+        const status = field('MessageStatus');
+        if (!sid || !status) return { status: 400 as const, body: { error: 'Missing MessageSid or MessageStatus' } };
+        const error = field('ErrorCode');
+        await internals.enqueue!(c, 'deliveryStatus', { sid, status, ...(error ? { error } : {}) });
+        return { status: 200 as const, body: { received: true } };
+      },
+      { reason: 'twilio status callback' },
+    );
+    return c.json(answer.body, answer.status);
   });
 
   return app;
