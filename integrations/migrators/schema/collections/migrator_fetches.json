@@ -1,0 +1,77 @@
+{
+  "name": "migrator_fetches",
+  "defaultGrants": false,
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "connection_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "migrator_connections"
+      },
+      "required": true
+    },
+    {
+      "name": "source",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "object",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "row_limit",
+      "type": "integer",
+      "required": true
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "pending",
+      "options": {
+        "values": [
+          "pending",
+          "fetching",
+          "ready",
+          "failed"
+        ]
+      }
+    },
+    {
+      "name": "columns",
+      "type": "json"
+    },
+    {
+      "name": "rows",
+      "type": "json"
+    },
+    {
+      "name": "total_rows",
+      "type": "integer"
+    },
+    {
+      "name": "error",
+      "type": "textarea"
+    },
+    {
+      "name": "fetched_at",
+      "type": "datetime"
+    }
+  ],
+  "relations": [
+    {
+      "name": "migrator_fetches_connection_id",
+      "type": "m2o",
+      "field": "connection_id",
+      "target": "migrator_connections",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

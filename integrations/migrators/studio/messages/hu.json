@@ -1,5 +1,11 @@
 {
+  "integrations.migrators.action.discover": "Objektumok frissítése",
+  "integrations.migrators.action.fetch": "Sorok lekérése",
+  "integrations.migrators.action.import": "Importálás gyűjteménybe",
+  "integrations.migrators.col.error": "Hiba",
   "integrations.migrators.col.object": "Object",
+  "integrations.migrators.col.objectsAt": "Objektumok ellenőrizve",
+  "integrations.migrators.col.objectsError": "Objektumhiba",
   "integrations.migrators.col.rows": "Sorok",
   "integrations.migrators.col.source": "Forrás",
   "integrations.migrators.confirm.deleteConnection": "Törli ezt a kapcsolatot? A tárolt token megsemmisül.",
@@ -12,6 +18,7 @@
   "integrations.migrators.ph.token": "pat-… / secret_… / privát alkalmazás tokenje",
   "integrations.migrators.subtitle": "Bring your data in from HubSpot, Notion or Airtable",
   "integrations.migrators.tab.connections": "Kapcsolatok",
+  "integrations.migrators.tab.fetches": "Lekérések",
   "integrations.migrators.tab.runs": "Importok",
   "integrations.migrators.title": "Adatmigrálók"
 }

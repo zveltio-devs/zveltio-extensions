@@ -1,5 +1,11 @@
 {
+  "integrations.migrators.action.discover": "Refresh objects",
+  "integrations.migrators.action.fetch": "Fetch rows",
+  "integrations.migrators.action.import": "Import into collection",
+  "integrations.migrators.col.error": "Error",
   "integrations.migrators.col.object": "Object",
+  "integrations.migrators.col.objectsAt": "Objects checked",
+  "integrations.migrators.col.objectsError": "Objects error",
   "integrations.migrators.col.rows": "Rows",
   "integrations.migrators.col.source": "Source",
   "integrations.migrators.confirm.deleteConnection": "Delete this connection? Its stored token is destroyed.",
@@ -12,6 +18,7 @@
   "integrations.migrators.ph.token": "pat-… / secret_… / private app token",
   "integrations.migrators.subtitle": "Bring your data in from HubSpot, Notion or Airtable",
   "integrations.migrators.tab.connections": "Connections",
+  "integrations.migrators.tab.fetches": "Fetches",
   "integrations.migrators.tab.runs": "Imports",
   "integrations.migrators.title": "Data Migrators"
 }

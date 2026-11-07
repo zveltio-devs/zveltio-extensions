@@ -1,0 +1,19 @@
+{
+  "name": "migrator_connections",
+  "defaultGrants": false,
+  "fields": [
+    {
+      "name": "source",
+      "type": "enum",
+      "required": true,
+      "options": {
+        "values": ["hubspot", "notion", "airtable"]
+      }
+    },
+    { "name": "name", "type": "text", "required": true },
+    { "name": "token", "type": "secret", "required": true },
+    { "name": "objects", "type": "json" },
+    { "name": "objects_error", "type": "textarea" },
+    { "name": "objects_at", "type": "datetime" }
+  ]
+}

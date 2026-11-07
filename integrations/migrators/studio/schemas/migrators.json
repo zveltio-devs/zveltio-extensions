@@ -6,8 +6,8 @@
     {
       "id": "connections",
       "label": "integrations.migrators.tab.connections",
-      "dataSource": "/ext/integrations/migrators/connections",
-      "dataPath": "connections",
+      "dataSource": "/api/data/migrator_connections?sort=created_at&order=desc&limit=500",
+      "dataPath": "records",
       "columns": [
         {
           "key": "name",
@@ -26,6 +26,15 @@
           }
         },
         {
+          "key": "objects_error",
+          "label": "integrations.migrators.col.objectsError"
+        },
+        {
+          "key": "objects_at",
+          "label": "integrations.migrators.col.objectsAt",
+          "type": "date"
+        },
+        {
           "key": "created_at",
           "label": "common.col.created",
           "type": "date"
@@ -33,17 +42,54 @@
       ],
       "rowActions": [
         {
+          "id": "discover",
+          "label": "integrations.migrators.action.discover",
+          "kind": "call",
+          "method": "POST",
+          "endpoint": "/ext/integrations/migrators/actions/discover",
+          "body": {
+            "connection_id": "{id}"
+          }
+        },
+        {
+          "id": "fetch",
+          "label": "integrations.migrators.action.fetch",
+          "kind": "call",
+          "method": "POST",
+          "endpoint": "/ext/integrations/migrators/actions/fetch",
+          "body": {
+            "connection_id": "{id}"
+          },
+          "prompt": {
+            "title": "integrations.migrators.action.fetch",
+            "fields": [
+              {
+                "name": "object",
+                "label": "integrations.migrators.field.object",
+                "required": true,
+                "placeholder": "integrations.migrators.ph.resource"
+              },
+              {
+                "name": "limit",
+                "label": "integrations.migrators.field.limit",
+                "type": "number",
+                "default": 1000
+              }
+            ]
+          }
+        },
+        {
           "id": "delete",
           "label": "common.delete",
-          "kind": "call",
+          "icon": "Trash2",
+          "variant": "text-error",
           "method": "DELETE",
-          "endpoint": "/ext/integrations/migrators/connections/{id}",
-          "variant": "btn-error btn-outline",
+          "endpoint": "/api/data/migrator_connections/{id}",
           "confirm": "integrations.migrators.confirm.deleteConnection"
         }
       ],
       "form": {
-        "endpoint": "/ext/integrations/migrators/connections",
+        "endpoint": "/api/data/migrator_connections",
         "fields": [
           {
             "name": "source",
@@ -81,10 +127,107 @@
       }
     },
     {
+      "id": "fetches",
+      "label": "integrations.migrators.tab.fetches",
+      "dataSource": "/api/data/migrator_fetches?sort=created_at&order=desc&limit=50",
+      "dataPath": "records",
+      "columns": [
+        {
+          "key": "source",
+          "label": "integrations.migrators.col.source",
+          "type": "mono"
+        },
+        {
+          "key": "object",
+          "label": "integrations.migrators.col.object",
+          "type": "mono"
+        },
+        {
+          "key": "status",
+          "label": "common.col.status",
+          "type": "badge",
+          "badge": {
+            "colors": {
+              "pending": "badge-ghost",
+              "fetching": "badge-info",
+              "ready": "badge-success",
+              "failed": "badge-error"
+            }
+          }
+        },
+        {
+          "key": "total_rows",
+          "label": "integrations.migrators.col.rows"
+        },
+        {
+          "key": "error",
+          "label": "integrations.migrators.col.error"
+        },
+        {
+          "key": "created_at",
+          "label": "common.col.created",
+          "type": "date"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "import",
+          "label": "integrations.migrators.action.import",
+          "kind": "call",
+          "method": "POST",
+          "endpoint": "/ext/integrations/migrators/fetches/{id}/import",
+          "body": {},
+          "prompt": {
+            "title": "integrations.migrators.action.import",
+            "fields": [
+              {
+                "name": "target_collection",
+                "label": "integrations.migrators.field.target",
+                "required": true,
+                "placeholder": "leads"
+              }
+            ]
+          }
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/integrations/migrators/actions/fetch",
+        "fields": [
+          {
+            "name": "connection_id",
+            "label": "integrations.migrators.field.connection",
+            "type": "relation",
+            "required": true,
+            "relation": {
+              "dataSource": "/api/data/migrator_connections?sort=name&limit=500",
+              "dataPath": "records",
+              "valueKey": "id",
+              "labelKey": [
+                "name",
+                "source"
+              ]
+            }
+          },
+          {
+            "name": "object",
+            "label": "integrations.migrators.field.object",
+            "required": true,
+            "placeholder": "integrations.migrators.ph.resource"
+          },
+          {
+            "name": "limit",
+            "label": "integrations.migrators.field.limit",
+            "type": "number",
+            "default": 1000
+          }
+        ]
+      }
+    },
+    {
       "id": "runs",
       "label": "integrations.migrators.tab.runs",
-      "dataSource": "/ext/integrations/migrators/runs",
-      "dataPath": "runs",
+      "dataSource": "/api/data/migrator_runs?sort=created_at&order=desc&limit=200",
+      "dataPath": "records",
       "columns": [
         {
           "key": "source",
@@ -102,72 +245,15 @@
           "type": "mono"
         },
         {
-          "key": "status",
-          "label": "common.col.status",
-          "type": "badge",
-          "badge": {
-            "colors": {
-              "running": "badge-info",
-              "completed": "badge-success",
-              "failed": "badge-error"
-            }
-          }
-        },
-        {
           "key": "imported_rows",
-          "label": "integrations.migrators.col.rows",
-          "join": {
-            "keys": [
-              "imported_rows",
-              "total_rows"
-            ],
-            "sep": " / "
-          }
+          "label": "integrations.migrators.col.rows"
         },
         {
           "key": "created_at",
           "label": "common.col.created",
           "type": "date"
         }
-      ],
-      "form": {
-        "endpoint": "/ext/integrations/migrators/run",
-        "fields": [
-          {
-            "name": "connection_id",
-            "label": "integrations.migrators.field.connection",
-            "type": "relation",
-            "required": true,
-            "relation": {
-              "dataSource": "/ext/integrations/migrators/connections",
-              "dataPath": "connections",
-              "valueKey": "id",
-              "labelKey": [
-                "name",
-                "source"
-              ]
-            }
-          },
-          {
-            "name": "object",
-            "label": "integrations.migrators.field.object",
-            "required": true,
-            "placeholder": "integrations.migrators.ph.resource"
-          },
-          {
-            "name": "target_collection",
-            "label": "integrations.migrators.field.target",
-            "required": true,
-            "placeholder": "zvd_leads"
-          },
-          {
-            "name": "limit",
-            "label": "integrations.migrators.field.limit",
-            "type": "number",
-            "default": 1000
-          }
-        ]
-      }
+      ]
     }
   ]
 }

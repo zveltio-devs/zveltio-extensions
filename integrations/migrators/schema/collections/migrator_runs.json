@@ -1,0 +1,32 @@
+{
+  "name": "migrator_runs",
+  "defaultGrants": false,
+  "fields": [
+    {
+      "name": "fetch_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "migrator_fetches"
+      }
+    },
+    { "name": "source", "type": "text", "required": true },
+    { "name": "source_object", "type": "text", "required": true },
+    { "name": "target_collection", "type": "text", "required": true, "indexed": true },
+    { "name": "imported_rows", "type": "integer", "required": true },
+    { "name": "skipped_fields", "type": "json" },
+    { "name": "record_ids", "type": "json" }
+  ],
+  "relations": [
+    {
+      "name": "migrator_runs_fetch_id",
+      "type": "m2o",
+      "field": "fetch_id",
+      "target": "migrator_fetches",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

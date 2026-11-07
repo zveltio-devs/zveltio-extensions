@@ -1,24 +1,19 @@
 import type { ZveltioExtension } from '@zveltio/sdk/extension';
-import { join } from 'path';
+import { migratorActions } from './actions.js';
 import { migratorRoutes } from './routes.js';
 
-/**
- * integrations/migrators — the adoption path INTO Zveltio: import data from
- * HubSpot / Notion / Airtable into collections. Mounted at
- * /ext/integrations/migrators; admin-only routes; source tokens AES-256-GCM
- * encrypted at rest; all vendor calls go to fixed hosts (no SSRF surface).
- */
+// integrations/migrators — the adoption path INTO Zveltio: HubSpot, Notion and
+// Airtable data into collections. The connections (token sealed as a `secret`
+// field), the fetches and the import runs are collections this extension
+// declares in `schema/collections/`; the engine creates them and serves them
+// through the data API. Reading a source is a job in the engine's Deno runner
+// (`jobs.ts`); writing into a collection is the import route, as the caller.
 const extension: ZveltioExtension = {
   name: 'integrations/migrators',
   category: 'integrations',
   mountStrategy: 'subapp',
 
-  getMigrations() {
-    return [
-      join(import.meta.dir, 'migrations/001_initial.sql'),
-      join(import.meta.dir, 'migrations/002_tenant_rls.sql'),
-    ];
-  },
+  actions: migratorActions,
 
   async register(app, ctx) {
     app.route('/', migratorRoutes(ctx));
