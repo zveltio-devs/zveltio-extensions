@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.1 (2026-11-08)
+
+- Needs engine 3.0.0-beta.106 (ADR 0028): to a row rule, the `complete` job is
+  the user who asked. Conversations are private to their author with the
+  operator's rules `ai_conversations: * created_by eq user_id` and
+  `ai_messages: * created_by eq user_id`; the role-named workaround of 2.0.0 is
+  no longer needed.
+
 ## 2.0.0 (2026-11-08)
 
 Rebuilt on the engine's extension model (ADR 0027, "an AI agent is just a
