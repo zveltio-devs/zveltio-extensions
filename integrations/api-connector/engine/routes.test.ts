@@ -59,7 +59,12 @@ describe('POST /webhooks/receive', () => {
     expect(t.queued).toHaveLength(1);
     expect(t.queued[0]).toMatchObject({
       job: 'receive',
-      input: { webhook_id: ID, payload: { event: 'paid' }, source_ip: '1.2.3.4' },
+      input: {
+        webhook_id: ID,
+        delivery_key: sign('sec').slice(7),
+        payload: { event: 'paid' },
+        source_ip: '1.2.3.4',
+      },
     });
     expect(t.asSystem).toEqual([['connector_webhooks']]);
   });

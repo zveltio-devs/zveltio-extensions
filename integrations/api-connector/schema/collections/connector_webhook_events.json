@@ -22,6 +22,10 @@
     {
       "name": "source_ip",
       "type": "text"
+    },
+    {
+      "name": "delivery_key",
+      "type": "text"
     }
   ],
   "relations": [
@@ -34,6 +38,15 @@
       "onDelete": "CASCADE",
       "onUpdate": "CASCADE",
       "metadata": {}
+    }
+  ],
+  "indexes": [
+    {
+      "fields": [
+        "webhook_id",
+        "delivery_key"
+      ],
+      "unique": true
     }
   ]
 }

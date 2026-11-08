@@ -49,6 +49,11 @@ function world(routes: Record<string, Route>, bound: string[] = ['api.example.co
       switch (name) {
         case 'collections.read':
           return table(a[0]).get(a[1]) ?? null;
+        case 'collections.list': {
+          const f = (a[1]?.filter ?? {}) as Record<string, { eq: Any }>;
+          const records = [...table(a[0]).values()].filter((r) => Object.entries(f).every(([k, v]) => r[k] === v.eq));
+          return { records: records.slice(0, a[1]?.limit ?? records.length) };
+        }
         case 'collections.insert':
           return put(a[0], a[1]);
         case 'collections.update': {
@@ -228,6 +233,37 @@ describe('call', () => {
     expect(w.seen.at(-1)!.headers.get('authorization')).toBe('Bearer t2');
   });
 
+  it('takes the token a concurrent call stored when its own refresh token was rotated away', async () => {
+    const grants: string[] = [];
+    const w = world({
+      [`POST ${API}/token`]: ({ body }) => {
+        grants.push(new URLSearchParams(body).get('grant_type')!);
+        // The other call refreshed first: the provider rotated r1 to r2 and refuses r1.
+        const conn = [...w.table('connector_connections').values()][0]!;
+        w.table('connector_connections').set(conn.id, {
+          ...conn,
+          access_token: 'won',
+          refresh_token: 'r2',
+          token_expires_at: new Date(Date.now() + 3_600_000).toISOString(),
+        });
+        return { status: 400, body: '{"error":"invalid_grant"}' };
+      },
+      [`POST ${API}/v1/users/a%20b`]: () => ({ body: '{}' }),
+    });
+    const { call } = setup(w, {
+      auth_type: 'oauth2',
+      auth_username: 'cid',
+      token_url: `${API}/token`,
+      access_token: 'old',
+      refresh_token: 'r1',
+      token_expires_at: new Date(Date.now() - 1000).toISOString(),
+    });
+    await w.run('call', { id: call.id });
+    expect(grants).toEqual(['refresh_token']);
+    expect(w.seen.at(-1)!.headers.get('authorization')).toBe('Bearer won');
+    expect(w.table('connector_calls').get(call.id)).toMatchObject({ status: 'succeeded' });
+  });
+
   it('takes a fresh OAuth2 token once when the stored one is refused', async () => {
     let n = 0;
     const w = world({
@@ -257,5 +293,22 @@ describe('receive', () => {
     expect(events.map((e) => e.payload)).toEqual([{ a: 1 }, {}]);
     expect(events[0]).toMatchObject({ webhook_id: hook.id, headers: { 'x-a': 'b' }, source_ip: '1.2.3.4' });
     expect(w.table('connector_webhooks').get(hook.id)!.last_received_at).toBeString();
+  });
+
+  it('drops a delivery whose signature is already stored: a replay', async () => {
+    const w = world({});
+    const hook = w.put('connector_webhooks', { name: 'h', is_active: true });
+    const other = w.put('connector_webhooks', { name: 'o', is_active: true });
+    const d = { payload: { a: 1 }, headers: {}, delivery_key: 'ab12' };
+    await w.run('receive', { webhook_id: hook.id, ...d });
+    await w.run('receive', { webhook_id: hook.id, ...d });
+    await w.run('receive', { webhook_id: other.id, ...d });
+    await w.run('receive', { webhook_id: hook.id, ...d, delivery_key: 'cd34' });
+    const events = [...w.table('connector_webhook_events').values()];
+    expect(events.map((e) => [e.webhook_id, e.delivery_key])).toEqual([
+      [hook.id, 'ab12'],
+      [other.id, 'ab12'],
+      [hook.id, 'cd34'],
+    ]);
   });
 });

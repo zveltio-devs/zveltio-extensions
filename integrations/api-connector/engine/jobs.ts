@@ -60,6 +60,13 @@ async function oauthToken(host: JobHost, conn: Row, timeoutMs: number): Promise<
   if (conn.refresh_token) {
     const res = await post({ grant_type: 'refresh_token', refresh_token: String(conn.refresh_token) });
     if (res.ok) return storeToken(host, conn, res);
+    // A provider that rotates refresh tokens refuses the old one to the slower
+    // of two concurrent calls: take the token the faster one stored.
+    const now = (await host.collections.read(CONNECTIONS, conn.id)) as Row | null;
+    const nowExpires = now?.token_expires_at ? Date.parse(now.token_expires_at) : Number.POSITIVE_INFINITY;
+    if (now?.access_token && now.refresh_token !== conn.refresh_token && nowExpires > Date.now() + 60_000) {
+      return String(now.access_token);
+    }
   }
   const res = await post({ grant_type: 'client_credentials', scope: String(conn.scope ?? '') });
   if (!res.ok) throw new Error(`OAuth2 token request failed (${res.status})`);
@@ -180,20 +187,34 @@ const call: ExtensionJob = async (input, host) => {
  * A signed delivery the public route verified: stamped on its webhook, then
  * stored. The job runs in one transaction; the stamp goes first anyway, as it is
  * the write a retry may repeat.
+ *
+ * A delivery whose signature is already stored is a replay, or the sender's own
+ * redelivery of the same body: dropped. The unique key on (webhook, signature)
+ * holds against two at once. Deleting the stored event lets its replay in again.
  */
 const receive: ExtensionJob = async (input, host) => {
-  const { webhook_id, payload, headers, source_ip } = input as {
+  const { webhook_id, delivery_key, payload, headers, source_ip } = input as {
     webhook_id: string;
+    delivery_key?: string;
     payload: unknown;
     headers: Record<string, string>;
     source_ip?: string;
   };
+  if (delivery_key) {
+    const seen = (await host.collections.list(EVENTS, {
+      filter: { webhook_id: { eq: webhook_id }, delivery_key: { eq: delivery_key } },
+      limit: 1,
+      count: 'none',
+    })) as { records?: Row[] };
+    if (seen.records?.length) return;
+  }
   await host.collections.update(WEBHOOKS, webhook_id, { last_received_at: new Date().toISOString() });
   await host.collections.insert(EVENTS, {
     webhook_id,
     payload: payload && typeof payload === 'object' ? payload : {},
     headers,
     source_ip: source_ip ?? null,
+    delivery_key: delivery_key ?? null,
   });
 };
 

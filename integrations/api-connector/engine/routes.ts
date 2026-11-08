@@ -18,7 +18,8 @@ export function connectorRoutes(ctx: ExtensionContext): Hono {
   // authenticated by the HMAC-SHA256 of the raw body under the webhook's secret,
   // in `x-hub-signature-256` or `x-webhook-signature` (hex, `sha256=` optional).
   // The webhook is read as the system (`data:system`, audited) and must belong to
-  // the request's tenant; the delivery is stored by the `receive` job.
+  // the request's tenant; the delivery is stored by the `receive` job, once per
+  // signature.
   app.post('/webhooks/receive', async (c) => {
     const id = c.req.query('id') ?? '';
     const sig = c.req.header('x-hub-signature-256') ?? c.req.header('x-webhook-signature');
@@ -47,6 +48,8 @@ export function connectorRoutes(ctx: ExtensionContext): Hono {
         });
         await internals.enqueue!(c, 'receive', {
           webhook_id: w.id,
+          // The verified signature: a captured delivery replayed carries the same one.
+          delivery_key: provided,
           payload,
           headers,
           ...(c.req.header('x-forwarded-for') ? { source_ip: c.req.header('x-forwarded-for')!.slice(0, 512) } : {}),

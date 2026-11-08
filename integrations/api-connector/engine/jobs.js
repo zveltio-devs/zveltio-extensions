@@ -49,6 +49,11 @@ async function oauthToken(host, conn, timeoutMs) {
     const res = await post({ grant_type: "refresh_token", refresh_token: String(conn.refresh_token) });
     if (res.ok)
       return storeToken(host, conn, res);
+    const now = await host.collections.read(CONNECTIONS, conn.id);
+    const nowExpires = now?.token_expires_at ? Date.parse(now.token_expires_at) : Number.POSITIVE_INFINITY;
+    if (now?.access_token && now.refresh_token !== conn.refresh_token && nowExpires > Date.now() + 60000) {
+      return String(now.access_token);
+    }
   }
   const res = await post({ grant_type: "client_credentials", scope: String(conn.scope ?? "") });
   if (!res.ok)
@@ -155,13 +160,23 @@ var call = async (input, host) => {
   }
 };
 var receive = async (input, host) => {
-  const { webhook_id, payload, headers, source_ip } = input;
+  const { webhook_id, delivery_key, payload, headers, source_ip } = input;
+  if (delivery_key) {
+    const seen = await host.collections.list(EVENTS, {
+      filter: { webhook_id: { eq: webhook_id }, delivery_key: { eq: delivery_key } },
+      limit: 1,
+      count: "none"
+    });
+    if (seen.records?.length)
+      return;
+  }
   await host.collections.update(WEBHOOKS, webhook_id, { last_received_at: new Date().toISOString() });
   await host.collections.insert(EVENTS, {
     webhook_id,
     payload: payload && typeof payload === "object" ? payload : {},
     headers,
-    source_ip: source_ip ?? null
+    source_ip: source_ip ?? null,
+    delivery_key: delivery_key ?? null
   });
 };
 var jobs_default = { call, receive };
