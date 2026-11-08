@@ -1,7 +1,7 @@
 {
   "name": "@zveltio/ext-ai",
-  "version": "1.0.2",
+  "version": "2.0.0",
   "private": true,
   "type": "module",
-  "description": "AI capabilities for Zveltio Business OS — providers, chat, embeddings, semantic search, text-to-SQL, schema generation, agentic workflows."
+  "description": "AI chat for Zveltio on operator-allowed providers, with prompt templates and a usage log."
 }

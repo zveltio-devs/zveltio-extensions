@@ -1,0 +1,73 @@
+{
+  "name": "ai_usage",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "provider_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "ai_providers"
+      }
+    },
+    {
+      "name": "conversation_id",
+      "type": "m2o",
+      "indexed": true,
+      "options": {
+        "related_collection": "ai_conversations"
+      }
+    },
+    {
+      "name": "model",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "operation",
+      "type": "text",
+      "required": true,
+      "defaultValue": "chat"
+    },
+    {
+      "name": "prompt_tokens",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "response_tokens",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0
+    },
+    {
+      "name": "latency_ms",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 0
+    }
+  ],
+  "relations": [
+    {
+      "name": "ai_usage_provider_id",
+      "type": "m2o",
+      "field": "provider_id",
+      "target": "ai_providers",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "ai_usage_conversation_id",
+      "type": "m2o",
+      "field": "conversation_id",
+      "target": "ai_conversations",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "name": "ai_providers",
+  "defaultGrants": false,
+  "fields": [
+    { "name": "name", "type": "text", "required": true, "unique": true },
+    {
+      "name": "kind",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "openai",
+      "options": { "values": ["openai", "anthropic", "ollama", "openai_compatible"] }
+    },
+    { "name": "base_url", "type": "url" },
+    { "name": "api_key", "type": "secret" },
+    { "name": "default_model", "type": "text", "required": true },
+    { "name": "is_active", "type": "boolean", "required": true, "defaultValue": true },
+    { "name": "is_default", "type": "boolean", "required": true, "defaultValue": false }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "name": "ai_conversations",
+  "fields": [
+    {
+      "name": "title",
+      "type": "text"
+    },
+    {
+      "name": "provider_id",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ai_providers"
+      }
+    },
+    {
+      "name": "template_id",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ai_prompt_templates"
+      }
+    },
+    {
+      "name": "model",
+      "type": "text"
+    },
+    {
+      "name": "system_prompt",
+      "type": "textarea"
+    }
+  ],
+  "relations": [
+    {
+      "name": "ai_conversations_provider_id",
+      "type": "m2o",
+      "field": "provider_id",
+      "target": "ai_providers",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "ai_conversations_template_id",
+      "type": "m2o",
+      "field": "template_id",
+      "target": "ai_prompt_templates",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

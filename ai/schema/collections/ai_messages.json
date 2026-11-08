@@ -1,0 +1,74 @@
+{
+  "name": "ai_messages",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "conversation_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "ai_conversations"
+      }
+    },
+    {
+      "name": "role",
+      "type": "enum",
+      "required": true,
+      "options": {
+        "values": [
+          "user",
+          "assistant"
+        ]
+      }
+    },
+    {
+      "name": "content",
+      "type": "textarea",
+      "required": true,
+      "defaultValue": ""
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "done",
+      "options": {
+        "values": [
+          "pending",
+          "running",
+          "done",
+          "failed"
+        ]
+      }
+    },
+    {
+      "name": "error",
+      "type": "textarea"
+    },
+    {
+      "name": "model",
+      "type": "text"
+    },
+    {
+      "name": "prompt_tokens",
+      "type": "integer"
+    },
+    {
+      "name": "response_tokens",
+      "type": "integer"
+    }
+  ],
+  "relations": [
+    {
+      "name": "ai_messages_conversation_id",
+      "type": "m2o",
+      "field": "conversation_id",
+      "target": "ai_conversations",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

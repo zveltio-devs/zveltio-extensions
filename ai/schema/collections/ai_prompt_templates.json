@@ -1,0 +1,13 @@
+{
+  "name": "ai_prompt_templates",
+  "fields": [
+    { "name": "name", "type": "text", "required": true, "unique": true },
+    { "name": "description", "type": "textarea" },
+    { "name": "category", "type": "text", "required": true, "defaultValue": "general" },
+    { "name": "system_prompt", "type": "textarea", "required": true },
+    { "name": "model", "type": "text" },
+    { "name": "temperature", "type": "decimal" },
+    { "name": "max_tokens", "type": "integer" },
+    { "name": "is_active", "type": "boolean", "required": true, "defaultValue": true }
+  ]
+}

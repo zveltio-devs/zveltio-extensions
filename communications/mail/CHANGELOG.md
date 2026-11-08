@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.11 (2026-11-08)
+
+- `ai` is an optional dependency, no longer a required one: AI is opt-in
+  (ADR 0027), and mail installs without it. AI compose and summarize answer 503
+  until mail is ported to the extension model: ai 2.0 no longer offers the
+  `ai.providers` service they call.
+
 ## 1.2.10 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)

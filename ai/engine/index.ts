@@ -1,183 +1,21 @@
 import type { ZveltioExtension } from '@zveltio/sdk/extension';
-import { join } from 'path';
-import { buildAIRoutes } from './routes/index.js';
-import {
-  type AIProvider,
-  type AIProviderManager,
-  forgetProviders,
-  PROVIDERS_CHANGED,
-  providersFor,
-  tenantProviders,
-} from './lib/ai-provider.js';
-import { setInternals } from './lib/ai-crypto.js';
-import { triggerEmbedding } from './lib/ai-embed-hook.js';
-import { ZveltioAIEngine } from './lib/zveltio-ai/engine.js';
-import { extractTextFromFile, scheduleFileIndexing } from './lib/document-indexer.js';
+import { aiActions } from './actions.js';
 
-/**
- * AI extension — providers, chat, embeddings, semantic search, text-to-SQL,
- * schema generation, agentic workflows.
- *
- * Publishes the following inter-extension services:
- *   ai.providers                    — getDefault() / get(name): the request
- *                                     firm's provider, picked when it is called
- *   ai.embed(text, model?)          — single-shot embedding helper
- *   ai.chat(messages, opts?)        — single-shot chat helper
- *   ai.triggerEmbedding(collection, recordId, record, tenantId?)
- *                                   — re-index one record's embedding
- *   ai.runBackgroundTask(userId, instruction, opts)
- *                                   — agentic task, consumed by flow-scheduler
- *   ai.extractText(buffer, mimeType)
- *                                   — plain text out of an uploaded file
- *   ai.indexFile(db, fileId, buffer, mimeType)
- *                                   — extract + embed a file, fire-and-forget,
- *                                     consumed by content/media
- *
- * Other extensions consume these via `ctx.services.get('ai.providers')` etc.
- * Consumers should declare a manifest dependency: { "name": "ai" }.
- *
- * The signatures above are now what a caller can actually pass. Two were not:
- * `ai.embed` was documented taking `opts` and takes a model name, and
- * `ai.triggerEmbedding` was registered as the raw internal function, whose first
- * parameter is a database handle no consumer has any way to supply — any call
- * would have thrown on `db.selectFrom is not a function`. Nothing broke, because
- * nothing outside this extension has ever called either: `ai.providers` has four
- * consumers and `ai.runBackgroundTask` one, and those are the only two exercised.
- */
+// Providers, prompt templates, conversations, messages and usage are
+// collections this extension declares in `schema/collections/` (manifest
+// `collections`); the engine creates them, owns their rules and serves them
+// through the data API. A chat turn is the `chat` action; the model call is a
+// job in the engine's Deno runner (`jobs.ts`, ADR 0022), toward the hosts the
+// operator bound to the `provider` egress slot (ADR 0026). The agent acts as
+// its caller and nothing more (ADR 0027).
 const extension: ZveltioExtension = {
   name: 'ai',
   category: 'intelligence',
-  // S3-01: sub-app mounted at /ext/ai by the engine. Sub-routers inside
-  // buildAIRoutes() are exposed under /, /alchemist, /query, /analytics,
-  // /zveltio (see engine/routes/index.ts).
   mountStrategy: 'subapp',
 
-  getMigrations() {
-    return [
-      join(import.meta.dir, 'migrations/001_initial.sql'),
-      join(import.meta.dir, 'migrations/002_ai_complete.sql'),
-      join(import.meta.dir, 'migrations/003_ai_memory_columns.sql'),
-      join(import.meta.dir, 'migrations/004_tenant_rls.sql'),
-      join(import.meta.dir, 'migrations/005_tenant_scoped_unique_keys.sql'),
-      join(import.meta.dir, 'migrations/006_remaining_tenant_unique_keys.sql'),
-      join(import.meta.dir, 'migrations/007_prompt_templates_tenant.sql'),
-      join(import.meta.dir, 'migrations/008_prompt_templates_policy.sql'),
-    ];
-  },
+  actions: aiActions,
 
-  async register(app, ctx) {
-    // Before anything that could touch a provider key: loading a firm's
-    // providers decrypts its keys.
-    setInternals(ctx.internals);
-
-    // A firm's provider change reaches every replica: the handler runs in that
-    // firm's transaction, so `ctx.db` names it. A replica that may have missed
-    // one drops them all and reloads each firm on its next call.
-    ctx.broadcast.on(PROVIDERS_CHANGED, () => forgetProviders(ctx.db));
-    ctx.broadcast.onMissed(() => tenantProviders.clear());
-
-    // Providers are per firm and loaded on the firm's first AI call
-    // (`providersFor`), so there is nothing to load here. A firm with none gets
-    // the "AI not configured" answers — never another firm's provider.
-    //
-    // Other extensions ask `ai.providers` for a provider synchronously, and the
-    // firm is only known from the database. So what they get is a stand-in that
-    // picks the CALLER's firm's provider when it is used.
-    const onDemand = (pick: (m: AIProviderManager) => AIProvider | null) => {
-      const resolve = async () => {
-        const p = pick(await providersFor(ctx.db));
-        if (!p) throw new Error('No AI provider is configured.');
-        return p;
-      };
-      return {
-        // The stand-in is never null, so "is there one?" is this, not `!provider`:
-        // a caller that answers 503 for a firm with none asks before chatting.
-        configured: async () => pick(await providersFor(ctx.db)) !== null,
-        chat: async (...a: Parameters<AIProvider['chat']>) => (await resolve()).chat(...a),
-        embed: async (text: string, model?: string) => {
-          const p = await resolve();
-          if (!p.embed) throw new Error('No AI provider with embedding capability is configured.');
-          return p.embed(text, model);
-        },
-      };
-    };
-    const defaultProvider = onDemand((m) => m.getDefault());
-    ctx.services.register('ai.providers', {
-      getDefault: () => defaultProvider,
-      get: (name: string) => onDemand((m) => m.get(name)),
-    });
-    ctx.services.register('ai.embed', defaultProvider.embed);
-    ctx.services.register('ai.chat', defaultProvider.chat);
-    // Closed over `ctx.db` — the internal function takes the handle first, which
-    // is not something a consumer in another extension can be expected to hand
-    // over (and its own restricted handle would be the wrong one anyway).
-    ctx.services.register(
-      'ai.triggerEmbedding',
-      async (
-        collection: string,
-        recordId: string,
-        record: Record<string, any>,
-        tenantId: string | null = null,
-      ) => triggerEmbedding(ctx.DDLManager, ctx.db, collection, recordId, record, tenantId),
-    );
-
-    // File text extraction and indexing. Both were `ctx.internals` members, so
-    // the host carried the code that writes `zvd_ai_embeddings` — this
-    // extension's own table. `extractText` resolves null to '' to keep the
-    // `Promise<string>` shape `ctx.internals.extractTextFromFile` declared.
-    ctx.services.register('ai.extractText', async (buffer: Buffer, mimeType: string) =>
-      (await extractTextFromFile(buffer, mimeType)) ?? '',
-    );
-    ctx.services.register(
-      'ai.indexFile',
-      async (db: any, fileId: string, buffer: Buffer, mimeType: string) =>
-        scheduleFileIndexing(db, fileId, buffer, mimeType),
-    );
-
-    // Background AI task runner — used by flow-scheduler for `ai_task` flows.
-    ctx.services.register('ai.runBackgroundTask', async (userId: string, instruction: string, opts: any) => {
-      const engine = new ZveltioAIEngine(ctx);
-      return engine.processBackgroundTask(userId, instruction, opts);
-    });
-
-    // Subscribe to record lifecycle for auto-embedding (when the collection has
-    // ai_search_enabled = true).
-    //
-    // `tenantId` comes from the event payload and is passed explicitly rather
-    // than left to the column DEFAULT. The reason recorded here used to be that
-    // the hook runs on the global pool outside the request's transaction — that
-    // is no longer true, and the note mattered enough to correct rather than
-    // delete. Two host changes landed since: the bus now uses `emitAsync`, so
-    // this listener is awaited inside the transaction that triggered it, and
-    // `ctx.db` (H-12) resolves that same tenant transaction. So the GUC IS set
-    // and the DEFAULT would resolve correctly on its own.
-    //
-    // Passing it stays right for a different reason: it is the tenant of the
-    // write that caused this embedding, stated at the call site, and it does not
-    // depend on which connection the hook happens to run on. It must keep
-    // matching the GUC — FORCE RLS on `zvd_ai_embeddings` rejects any other
-    // value, including NULL, which is exactly what we want if these two ever
-    // disagree again.
-    //
-    // Failures are logged and dropped: an embedding is worth attempting and
-    // never worth failing a data write for. The bus wraps each listener in its
-    // own SAVEPOINT, so a throw here cannot poison the caller's transaction.
-    const onWrite = async (evt: { collection: string; id: string; record: Record<string, any>; tenantId?: string | null }) => {
-      try {
-        await triggerEmbedding(ctx.DDLManager, ctx.db, evt.collection, evt.id, evt.record, evt.tenantId ?? null);
-      } catch (err) {
-        console.warn(
-          `[ai] auto-embedding failed for ${evt.collection}/${evt.id}:`,
-          (err as Error).message,
-        );
-      }
-    };
-    ctx.events.on('record.created', onWrite);
-    ctx.events.on('record.updated', onWrite);
-
-    // Mount HTTP routes.
-    app.route('/', buildAIRoutes(ctx));
-  },
+  async register() {},
 };
 
 export default extension;

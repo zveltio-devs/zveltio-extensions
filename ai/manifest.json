@@ -2,20 +2,13 @@
   "name": "ai",
   "displayName": "AI",
   "category": "intelligence",
-  "description": "AI capabilities: providers, chat, embeddings, semantic search, text-to-SQL, schema generation, agentic workflows.",
-  "version": "1.0.27",
-  "zveltioMinVersion": "3.0.0-beta.90",
+  "description": "AI chat on providers the operator allows: OpenAI, Anthropic, Ollama or any OpenAI-compatible server, with prompt templates and a usage log. The assistant acts as its caller and nothing more.",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.105",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-ai",
   "permissions": [
-    "database",
-    "ddl",
-    "documents",
-    "files",
-    "network",
-    "notifications",
-    "secrets",
-    "settings"
+    "data:system"
   ],
   "i18nPrefixes": [
     "ai"
@@ -24,9 +17,6 @@
     "engine": true,
     "studio": true,
     "fieldTypes": [],
-    "stepTypes": [
-      "ai_decision"
-    ],
     "slots": [
       "topbar.center",
       "dashboard.hero"
@@ -55,8 +45,91 @@
     "bundled": true,
     "bundlePeers": false
   },
+  "collections": [
+    "ai_providers",
+    "ai_prompt_templates",
+    "ai_conversations",
+    "ai_messages",
+    "ai_usage"
+  ],
+  "actions": [
+    {
+      "name": "chat",
+      "permission": {
+        "resource": "ai_messages",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "conversation_id",
+          "content"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32000
+          }
+        }
+      },
+      "reads": [
+        "ai_conversations",
+        "ai_messages"
+      ],
+      "writes": [
+        "ai_messages"
+      ],
+      "enqueues": [
+        "complete"
+      ]
+    }
+  ],
+  "jobs": [
+    {
+      "name": "complete",
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "ai_messages",
+        "ai_conversations",
+        "ai_providers",
+        "ai_prompt_templates"
+      ],
+      "writes": [
+        "ai_messages",
+        "ai_usage"
+      ],
+      "egressSlots": [
+        "provider"
+      ],
+      "retry": {
+        "limit": 0,
+        "backoff": true
+      },
+      "timeoutSeconds": 300
+    }
+  ],
   "integrity": {
-    "engineSha256": "d42e8b6ff7e0ec5864de627e857dd298f7d58aeece4f4163b35dc70eb9516bab",
-    "sourceSha256": "98f127ac0892d3dee950e750ec7aeb2cfe61aa886bfcba980aa096f7fbe25cfc"
+    "engineSha256": "43fd7b006a60293db2194d04a6c505dfbe5e35fedb18dc32a8c28a2483ded1bb",
+    "sourceSha256": "206ac3f199713d439593524ce007ed37cacea9fccdf1543181c7780cf6187c1b",
+    "schemaSha256": "56a5ac3e17cd2e5ff6d500dab3a83577d5db0f3daf6c94fa5fbd7353aead2201",
+    "jobsSha256": "ddd2abf1c7ff6c125adf3b9327e148bbf7452c64e696c8aca8d6693476b6d538"
   }
 }
