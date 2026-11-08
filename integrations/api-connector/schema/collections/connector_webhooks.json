@@ -46,5 +46,15 @@
       "onUpdate": "CASCADE",
       "metadata": {}
     }
+  ],
+  "validation": [
+    {
+      "field": "secret",
+      "rule": "minLength",
+      "config": {
+        "value": 32
+      },
+      "message": "A webhook secret is at least 32 characters: it is the HMAC key that authenticates every delivery."
+    }
   ]
 }

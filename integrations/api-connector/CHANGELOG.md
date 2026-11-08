@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.0.1 (2026-11-08)
+
+- An incoming webhook delivery is stored once per signature. A captured,
+  signed delivery replayed later is dropped, as is the sender's own redelivery
+  of the same body. The new `connector_webhook_events.delivery_key` holds the
+  signature, unique per webhook. Deleting a stored event lets its replay in again.
+- A webhook secret is at least 32 characters (a validation rule). Engines before
+  3.0.0-beta.105 judged rules on an encrypted field's ciphertext and so never
+  refuse a short secret. A secret stored before is not re-checked: rotate one
+  shorter than 32 characters.
+- Two calls refreshing the same OAuth2 token at once: when the provider rotated
+  the refresh token, the slower call takes the token the faster one stored,
+  instead of falling back to client credentials.
+
 ## 2.0.0 (2026-11-07)
 
 Rebuilt on the engine's extension model (phase D): no own tables, no own SQL,

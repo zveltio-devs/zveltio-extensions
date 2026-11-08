@@ -1558,6 +1558,7 @@ function connectorRoutes(ctx) {
       });
       await internals.enqueue(c, "receive", {
         webhook_id: w.id,
+        delivery_key: provided,
         payload,
         headers,
         ...c.req.header("x-forwarded-for") ? { source_ip: c.req.header("x-forwarded-for").slice(0, 512) } : {}
