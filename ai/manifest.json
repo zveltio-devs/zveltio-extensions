@@ -3,8 +3,8 @@
   "displayName": "AI",
   "category": "intelligence",
   "description": "AI chat on providers the operator allows: OpenAI, Anthropic, Ollama or any OpenAI-compatible server, with prompt templates and a usage log. The assistant acts as its caller and nothing more.",
-  "version": "2.0.0",
-  "zveltioMinVersion": "3.0.0-beta.105",
+  "version": "2.0.1",
+  "zveltioMinVersion": "3.0.0-beta.106",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-ai",
   "permissions": [
