@@ -1,5 +1,39 @@
 # Changelog
 
+## 2.0.0 (2026-11-08)
+
+Rebuilt on the engine's extension model (ADR 0027, "an AI agent is just a
+user"): no own tables, no own SQL, no authorization of its own, and no network
+from a route. AI is opt-in: engine 3.0.0-beta.105 no longer installs it by
+default.
+
+- **Breaking.** Providers, prompt templates, conversations, messages and usage
+  are the declared collections `ai_providers`, `ai_prompt_templates`,
+  `ai_conversations`, `ai_messages` and `ai_usage`, served by the data API.
+  The `zv_ai_*` tables of 1.x are not read or migrated (pre-GA, no installs).
+- A chat turn is the `chat` action (`POST /ext/ai/actions/chat`, permission
+  `execute` on `ai_messages`): it records the question and a pending answer and
+  queues the `complete` job. The job runs in the engine's Deno runner and calls
+  the model only on hosts the operator bound to the `provider` egress slot
+  (ADR 0026). An unbound slot fails the answer with that reason. No streaming:
+  Studio shows the answer when realtime reports it.
+- Providers: OpenAI, Anthropic, Ollama and any OpenAI-compatible server. The API
+  key is a `secret` field: only this extension's job reads it. Providers are an
+  administrator's collection (`defaultGrants: false`).
+- Conversations are private to their author only with the operator's row rules
+  `ai_conversations: member created_by eq user_id` and `ai_messages: member
+  created_by eq user_id` (the action writes both messages of a turn as the
+  caller): the extension carries no authorization logic. Name the users'
+  role(s), not `*`: a `*` rule also binds the `complete` job, whose principal is
+  not the author, and the job then finds no conversation to answer.
+- Messages and usage rows are written only by the action and the job
+  (`writtenBy: actions`). One usage row per answer, with the tokens the provider
+  reported, authored by the user who asked.
+- **Removed** (each needs a general engine primitive first, ADR 0027 §5):
+  text-to-SQL and saved queries, schema generation and the alchemist, embeddings,
+  semantic search and RAG documents, the agent's SQL/DDL/record tools, AI
+  analytics, background AI tasks and the `ai_decision` flow step.
+
 ## 1.0.27 (2026-10-26)
 
 - chore(deps): zod 4.6.7 and kysely 0.29.7 in every extension bundle (#264)
