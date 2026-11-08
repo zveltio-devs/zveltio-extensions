@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.2 (2026-11-08)
+
+- Needs engine 3.0.0-beta.105, the first that judges validation rules on a
+  secret's plaintext: on an earlier engine the 32-character minimum for a
+  webhook secret was never enforced.
+
 ## 2.0.1 (2026-11-08)
 
 - An incoming webhook delivery is stored once per signature. A captured,
