@@ -3,8 +3,8 @@
   "displayName": "API Connector",
   "category": "integrations",
   "description": "No-code HTTP integrations: call external REST APIs on hosts the operator allows, with retries, OAuth2 and a call log; receive signed incoming webhooks",
-  "version": "2.0.1",
-  "zveltioMinVersion": "3.0.0-beta.104",
+  "version": "2.0.2",
+  "zveltioMinVersion": "3.0.0-beta.105",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-api-connector",
   "permissions": [
