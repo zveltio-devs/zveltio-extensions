@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.1 (2026-11-09)
+
+- build: repacked with hono 4.13.17 and kysely 0.29.8, in lockstep with the engine; no behaviour change
+
 ## 2.0.0 (2026-11-02)
 
 - feat!: layouts are the collection `dashboard_layouts`, declared in `schema/collections/` and created and owned by the engine (unique per `scope` and `owner`); no SQL migrations, `zv_dashboard_layouts` is no longer created; layouts saved by 1.x are not carried over (users and roles start from the default again), and the old table is left in place

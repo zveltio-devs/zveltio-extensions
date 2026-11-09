@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.1 (2026-11-09)
+
+- build: repacked with hono 4.13.17 and kysely 0.29.8, in lockstep with the engine; no behaviour change
+
 ## 2.0.0 (2026-11-04)
 
 - feat!: a scan reads the collection through the data API as the scanning user (`ctx.internals.listRecords`): only the rows and columns the caller may read are scanned, and a column hidden from them is never quoted in an issue. 1.x read the table with SQL in a tenant transaction, past the caller's row policies and column rules. Up to 10,000 rows per scan; a scan of a larger collection says `truncated: true`

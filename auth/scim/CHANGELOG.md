@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.2 (2026-11-09)
+
+- build: repacked with hono 4.13.17 and kysely 0.29.8, in lockstep with the engine; no behaviour change
+
 ## 2.0.1 (2026-11-05)
 
 - feat: the `extension.as_system` audit row for a SCIM request names the bearer token that called (`metadata.claimed_actor = scim:<token id>`, the same name `user.deleted` carries), not only "system". Needs engine 3.0.0-beta.102

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.2 (2026-11-09)
+
+- build: repacked with hono 4.13.17 and kysely 0.29.8, in lockstep with the engine; no behaviour change
+
 ## 2.0.1 (2026-11-02)
 
 - fix: an erasure whose account the engine did not find answered `complete: true` and recorded `gdpr.account_deleted`; it now answers 404 and records nothing

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.1 (2026-11-09)
+
+- build: repacked with hono 4.13.17 and kysely 0.29.8, in lockstep with the engine; no behaviour change
+
 ## 2.0.0 (2026-11-03)
 
 - feat!: stored queries are the collection `graphql_queries`, declared in `schema/collections/` and created and owned by the engine; no SQL migrations, the 1.x tables `zvd_graphql_persisted_queries`, `zvd_graphql_operation_logs` and `zvd_graphql_field_policies` are no longer created, their rows are not carried over, and the old tables are left in place

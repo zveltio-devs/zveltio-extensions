@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.1 (2026-11-09)
+
+- build: repacked with hono 4.13.17 and kysely 0.29.8, in lockstep with the engine; no behaviour change
+
 ## 2.1.0 (2026-11-03)
 
 - feat: `POST /webhook/stripe` no longer writes subscriptions. It verifies the signature, records the event id with the raw event in `billing_webhook_events` (new field `payload`), and enqueues the `applyEvent` job; the job writes `billing_subscriptions` through the data API (ADR 0018). The claim and the job commit together in the request's transaction: a replayed or retried event finds its id claimed, answers `{"received": true, "duplicate": true}` and queues nothing

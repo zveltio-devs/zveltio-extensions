@@ -1,148 +1,84 @@
 // @bun
-// /zveltio-extension/node_modules/hono/dist/compose.js
-var compose = (middleware, onError, onNotFound) => {
-  return (context, next) => {
-    let index = -1;
-    return dispatch(0);
-    async function dispatch(i) {
-      if (i <= index) {
-        throw new Error("next() called multiple times");
-      }
-      index = i;
-      let res;
-      let isError = false;
-      let handler;
-      if (middleware[i]) {
-        handler = middleware[i][0][0];
-        context.req.routeIndex = i;
-      } else {
-        handler = i === middleware.length && next || undefined;
-      }
-      if (handler) {
-        try {
-          res = await handler(context, () => dispatch(i + 1));
-        } catch (err) {
-          if (err instanceof Error && onError) {
-            context.error = err;
-            res = await onError(err, context);
-            isError = true;
-          } else {
-            throw err;
-          }
-        }
-      } else {
-        if (context.finalized === false && onNotFound) {
-          res = await onNotFound(context);
-        }
-      }
-      if (res && (context.finalized === false || isError)) {
-        context.res = res;
-      }
-      return context;
-    }
-  };
-};
-
 // /zveltio-extension/node_modules/hono/dist/request/constants.js
-var GET_MATCH_RESULT = /* @__PURE__ */ Symbol();
+var GET_MATCH_RESULT = Symbol();
 
 // /zveltio-extension/node_modules/hono/dist/utils/buffer.js
 var bufferToFormData = (arrayBuffer, contentType) => {
-  const response = new Response(arrayBuffer, {
-    headers: {
-      "Content-Type": contentType.replace(/^[^;]+/, (mediaType) => mediaType.toLowerCase())
-    }
-  });
-  return response.formData();
+  return new Response(arrayBuffer, { headers: { "Content-Type": contentType.replace(/^[^;]+/, (mediaType) => mediaType.toLowerCase()) } }).formData();
 };
 
 // /zveltio-extension/node_modules/hono/dist/utils/body.js
-var MAX_NESTING_DEPTH = 32;
 var MAX_NESTED_OBJECTS = 1e4;
 var isRawRequest = (request) => ("headers" in request);
-var parseBody = async (request, options = /* @__PURE__ */ Object.create(null)) => {
+var parseBody = async (request, options = Object.create(null)) => {
   const { all = false, dot = false } = options;
-  const headers = isRawRequest(request) ? request.headers : request.raw.headers;
-  const contentType = headers.get("Content-Type");
-  const mediaType = contentType?.split(";")[0].trim().toLowerCase();
-  if (mediaType === "multipart/form-data" || mediaType === "application/x-www-form-urlencoded") {
-    return parseFormData(request, { all, dot });
-  }
+  const mediaType = (isRawRequest(request) ? request.headers : request.raw.headers).get("Content-Type")?.split(";")[0].trim().toLowerCase();
+  if (mediaType === "multipart/form-data" || mediaType === "application/x-www-form-urlencoded")
+    return parseFormData(request, {
+      all,
+      dot
+    });
   return {};
 };
 async function parseFormData(request, options) {
-  if (!isRawRequest(request) && request.bodyCache.formData) {
+  if (!isRawRequest(request) && request.bodyCache.formData)
     return convertFormDataToBodyData(await request.bodyCache.formData, options);
-  }
   const headers = isRawRequest(request) ? request.headers : request.raw.headers;
   const arrayBuffer = await request.arrayBuffer();
   const formDataPromise = bufferToFormData(arrayBuffer, headers.get("Content-Type") || "");
-  if (!isRawRequest(request)) {
+  if (!isRawRequest(request))
     request.bodyCache.formData = formDataPromise;
-  }
   const formData = await formDataPromise;
-  if (formData) {
+  if (formData)
     return convertFormDataToBodyData(formData, options);
-  }
   return {};
 }
 function convertFormDataToBodyData(formData, options) {
-  const form = /* @__PURE__ */ Object.create(null);
+  const form = Object.create(null);
   const nestingState = { count: 0 };
   formData.forEach((value, key) => {
-    const shouldParseAllValues = options.all || key.endsWith("[]");
-    if (!shouldParseAllValues) {
+    if (!(options.all || key.endsWith("[]")))
       form[key] = value;
-    } else {
+    else
       handleParsingAllValues(form, key, value);
-    }
   });
-  if (options.dot) {
+  if (options.dot)
     Object.entries(form).forEach(([key, value]) => {
-      const shouldParseDotValues = key.includes(".");
-      if (shouldParseDotValues) {
+      if (key.includes(".")) {
         handleParsingNestedValues(form, key, value, nestingState);
         delete form[key];
       }
     });
-  }
   return form;
 }
 var handleParsingAllValues = (form, key, value) => {
   if (form[key] !== undefined) {
-    if (Array.isArray(form[key])) {
+    if (Array.isArray(form[key]))
       form[key].push(value);
-    } else {
+    else
       form[key] = [form[key], value];
-    }
-  } else {
-    if (!key.endsWith("[]")) {
-      form[key] = value;
-    } else {
-      form[key] = [value];
-    }
-  }
+  } else if (!key.endsWith("[]"))
+    form[key] = value;
+  else
+    form[key] = [value];
 };
 var handleParsingNestedValues = (form, key, value, state) => {
-  if (/(?:^|\.)__proto__\./.test(key)) {
+  if (/(?:^|\.)__proto__\./.test(key))
     return;
-  }
   let nestedForm = form;
-  const keys = key.split(".", MAX_NESTING_DEPTH + 2);
-  if (keys.length > MAX_NESTING_DEPTH + 1) {
+  const keys = key.split(".", 34);
+  if (keys.length > 33)
     throwNestingLimitExceeded();
-  }
-  keys.forEach((key2, index) => {
-    if (index === keys.length - 1) {
-      nestedForm[key2] = value;
-    } else {
-      if (!nestedForm[key2] || typeof nestedForm[key2] !== "object" || Array.isArray(nestedForm[key2]) || nestedForm[key2] instanceof File) {
-        if (state.count++ >= MAX_NESTED_OBJECTS) {
+  keys.forEach((key, index) => {
+    if (index === keys.length - 1)
+      nestedForm[key] = value;
+    else {
+      if (!nestedForm[key] || typeof nestedForm[key] !== "object" || Array.isArray(nestedForm[key]) || nestedForm[key] instanceof File) {
+        if (state.count++ >= MAX_NESTED_OBJECTS)
           throwNestingLimitExceeded();
-        }
-        nestedForm[key2] = /* @__PURE__ */ Object.create(null);
+        nestedForm[key] = Object.create(null);
       }
-      nestedForm = nestedForm[key2];
+      nestedForm = nestedForm[key];
     }
   });
 };
@@ -153,9 +89,8 @@ var throwNestingLimitExceeded = () => {
 // /zveltio-extension/node_modules/hono/dist/utils/url.js
 var splitPath = (path) => {
   const paths = path.split("/");
-  if (paths[0] === "") {
+  if (paths[0] === "")
     paths.shift();
-  }
   return paths;
 };
 var splitRoutingPath = (routePath) => {
@@ -170,34 +105,46 @@ var extractGroupsFromPath = (path) => {
     groups.push([mark, match]);
     return mark;
   });
-  return { groups, path };
+  return {
+    groups,
+    path
+  };
 };
 var replaceGroupMarks = (paths, groups) => {
   for (let i = groups.length - 1;i >= 0; i--) {
     const [mark] = groups[i];
-    for (let j = paths.length - 1;j >= 0; j--) {
+    for (let j = paths.length - 1;j >= 0; j--)
       if (paths[j].includes(mark)) {
         paths[j] = paths[j].replace(mark, groups[i][1]);
         break;
       }
-    }
   }
   return paths;
 };
 var patternCache = {};
 var getPattern = (label, next) => {
-  if (label === "*") {
+  if (label === "*")
     return "*";
-  }
   const match = label.match(/^\:([^\{\}]+)(?:\{(.+)\})?$/);
   if (match) {
     const cacheKey = `${label}#${next}`;
     if (!patternCache[cacheKey]) {
-      if (match[2]) {
-        patternCache[cacheKey] = next && next[0] !== ":" && next[0] !== "*" ? [cacheKey, match[1], new RegExp(`^${match[2]}(?=/${next})`)] : [label, match[1], new RegExp(`^${match[2]}$`)];
-      } else {
-        patternCache[cacheKey] = [label, match[1], true];
-      }
+      if (match[2])
+        patternCache[cacheKey] = next && next[0] !== ":" && next[0] !== "*" ? [
+          cacheKey,
+          match[1],
+          new RegExp(`^${match[2]}(?=/${next})`)
+        ] : [
+          label,
+          match[1],
+          new RegExp(`^${match[2]}$`)
+        ];
+      else
+        patternCache[cacheKey] = [
+          label,
+          match[1],
+          true
+        ];
     }
     return patternCache[cacheKey];
   }
@@ -229,9 +176,8 @@ var getPath = (request) => {
       const end = queryIndex === -1 ? hashIndex === -1 ? undefined : hashIndex : hashIndex === -1 ? queryIndex : Math.min(queryIndex, hashIndex);
       const path = url.slice(start, end);
       return tryDecodeURI(path.includes("%25") ? path.replace(/%25/g, "%2525") : path);
-    } else if (charCode === 63 || charCode === 35) {
+    } else if (charCode === 63 || charCode === 35)
       break;
-    }
   }
   return url.slice(start, i);
 };
@@ -239,110 +185,110 @@ var getPathNoStrict = (request) => {
   const result = getPath(request);
   return result.length > 1 && result.at(-1) === "/" ? result.slice(0, -1) : result;
 };
-var mergePath = (base, sub, ...rest) => {
-  if (rest.length) {
-    sub = mergePath(sub, ...rest);
+var stripPathPrefix = (rawPath, decodedPath, prefixLength) => {
+  if (rawPath.at(-1) === "/" && decodedPath.at(-1) !== "/")
+    rawPath = rawPath.slice(0, -1);
+  let index = 0;
+  for (let i = decodedPath.indexOf("/");i !== -1 && i < prefixLength; i = decodedPath.indexOf("/", i + 1)) {
+    index = rawPath.indexOf("/", index + 1);
+    if (index === -1)
+      return "/";
   }
+  return rawPath.slice(index) || "/";
+};
+var mergePath = (base, sub, ...rest) => {
+  if (rest.length)
+    sub = mergePath(sub, ...rest);
   return `${base?.[0] === "/" ? "" : "/"}${base}${sub === "/" ? "" : `${base?.at(-1) === "/" ? "" : "/"}${sub?.[0] === "/" ? sub.slice(1) : sub}`}`;
 };
 var checkOptionalParameter = (path) => {
-  if (path.charCodeAt(path.length - 1) !== 63 || !path.includes(":")) {
+  if (path.charCodeAt(path.length - 1) !== 63 || !path.includes(":"))
     return null;
-  }
   const segments = path.split("/");
   const results = [];
   let basePath = "";
   segments.forEach((segment) => {
-    if (segment !== "" && !/\:/.test(segment)) {
+    if (segment !== "" && !/\:/.test(segment))
       basePath += "/" + segment;
-    } else if (/\:/.test(segment)) {
+    else if (/\:/.test(segment)) {
       if (segment.charCodeAt(segment.length - 1) === 63) {
-        if (results.length === 0 && basePath === "") {
+        if (results.length === 0 && basePath === "")
           results.push("/");
-        } else {
+        else
           results.push(basePath);
-        }
         const optionalSegment = segment.slice(0, -1);
         basePath += "/" + optionalSegment;
         results.push(basePath);
-      } else {
+      } else
         basePath += "/" + segment;
-      }
     }
   });
   return results.filter((v, i, a) => a.indexOf(v) === i);
 };
 var tryDecodeURIComponent = (str) => str.indexOf("%") !== -1 ? tryDecode(str, decodeURIComponent_) : str;
 var _decodeURI = (value) => {
-  if (value.indexOf("+") !== -1) {
+  if (value.indexOf("+") !== -1)
     value = value.replace(/\+/g, " ");
-  }
   return tryDecodeURIComponent(value);
 };
 var _getQueryParam = (url, key, multiple) => {
   const hashIndex = url.indexOf("#", 8);
-  if (hashIndex !== -1) {
+  if (hashIndex !== -1)
     url = url.slice(0, hashIndex);
-  }
   let encoded;
-  if (!multiple && key && key.indexOf("%") === -1 && key.indexOf("+") === -1) {
-    let keyIndex2 = url.indexOf("?", 8);
-    if (keyIndex2 === -1) {
+  if (!multiple && key && !/[%+&=]/.test(key)) {
+    const queryIndex = url.indexOf("?", 8);
+    let keyIndex = queryIndex;
+    if (keyIndex === -1)
       return;
-    }
-    if (!url.startsWith(key, keyIndex2 + 1)) {
-      keyIndex2 = url.indexOf(`&${key}`, keyIndex2 + 1);
-    }
-    while (keyIndex2 !== -1) {
-      const trailingKeyCode = url.charCodeAt(keyIndex2 + key.length + 1);
-      if (trailingKeyCode === 61) {
-        const valueIndex = keyIndex2 + key.length + 2;
-        const endIndex = url.indexOf("&", valueIndex);
-        return _decodeURI(url.slice(valueIndex, endIndex === -1 ? undefined : endIndex));
-      } else if (trailingKeyCode == 38 || isNaN(trailingKeyCode)) {
+    if (!url.startsWith(key, keyIndex + 1))
+      keyIndex = url.indexOf(`&${key}`, keyIndex + 1);
+    while (keyIndex !== -1) {
+      const trailingKeyCode = url.charCodeAt(keyIndex + key.length + 1);
+      if (trailingKeyCode === 61 || trailingKeyCode === 38 || isNaN(trailingKeyCode)) {
+        if (keyIndex > queryIndex && /(?:^|&)[^=&]*[%+]/.test(url.slice(queryIndex + 1, keyIndex)))
+          break;
+        if (trailingKeyCode === 61) {
+          const valueIndex = keyIndex + key.length + 2;
+          const endIndex = url.indexOf("&", valueIndex);
+          return _decodeURI(url.slice(valueIndex, endIndex === -1 ? undefined : endIndex));
+        }
         return "";
       }
-      keyIndex2 = url.indexOf(`&${key}`, keyIndex2 + 1);
+      keyIndex = url.indexOf(`&${key}`, keyIndex + 1);
     }
     encoded = /[%+]/.test(url);
-    if (!encoded) {
+    if (!encoded)
       return;
-    }
   }
-  const results = /* @__PURE__ */ Object.create(null);
+  const results = Object.create(null);
   encoded ??= /[%+]/.test(url);
   let keyIndex = url.indexOf("?", 8);
   while (keyIndex !== -1) {
     const nextKeyIndex = url.indexOf("&", keyIndex + 1);
     let valueIndex = url.indexOf("=", keyIndex);
-    if (valueIndex > nextKeyIndex && nextKeyIndex !== -1) {
+    if (valueIndex > nextKeyIndex && nextKeyIndex !== -1)
       valueIndex = -1;
-    }
     let name = url.slice(keyIndex + 1, valueIndex === -1 ? nextKeyIndex === -1 ? undefined : nextKeyIndex : valueIndex);
-    if (encoded) {
+    if (encoded)
       name = _decodeURI(name);
-    }
     keyIndex = nextKeyIndex;
-    if (name === "") {
+    if (name === "")
       continue;
-    }
     let value;
-    if (valueIndex === -1) {
+    if (valueIndex === -1)
       value = "";
-    } else {
+    else {
       value = url.slice(valueIndex + 1, nextKeyIndex === -1 ? undefined : nextKeyIndex);
-      if (encoded) {
+      if (encoded)
         value = _decodeURI(value);
-      }
     }
     if (multiple) {
-      if (!(results[name] && Array.isArray(results[name]))) {
+      if (!(results[name] && Array.isArray(results[name])))
         results[name] = [];
-      }
       results[name].push(value);
-    } else {
+    } else
       results[name] ??= value;
-    }
   }
   return key ? results[key] : results;
 };
@@ -378,9 +324,8 @@ var HonoRequest = class {
     const keys = Object.keys(this.#matchResult[0][this.routeIndex]?.[1] ?? {});
     for (const key of keys) {
       const value = this.#getParamValue(this.#matchResult[0][this.routeIndex][1][key]);
-      if (value !== undefined) {
+      if (value !== undefined)
         decoded[key] = tryDecodeURIComponent(value);
-      }
     }
     return decoded;
   }
@@ -394,10 +339,9 @@ var HonoRequest = class {
     return getQueryParams(this.url, key);
   }
   header(name) {
-    if (name) {
+    if (name)
       return this.raw.headers.get(name) ?? undefined;
-    }
-    const headerData = /* @__PURE__ */ Object.create(null);
+    const headerData = Object.create(null);
     this.raw.headers.forEach((value, key) => {
       headerData[key] = value;
     });
@@ -409,20 +353,15 @@ var HonoRequest = class {
   #cachedBody = (key) => {
     const { bodyCache, raw } = this;
     const cachedBody = bodyCache[key];
-    if (cachedBody) {
+    if (cachedBody)
       return cachedBody;
-    }
-    for (const anyCachedKey in bodyCache) {
+    for (const anyCachedKey in bodyCache)
       return bodyCache[anyCachedKey].then((body) => {
-        if (anyCachedKey === "json") {
+        if (anyCachedKey === "json")
           body = JSON.stringify(body);
-        }
         const contentType = anyCachedKey === "formData" ? undefined : raw.headers.get("content-type");
-        return new Response(body, {
-          headers: contentType ? { "Content-Type": contentType } : undefined
-        })[key]();
+        return new Response(body, { headers: contentType ? { "Content-Type": contentType } : undefined })[key]();
       });
-    }
     return bodyCache[key] = raw[key]();
   };
   json() {
@@ -480,28 +419,27 @@ var raw = (value, callbacks) => {
 };
 var resolveCallback = async (str, phase, preserveCallbacks, context, buffer) => {
   if (typeof str === "object" && !(str instanceof String)) {
-    if (!(str instanceof Promise)) {
+    if (!(str instanceof Promise))
       str = str.toString();
-    }
-    if (str instanceof Promise) {
+    if (str instanceof Promise)
       str = await str;
-    }
   }
   const callbacks = str.callbacks;
-  if (!callbacks?.length) {
+  if (!callbacks?.length)
     return Promise.resolve(str);
-  }
-  if (buffer) {
+  if (buffer)
     buffer[0] += str;
-  } else {
+  else
     buffer = [str];
-  }
-  const resStr = Promise.all(callbacks.map((c) => c({ phase, buffer, context }))).then((res) => Promise.all(res.filter(Boolean).map((str2) => resolveCallback(str2, phase, false, context, buffer))).then(() => buffer[0]));
-  if (preserveCallbacks) {
+  const resStr = Promise.all(callbacks.map((c) => c({
+    phase,
+    buffer,
+    context
+  }))).then((res) => Promise.all(res.filter(Boolean).map((str) => resolveCallback(str, phase, false, context, buffer))).then(() => buffer[0]));
+  if (preserveCallbacks)
     return raw(await resStr, callbacks);
-  } else {
+  else
     return resStr;
-  }
 };
 
 // /zveltio-extension/node_modules/hono/dist/context.js
@@ -544,40 +482,33 @@ var Context = class {
     return this.#req;
   }
   get event() {
-    if (this.#executionCtx && "respondWith" in this.#executionCtx) {
+    if (this.#executionCtx && "respondWith" in this.#executionCtx)
       return this.#executionCtx;
-    } else {
+    else
       throw Error("This context has no FetchEvent");
-    }
   }
   get executionCtx() {
-    if (this.#executionCtx) {
+    if (this.#executionCtx)
       return this.#executionCtx;
-    } else {
+    else
       throw Error("This context has no ExecutionContext");
-    }
   }
   get res() {
-    return this.#res ||= createResponseInstance(null, {
-      headers: this.#preparedHeaders ??= new Headers
-    });
+    return this.#res ||= createResponseInstance(null, { headers: this.#preparedHeaders ??= new Headers });
   }
   set res(_res) {
     if (this.#res && _res) {
       _res = createResponseInstance(_res.body, _res);
       for (const [k, v] of this.#res.headers.entries()) {
-        if (k === "content-type") {
+        if (k === "content-type")
           continue;
-        }
         if (k === "set-cookie") {
           const cookies = this.#res.headers.getSetCookie();
           _res.headers.delete("set-cookie");
-          for (const cookie of cookies) {
+          for (const cookie of cookies)
             _res.headers.append("set-cookie", cookie);
-          }
-        } else {
+        } else
           _res.headers.set(k, v);
-        }
       }
     }
     this.#res = _res;
@@ -593,17 +524,15 @@ var Context = class {
     this.#renderer = renderer;
   };
   header = (name, value, options) => {
-    if (this.finalized) {
+    if (this.finalized && !this.#res.bodyUsed)
       this.#res = createResponseInstance(this.#res.body, this.#res);
-    }
     const headers = this.#res ? this.#res.headers : this.#preparedHeaders ??= new Headers;
-    if (value === undefined) {
+    if (value === undefined)
       headers.delete(name);
-    } else if (options?.append) {
+    else if (options?.append)
       headers.append(name, value);
-    } else {
+    else
       headers.set(name, value);
-    }
   };
   status = (status) => {
     this.#status = status;
@@ -616,46 +545,40 @@ var Context = class {
     return this.#var ? this.#var.get(key) : undefined;
   };
   get var() {
-    if (!this.#var) {
+    if (!this.#var)
       return {};
-    }
     return Object.fromEntries(this.#var);
   }
   #newResponse(data, arg, headers) {
     let responseHeaders = this.#res ? new Headers(this.#res.headers) : this.#preparedHeaders;
     if (typeof arg === "object" && arg.headers) {
       responseHeaders ??= new Headers;
-      for (const [key, value] of new Headers(arg.headers)) {
-        if (key === "set-cookie") {
+      for (const [key, value] of new Headers(arg.headers))
+        if (key === "set-cookie")
           responseHeaders.append(key, value);
-        } else {
+        else
           responseHeaders.set(key, value);
-        }
-      }
     }
     if (headers) {
       if (!responseHeaders) {
         let count = 0;
-        for (const k in headers) {
+        for (const k in headers)
           if (++count > 1 || typeof headers[k] !== "string") {
             responseHeaders = new Headers;
             break;
           }
-        }
       }
-      if (responseHeaders) {
+      if (responseHeaders)
         for (const k in headers) {
           const v = headers[k];
-          if (typeof v === "string") {
+          if (typeof v === "string")
             responseHeaders.set(k, v);
-          } else {
+          else {
             responseHeaders.delete(k);
-            for (const v2 of v) {
+            for (const v2 of v)
               responseHeaders.append(k, v2);
-            }
           }
         }
-      }
     }
     const status = typeof arg === "number" ? arg : arg?.status ?? this.#status;
     return createResponseInstance(data, {
@@ -686,16 +609,94 @@ var Context = class {
   };
 };
 
+// /zveltio-extension/node_modules/hono/dist/compose.js
+var compose = (middleware, onError, onNotFound) => {
+  return (context, next) => {
+    let index = -1;
+    return dispatch(0);
+    async function dispatch(i) {
+      if (i <= index)
+        throw new Error("next() called multiple times");
+      index = i;
+      let res;
+      let isError = false;
+      let handler;
+      if (middleware[i]) {
+        handler = middleware[i][0][0];
+        context.req.routeIndex = i;
+      } else
+        handler = i === middleware.length && next || undefined;
+      if (handler)
+        try {
+          res = await handler(context, () => dispatch(i + 1));
+        } catch (err) {
+          if (err instanceof Error && onError) {
+            context.error = err;
+            res = await onError(err, context);
+            isError = true;
+          } else
+            throw err;
+        }
+      else if (context.finalized === false && onNotFound)
+        res = await onNotFound(context);
+      if (res && (context.finalized === false || isError))
+        context.res = res;
+      return context;
+    }
+  };
+};
+
 // /zveltio-extension/node_modules/hono/dist/router.js
-var METHOD_NAME_ALL = "ALL";
-var METHOD_NAME_ALL_LOWERCASE = "all";
-var METHODS = ["get", "post", "put", "delete", "options", "patch", "query"];
+var METHODS = [
+  "get",
+  "post",
+  "put",
+  "delete",
+  "options",
+  "patch",
+  "query"
+];
 var MESSAGE_MATCHER_IS_ALREADY_BUILT = "Can not add a route since the matcher is already built.";
 var UnsupportedPathError = class extends Error {
 };
 
 // /zveltio-extension/node_modules/hono/dist/utils/constants.js
 var COMPOSED_HANDLER = "__COMPOSED_HANDLER";
+
+// /zveltio-extension/node_modules/hono/dist/utils/mount.js
+var getPathPrefixLength = (c, pathPrefix, routePath) => {
+  if (!/[:*]/.test(pathPrefix))
+    return pathPrefix.length;
+  const path = c.req.path;
+  const matchResult = c.req[GET_MATCH_RESULT];
+  const paramNames = /* @__PURE__ */ new Set;
+  let length = 0;
+  for (const part of splitRoutingPath(pathPrefix)) {
+    const pattern = getPattern(part);
+    if (pattern && pattern !== "*") {
+      const name = pattern[1];
+      if (paramNames.has(name))
+        throw new Error(`mount(): Duplicate path parameter "${name}" in "${routePath}".`);
+      paramNames.add(name);
+    }
+    if (pattern && pattern !== "*" && pattern[2] !== true) {
+      const value = matchResult.length === 2 ? matchResult[1][matchResult[0][c.req.routeIndex][1][pattern[1]]] : matchResult[0][c.req.routeIndex][1][pattern[1]];
+      length += value.length + 1;
+    } else if (pattern || part.endsWith("*")) {
+      const end = path.indexOf("/", length + 1);
+      length = end === -1 ? path.length : end;
+    } else
+      length += part.length + 1;
+  }
+  return length;
+};
+var createMountedRequest = (c, pathPrefix, routePath) => {
+  if (/[^/]\*$/.test(routePath))
+    throw new Error(`mount(): Wildcard must follow "/" in "${routePath}".`);
+  const url = new URL(c.req.raw.url);
+  url.pathname = stripPathPrefix(url.pathname, c.req.path, getPathPrefixLength(c, pathPrefix, routePath));
+  return new Request(url, c.req.raw);
+};
 
 // /zveltio-extension/node_modules/hono/dist/hono-base.js
 var notFoundHandler = (c) => {
@@ -709,7 +710,7 @@ var errorHandler = (err, c) => {
   console.error(err);
   return c.text("Internal Server Error", 500);
 };
-var Hono = class _Hono {
+var Hono = class Hono {
   get;
   post;
   put;
@@ -726,15 +727,13 @@ var Hono = class _Hono {
   #path = "/";
   routes = [];
   constructor(options = {}) {
-    const allMethods = [...METHODS, METHOD_NAME_ALL_LOWERCASE];
-    allMethods.forEach((method) => {
+    [...METHODS, "all"].forEach((method) => {
       this[method] = (args1, ...args) => {
         const methodName = method.toUpperCase();
-        if (typeof args1 === "string") {
+        if (typeof args1 === "string")
           this.#path = args1;
-        } else {
+        else
           this.#addRoute(methodName, this.#path, args1);
-        }
         args.forEach((handler) => {
           this.#addRoute(methodName, this.#path, handler);
         });
@@ -746,22 +745,21 @@ var Hono = class _Hono {
         this.#path = p;
         for (const m of [method].flat()) {
           const methodName = m.toUpperCase();
-          for (const handler of handlers) {
+          for (const handler of handlers)
             this.#addRoute(methodName, this.#path, handler);
-          }
         }
       }
       return this;
     };
     this.use = (arg1, ...handlers) => {
-      if (typeof arg1 === "string") {
+      if (typeof arg1 === "string")
         this.#path = arg1;
-      } else {
+      else {
         this.#path = "*";
         handlers.unshift(arg1);
       }
       handlers.forEach((handler) => {
-        this.#addRoute(METHOD_NAME_ALL, this.#path, handler);
+        this.#addRoute("ALL", this.#path, handler);
       });
       return this;
     };
@@ -770,7 +768,7 @@ var Hono = class _Hono {
     this.getPath = strict ?? true ? options.getPath ?? getPath : getPathNoStrict;
   }
   #clone() {
-    const clone = new _Hono({
+    const clone = new Hono({
       router: this.router,
       getPath: this.getPath
     });
@@ -785,9 +783,9 @@ var Hono = class _Hono {
     const subApp = this.basePath(path);
     app.routes.map((r) => {
       let handler;
-      if (app.errorHandler === errorHandler) {
+      if (app.errorHandler === errorHandler)
         handler = r.handler;
-      } else {
+      else {
         handler = async (c, next) => (await compose([], app.errorHandler)(c, () => r.handler(c, next))).res;
         handler[COMPOSED_HANDLER] = r.handler;
       }
@@ -812,20 +810,19 @@ var Hono = class _Hono {
     let replaceRequest;
     let optionHandler;
     if (options) {
-      if (typeof options === "function") {
+      if (typeof options === "function")
         optionHandler = options;
-      } else {
+      else {
         optionHandler = options.optionHandler;
-        if (options.replaceRequest === false) {
+        if (options.replaceRequest === false)
           replaceRequest = (request) => request;
-        } else {
+        else
           replaceRequest = options.replaceRequest;
-        }
       }
     }
     const getOptions = optionHandler ? (c) => {
-      const options2 = optionHandler(c);
-      return Array.isArray(options2) ? options2 : [options2];
+      const options = optionHandler(c);
+      return Array.isArray(options) ? options : [options];
     } : (c) => {
       let executionContext = undefined;
       try {
@@ -833,23 +830,15 @@ var Hono = class _Hono {
       } catch {}
       return [c.env, executionContext];
     };
-    replaceRequest ||= (() => {
-      const mergedPath = mergePath(this._basePath, path);
-      const pathPrefixLength = mergedPath === "/" ? 0 : mergedPath.length;
-      return (request) => {
-        const url = new URL(request.url);
-        url.pathname = this.getPath(request).slice(pathPrefixLength) || "/";
-        return new Request(url, request);
-      };
-    })();
+    const mergedPath = mergePath(this._basePath, path);
+    const defaultReplaceRequest = (c) => createMountedRequest(c, mergedPath.replace(/\/$/, ""), mergePath(mergedPath, "*"));
     const handler = async (c, next) => {
-      const res = await applicationHandler(replaceRequest(c.req.raw), ...getOptions(c));
-      if (res) {
+      const res = await applicationHandler(replaceRequest ? replaceRequest(c.req.raw) : defaultReplaceRequest(c), ...getOptions(c));
+      if (res)
         return res;
-      }
       await next();
     };
-    this.#addRoute(METHOD_NAME_ALL, mergePath(path, "*"), handler);
+    this.#addRoute("ALL", mergePath(path, "*"), handler);
     return this;
   }
   #addRoute(method, path, handler, baseRoutePath) {
@@ -864,15 +853,13 @@ var Hono = class _Hono {
     this.routes.push(r);
   }
   #handleError(err, c) {
-    if (err instanceof Error) {
+    if (err instanceof Error)
       return this.errorHandler(err, c);
-    }
     throw err;
   }
   #dispatch(request, executionCtx, env, method) {
-    if (method === "HEAD") {
+    if (method === "HEAD")
       return (async () => new Response(null, await this.#dispatch(request, executionCtx, env, "GET")))();
-    }
     const path = this.getPath(request, { env });
     const matchResult = this.router.match(method, path);
     const c = new Context(request, {
@@ -897,9 +884,8 @@ var Hono = class _Hono {
     return (async () => {
       try {
         const context = await composed(c);
-        if (!context.finalized) {
+        if (!context.finalized)
           throw new Error("Context is not finalized. Did you forget to return a Response object or `await next()`?");
-        }
         return context.res;
       } catch (err) {
         return this.#handleError(err, c);
@@ -910,9 +896,8 @@ var Hono = class _Hono {
     return this.#dispatch(request, rest[1], rest[0], request.method);
   };
   request = (input, requestInit, Env, executionCtx) => {
-    if (input instanceof Request) {
+    if (input instanceof Request)
       return this.fetch(requestInit ? new Request(input, requestInit) : input, Env, executionCtx);
-    }
     input = input.toString();
     return this.fetch(new Request(/^https?:\/\//.test(input) ? input : `http://localhost${mergePath("/", input)}`, requestInit), Env, executionCtx);
   };
@@ -924,128 +909,124 @@ var Hono = class _Hono {
 };
 
 // /zveltio-extension/node_modules/hono/dist/router/utils.js
-var createNullObject = () => /* @__PURE__ */ Object.create(null);
+var createNullObject = () => Object.create(null);
 
 // /zveltio-extension/node_modules/hono/dist/router/reg-exp-router/matcher.js
 var emptyParam = [];
 function match(method, path) {
   const matchers = this.buildAllMatchers();
-  const match2 = (method2, path2) => {
-    const matcher = matchers[method2] || matchers[METHOD_NAME_ALL];
-    const staticMatch = matcher[2][path2];
-    if (staticMatch) {
+  const match = (method, path) => {
+    const matcher = matchers[method] || matchers["ALL"];
+    const staticMatch = matcher[2][path];
+    if (staticMatch)
       return staticMatch;
-    }
-    const match3 = path2.match(matcher[0]);
-    if (!match3) {
+    const match = path.match(matcher[0]);
+    if (!match)
       return [[], emptyParam];
-    }
-    const index = match3.indexOf("", 1);
-    return [matcher[1][index], match3];
+    const index = match.indexOf("", 1);
+    return [matcher[1][index], match];
   };
-  this.match = match2;
-  return match2(method, path);
+  this.match = match;
+  return match(method, path);
 }
 
 // /zveltio-extension/node_modules/hono/dist/router/reg-exp-router/node.js
 var LABEL_REG_EXP_STR = "[^/]+";
-var ONLY_WILDCARD_REG_EXP_STR = ".*";
-var TAIL_WILDCARD_REG_EXP_STR = "(?:|/.*)";
-var PATH_ERROR = /* @__PURE__ */ Symbol();
-var regExpMetaChars = new Set(".\\+*[^]$()");
+var ONLY_WILDCARD_REG_EXP_STR = "[^]*";
+var TAIL_WILDCARD_REG_EXP_STR = "(?:|/[^]*)";
+var PATH_ERROR = Symbol();
+var regExpMetaChars = /* @__PURE__ */ new Set(".\\+*[^]$()");
 function compareKey(a, b) {
-  if (a.length === 1) {
+  if (a.length === 1)
     return b.length === 1 ? a < b ? -1 : 1 : -1;
-  }
-  if (b.length === 1) {
+  if (b.length === 1)
     return 1;
-  }
-  if (a === ONLY_WILDCARD_REG_EXP_STR || a === TAIL_WILDCARD_REG_EXP_STR) {
-    return b === TAIL_WILDCARD_REG_EXP_STR ? -1 : 1;
-  } else if (b === ONLY_WILDCARD_REG_EXP_STR || b === TAIL_WILDCARD_REG_EXP_STR) {
+  if (a === "[^]*" || a === "(?:|/[^]*)")
+    return b === "[^]*" ? -1 : 1;
+  else if (b === "[^]*" || b === "(?:|/[^]*)")
     return -1;
-  }
-  if (a === LABEL_REG_EXP_STR) {
+  if (a === "[^/]+")
     return 1;
-  } else if (b === LABEL_REG_EXP_STR) {
+  else if (b === "[^/]+")
     return -1;
-  }
   return a.length === b.length ? a < b ? -1 : 1 : b.length - a.length;
 }
-var Node = class _Node {
+var Node = class Node {
   #index;
   #varIndex;
   #children = createNullObject();
-  insert(tokens, index, paramMap, context, isStatic) {
+  insert(tokens, index, paramMap, context, keys) {
     let node = this;
     for (let i = 0, len = tokens.length;i < len; i++) {
       const token = tokens[i];
-      const pattern = token.length === 1 ? token === "*" ? i === len - 1 ? ["", "", ONLY_WILDCARD_REG_EXP_STR] : ["", "", LABEL_REG_EXP_STR] : null : token === "/*" ? ["", "", TAIL_WILDCARD_REG_EXP_STR] : token.match(/^\:([^\{\}]+)(?:\{(.+)\})?$/);
+      const pattern = token.length === 1 ? token === "*" ? i === len - 1 ? [
+        "",
+        "",
+        ONLY_WILDCARD_REG_EXP_STR
+      ] : [
+        "",
+        "",
+        LABEL_REG_EXP_STR
+      ] : null : token === "/*" ? [
+        "",
+        "",
+        TAIL_WILDCARD_REG_EXP_STR
+      ] : token.match(/^\:([^\{\}]+)(?:\{(.+)\})?$/);
       let nextNode;
       if (pattern) {
         const name = pattern[1];
-        let regexpStr = pattern[2] || LABEL_REG_EXP_STR;
+        let regexpStr = pattern[2] || "[^/]+";
         if (name && pattern[2]) {
-          if (regexpStr === ".*") {
+          if (new RegExp(regexpStr).test(""))
             throw PATH_ERROR;
-          }
           regexpStr = regexpStr.replace(/^\((?!\?:)(?=[^)]+\)$)/, "(?:");
-          if (/\((?!\?:)/.test(regexpStr)) {
+          if (/\((?!\?:)/.test(regexpStr))
             throw PATH_ERROR;
-          }
-          if (regexpStr.length === 1 && regExpMetaChars.has(regexpStr)) {
+          if (regexpStr.length === 1 && regExpMetaChars.has(regexpStr))
             throw PATH_ERROR;
-          }
         }
+        keys.push(regexpStr);
         nextNode = node.#children[regexpStr];
         if (!nextNode) {
-          if (regexpStr !== ONLY_WILDCARD_REG_EXP_STR && regexpStr !== TAIL_WILDCARD_REG_EXP_STR) {
-            for (const k in node.#children) {
-              if ((regexpStr.length > 1 || k.length > 1) && k !== ONLY_WILDCARD_REG_EXP_STR && k !== TAIL_WILDCARD_REG_EXP_STR) {
+          if (regexpStr !== "[^]*" && regexpStr !== "(?:|/[^]*)") {
+            for (const k in node.#children)
+              if ((regexpStr.length > 1 || k.length > 1) && k !== "[^]*" && k !== "(?:|/[^]*)")
                 throw PATH_ERROR;
-              }
-            }
           }
-          nextNode = node.#children[regexpStr] = new _Node;
+          nextNode = node.#children[regexpStr] = new Node;
         }
         if (name !== "") {
           nextNode.#varIndex ??= context.varIndex++;
           paramMap.push([name, nextNode.#varIndex]);
         }
       } else {
+        keys.push(token);
         nextNode = node.#children[token];
         if (!nextNode) {
-          for (const k in node.#children) {
-            if (k.length > 1 && k !== ONLY_WILDCARD_REG_EXP_STR && k !== TAIL_WILDCARD_REG_EXP_STR) {
+          for (const k in node.#children)
+            if (k.length > 1 && k !== "[^]*" && k !== "(?:|/[^]*)")
               throw PATH_ERROR;
-            }
-          }
-          nextNode = node.#children[token] = new _Node;
+          nextNode = node.#children[token] = new Node;
         }
       }
       node = nextNode;
     }
-    if (node.#index !== undefined) {
+    if (node.#index !== undefined)
       throw PATH_ERROR;
-    }
-    node.#index = isStatic ? -1 : index;
+    node.#index = index;
   }
   buildRegExpStr() {
-    const childKeys = Object.keys(this.#children).sort(compareKey);
-    const strList = childKeys.map((k) => {
+    const strList = Object.keys(this.#children).sort(compareKey).map((k) => {
       const c = this.#children[k];
       const childStr = c.buildRegExpStr();
       return childStr === "" ? "" : (typeof c.#varIndex === "number" ? `(${k})@${c.#varIndex}` : regExpMetaChars.has(k) ? `\\${k}` : k) + childStr;
     }).filter(Boolean);
-    if (typeof this.#index === "number" && this.#index !== -1) {
+    if (typeof this.#index === "number" && this.#index !== -1)
       strList.unshift(`#${this.#index}`);
-    }
-    if (strList.length === 0) {
+    if (strList.length === 0)
       return "";
-    }
-    if (strList.length === 1) {
+    if (strList.length === 1)
       return strList[0];
-    }
     return "(?:" + strList.join("|") + ")";
   }
 };
@@ -1057,8 +1038,14 @@ var Trie = class {
   #index = 0;
   paths = createNullObject();
   insert(path, isStatic) {
+    const keys = [];
     if (isStatic) {
-      this.#root.insert(path.split(""), 0, [], this.#context, true);
+      this.#root.insert(path.split(""), -1, [], this.#context, keys);
+      this.paths[path] = [
+        -1,
+        [],
+        keys
+      ];
       return;
     }
     const paramAssoc = [];
@@ -1066,35 +1053,40 @@ var Trie = class {
     let markedPath = path;
     for (let i = 0;; ) {
       let replaced = false;
-      markedPath = markedPath.replace(/\{[^}]+\}/g, (m) => {
+      markedPath = markedPath.replace(/\{(?:\{[\d,]+\}|[^}])+\}/g, (m) => {
         const mark = `@\\${i}`;
         groups[i] = [mark, m];
         i++;
         replaced = true;
         return mark;
       });
-      if (!replaced) {
+      if (!replaced)
         break;
-      }
     }
-    const tokens = markedPath.match(/(?::[^\/]+)|(?:\/\*$)|./g) || [];
+    const tokens = markedPath.match(/(?::[^\/]+)|(?:\/\*$)|./gs) || [];
     for (let i = groups.length - 1;i >= 0; i--) {
       const [mark] = groups[i];
-      for (let j = tokens.length - 1;j >= 0; j--) {
+      for (let j = tokens.length - 1;j >= 0; j--)
         if (tokens[j].indexOf(mark) !== -1) {
           tokens[j] = tokens[j].replace(mark, groups[i][1]);
           break;
         }
-      }
     }
-    this.#root.insert(tokens, this.#index, paramAssoc, this.#context, false);
-    this.paths[path] = [this.#index++, paramAssoc];
+    this.#root.insert(tokens, this.#index, paramAssoc, this.#context, keys);
+    this.paths[path] = [
+      this.#index++,
+      paramAssoc,
+      keys
+    ];
   }
   buildRegExp() {
     let regexp = this.#root.buildRegExpStr();
-    if (regexp === "") {
-      return [/^$/, [], []];
-    }
+    if (regexp === "")
+      return [
+        /^$/,
+        [],
+        []
+      ];
     let captureIndex = 0;
     const indexReplacementMap = [];
     const paramReplacementMap = [];
@@ -1109,32 +1101,33 @@ var Trie = class {
       }
       return "";
     });
-    return [new RegExp(`^${regexp}`), indexReplacementMap, paramReplacementMap];
+    return [
+      new RegExp(`^${regexp}`),
+      indexReplacementMap,
+      paramReplacementMap
+    ];
   }
 };
 
 // /zveltio-extension/node_modules/hono/dist/router/reg-exp-router/router.js
-var wildcardRegExpCache = createNullObject();
-function buildWildcardRegExp(path) {
-  return wildcardRegExpCache[path] ??= new RegExp(`^${path.replace(/\/:[^/{}]+(?:\{\[\^\/]\+})?(?=[/{]|$)|\/?\*$|([.\\+*[^\]$()?{}|])/g, (match2, metaChar) => metaChar ? `\\${metaChar}` : match2 === "/*" ? TAIL_WILDCARD_REG_EXP_STR : match2 === "*" ? ONLY_WILDCARD_REG_EXP_STR : `/:${LABEL_REG_EXP_STR}`)}$`);
+function endsWithWildcard(keys) {
+  const tail = keys[keys.length - 1];
+  return tail === "[^]*" || tail === "(?:|/[^]*)";
 }
-function findMiddleware(middleware, path) {
-  for (const k of Object.keys(middleware).sort((a, b) => b.length - a.length)) {
-    if (buildWildcardRegExp(k).test(path)) {
-      return [...middleware[k]];
-    }
-  }
-  return;
+function covers(wildcard, target) {
+  const last = wildcard.length - 1;
+  for (let i = 0;i < last; i++)
+    if (wildcard[i] !== target[i])
+      return false;
+  return wildcard[last] === "[^]*" || target.length === last || target[last] === "/";
 }
 var RegExpRouter = class {
   name = "RegExpRouter";
-  #middleware;
-  #routes;
+  #handlers;
   #tries;
   constructor() {
-    this.#middleware = { [METHOD_NAME_ALL]: createNullObject() };
-    this.#routes = { [METHOD_NAME_ALL]: createNullObject() };
-    this.#tries = { [METHOD_NAME_ALL]: new Trie };
+    this.#handlers = { ["ALL"]: [] };
+    this.#tries = { ["ALL"]: new Trie };
   }
   #insertPath(method, path) {
     try {
@@ -1144,88 +1137,68 @@ var RegExpRouter = class {
     }
   }
   add(method, path, handler) {
-    const middleware = this.#middleware;
-    const routes = this.#routes;
-    if (!middleware) {
+    const handlers = this.#handlers;
+    if (!handlers)
       throw new Error(MESSAGE_MATCHER_IS_ALREADY_BUILT);
+    const tries = this.#tries;
+    if (!handlers[method]) {
+      tries[method] = new Trie;
+      handlers[method] = [...handlers["ALL"]];
+      for (const p in tries["ALL"].paths)
+        this.#insertPath(method, p);
     }
-    if (!middleware[method]) {
-      this.#tries[method] = new Trie;
-      for (const handlerMap of [middleware, routes]) {
-        handlerMap[method] = createNullObject();
-        for (const p in handlerMap[METHOD_NAME_ALL]) {
-          handlerMap[method][p] = [...handlerMap[METHOD_NAME_ALL][p]];
-          this.#insertPath(method, p);
-        }
-      }
-    }
-    if (path === "/*") {
+    if (path === "/*")
       path = "*";
-    }
-    const methods = method === METHOD_NAME_ALL ? Object.keys(middleware) : [method];
-    if (/\*$/.test(path)) {
-      const re = buildWildcardRegExp(path);
-      for (const m of methods) {
-        if (!middleware[m][path]) {
-          this.#insertPath(m, path);
-          middleware[m][path] = findMiddleware(middleware[m], path) || findMiddleware(middleware[METHOD_NAME_ALL], path) || [];
-        }
-      }
-      for (const handlerMap of [middleware, routes]) {
-        for (const m of methods) {
-          for (const p in handlerMap[m]) {
-            re.test(p) && handlerMap[m][p].push([handler, path]);
-          }
-        }
-      }
-      return;
-    }
+    const methods = method === "ALL" ? Object.keys(handlers) : [method];
     const paths = checkOptionalParameter(path) || [path];
-    for (const path2 of paths) {
+    for (const path of paths)
       for (const m of methods) {
-        if (!routes[m][path2]) {
-          this.#insertPath(m, path2);
-          routes[m][path2] = findMiddleware(middleware[m], path2) || findMiddleware(middleware[METHOD_NAME_ALL], path2) || [];
-        }
-        routes[m][path2].push([handler, path2]);
+        if (!tries[m].paths[path])
+          this.#insertPath(m, path);
+        handlers[m].push([handler, path]);
       }
-    }
   }
   match = match;
   buildAllMatchers() {
     const matchers = createNullObject();
-    for (const method of Object.keys(this.#routes)) {
+    for (const method of Object.keys(this.#handlers))
       matchers[method] = this.#buildMatcher(method);
-    }
-    this.#middleware = this.#routes = this.#tries = undefined;
-    wildcardRegExpCache = createNullObject();
+    this.#handlers = this.#tries = undefined;
     return matchers;
   }
   #buildMatcher(method) {
-    const middleware = this.#middleware[method];
-    const routes = this.#routes[method];
+    const handlers = this.#handlers[method];
     const trie = this.#tries[method];
     const staticMap = createNullObject();
     const handlerData = [];
     const [regexp, indexReplacementMap, paramReplacementMap] = trie.buildRegExp();
-    for (const r of [middleware, routes]) {
-      for (const path in r) {
-        const handlers = r[path];
-        const pathData = trie.paths[path];
-        if (!pathData) {
-          staticMap[path] = [handlers.map(([h]) => [h, createNullObject()]), emptyParam];
-          continue;
-        }
-        handlerData[pathData[0]] = handlers.map(([h, handlerPath]) => [
-          h,
-          trie.paths[handlerPath][1].reduceRight((map, [key], i) => {
-            map[key] = paramReplacementMap[pathData[1][i][1]];
-            return map;
-          }, createNullObject())
-        ]);
-      }
+    const own = createNullObject();
+    const entries = handlers.map(([h, p], i) => {
+      (own[p] ??= []).push(i);
+      return [h, trie.paths[p][1].reduceRight((map, [key, varIndex]) => {
+        map[key] = paramReplacementMap[varIndex];
+        return map;
+      }, createNullObject())];
+    });
+    const wildcards = Object.keys(own).filter((p) => endsWithWildcard(trie.paths[p][2]));
+    for (const path in trie.paths) {
+      const [index, , keys] = trie.paths[path];
+      const indexes = [...own[path]];
+      for (const p of wildcards)
+        if (p !== path && covers(trie.paths[p][2], keys))
+          indexes.push(...own[p]);
+      const data = indexes.sort((a, b) => a - b).map((i) => entries[i]);
+      if (index === -1) {
+        const last = Math.max(-1, ...data.flatMap(([, map]) => Object.values(map)));
+        staticMap[path] = [data, last === -1 ? emptyParam : path.match(regexp).slice(0, last + 1)];
+      } else
+        handlerData[index] = data;
     }
-    return [regexp, indexReplacementMap.map((i) => handlerData[i]), staticMap];
+    return [
+      regexp,
+      indexReplacementMap.map((i) => handlerData[i]),
+      staticMap
+    ];
   }
 };
 
@@ -1238,15 +1211,17 @@ var SmartRouter = class {
     this.#routers = init.routers;
   }
   add(method, path, handler) {
-    if (!this.#routes) {
+    if (!this.#routes)
       throw new Error(MESSAGE_MATCHER_IS_ALREADY_BUILT);
-    }
-    this.#routes.push([method, path, handler]);
+    this.#routes.push([
+      method,
+      path,
+      handler
+    ]);
   }
   match(method, path) {
-    if (!this.#routes) {
+    if (!this.#routes)
       throw new Error("Fatal error");
-    }
     const routers = this.#routers;
     const routes = this.#routes;
     const len = routers.length;
@@ -1255,14 +1230,12 @@ var SmartRouter = class {
     for (;i < len; i++) {
       const router = routers[i];
       try {
-        for (let i2 = 0, len2 = routes.length;i2 < len2; i2++) {
-          router.add(...routes[i2]);
-        }
+        for (let i = 0, len = routes.length;i < len; i++)
+          router.add(...routes[i]);
         res = router.match(method, path);
       } catch (e) {
-        if (e instanceof UnsupportedPathError) {
+        if (e instanceof UnsupportedPathError)
           continue;
-        }
         throw e;
       }
       this.match = router.match.bind(router);
@@ -1270,16 +1243,14 @@ var SmartRouter = class {
       this.#routes = undefined;
       break;
     }
-    if (i === len) {
+    if (i === len)
       throw new Error("Fatal error");
-    }
     this.name = `SmartRouter + ${this.activeRouter.name}`;
     return res;
   }
   get activeRouter() {
-    if (this.#routes || this.#routers.length !== 1) {
+    if (this.#routes || this.#routers.length !== 1)
       throw new Error("No active router has been determined yet.");
-    }
     return this.#routers[0];
   }
 };
@@ -1287,7 +1258,7 @@ var SmartRouter = class {
 // /zveltio-extension/node_modules/hono/dist/router/trie-router/node.js
 var emptyParams = createNullObject();
 var order = 0;
-var Node2 = class _Node {
+var Node2 = class Node {
   #methods = [];
   #children = createNullObject();
   #patterns = [];
@@ -1303,34 +1274,31 @@ var Node2 = class _Node {
       const pattern = getPattern(p, nextP) || (nextP === undefined && p && p.indexOf("*") === p.length - 1 ? p : null);
       const isParam = Array.isArray(pattern);
       const key = isParam ? pattern[0] : pattern || p;
-      const child = curNode.#children[key] ||= new _Node;
+      const child = curNode.#children[key] ||= new Node;
       if (pattern && !child.#pattern) {
         child.#pattern = pattern;
         curNode.#patterns.push(child);
       }
       curNode = child;
-      if (isParam) {
+      if (isParam)
         possibleKeys.add(pattern[1]);
-      }
     }
-    curNode.#methods.push({
-      [method]: {
-        handler,
-        possibleKeys: [...possibleKeys],
-        score: ++order
-      }
-    });
+    curNode.#methods.push({ [method]: {
+      handler,
+      possibleKeys: [...possibleKeys],
+      score: ++order
+    } });
   }
   #pushHandlerSets(handlerSets, node, method, nodeParams, params) {
     for (let i = 0, len = node.#methods.length;i < len; i++) {
       const m = node.#methods[i];
-      const handlerSet = m[method] || m[METHOD_NAME_ALL];
+      const handlerSet = m[method] || m["ALL"];
       if (handlerSet) {
         handlerSet.params = createNullObject();
         handlerSets.push(handlerSet);
-        for (let i2 = 0, len2 = handlerSet.possibleKeys.length;i2 < len2; i2++) {
-          const key = handlerSet.possibleKeys[i2];
-          handlerSet.params[key] = params?.[key] && !i2 ? params[key] : nodeParams[key] ?? params?.[key];
+        for (let i = 0, len = handlerSet.possibleKeys.length;i < len; i++) {
+          const key = handlerSet.possibleKeys[i];
+          handlerSet.params[key] = params?.[key] && !i ? params[key] : nodeParams[key] ?? params?.[key];
         }
       }
     }
@@ -1338,8 +1306,7 @@ var Node2 = class _Node {
   search(method, path) {
     const handlerSets = [];
     this.#params = emptyParams;
-    const curNode = this;
-    let curNodes = [curNode];
+    let curNodes = [this];
     const parts = splitPath(path);
     const curNodesQueue = [];
     const len = parts.length;
@@ -1354,13 +1321,11 @@ var Node2 = class _Node {
         if (nextNode) {
           nextNode.#params = node.#params;
           if (isLast) {
-            if (nextNode.#children["*"]) {
+            if (nextNode.#children["*"])
               this.#pushHandlerSets(handlerSets, nextNode.#children["*"], method, node.#params);
-            }
             this.#pushHandlerSets(handlerSets, nextNode, method, node.#params);
-          } else {
+          } else
             tempNodes.push(nextNode);
-          }
         }
         for (const child of node.#patterns) {
           const pattern = child.#pattern;
@@ -1376,9 +1341,8 @@ var Node2 = class _Node {
             continue;
           }
           const [, name, matcher] = pattern;
-          if (!part && matcher === true) {
+          if (!part && matcher === true)
             continue;
-          }
           if (matcher !== true) {
             if (!partOffsets) {
               partOffsets = [];
@@ -1391,28 +1355,27 @@ var Node2 = class _Node {
             const restPathString = path.slice(partOffsets[i]);
             const m = matcher.exec(restPathString);
             if (m) {
-              params[name] = m[0];
+              if (!Object.hasOwn(params, name))
+                params[name] = m[0];
               this.#pushHandlerSets(handlerSets, child, method, node.#params, params);
-              if (m[0].length === restPathString.length && child.#children["*"]) {
+              if (m[0].length === restPathString.length && child.#children["*"])
                 this.#pushHandlerSets(handlerSets, child.#children["*"], method, node.#params, params);
-              }
               for (const _ in child.#children) {
                 child.#params = params;
                 const componentCount = m[0].match(/\//g)?.length ?? 0;
-                const targetCurNodes = curNodesQueue[componentCount] ||= [];
-                targetCurNodes.push(child);
+                (curNodesQueue[componentCount] ||= []).push(child);
                 break;
               }
               continue;
             }
           }
           if (matcher === true || matcher.test(part)) {
-            params[name] = part;
+            if (!Object.hasOwn(params, name))
+              params[name] = part;
             if (isLast) {
               this.#pushHandlerSets(handlerSets, child, method, params, node.#params);
-              if (child.#children["*"]) {
+              if (child.#children["*"])
                 this.#pushHandlerSets(handlerSets, child.#children["*"], method, params, node.#params);
-              }
             } else {
               child.#params = params;
               tempNodes.push(child);
@@ -1423,11 +1386,10 @@ var Node2 = class _Node {
       const shifted = curNodesQueue.shift();
       curNodes = shifted ? tempNodes.concat(shifted) : tempNodes;
     }
-    if (handlerSets[1]) {
+    if (handlerSets[1])
       handlerSets.sort((a, b) => {
         return a.score - b.score;
       });
-    }
     return [handlerSets.map(({ handler, params }) => [handler, params])];
   }
 };
@@ -1437,9 +1399,8 @@ var TrieRouter = class {
   name = "TrieRouter";
   #node = new Node2;
   add(method, path, handler) {
-    for (const result of checkOptionalParameter(path) || [path]) {
+    for (const result of checkOptionalParameter(path) || [path])
       this.#node.insert(method, result, handler);
-    }
   }
   match(method, path) {
     return this.#node.search(method, path);
@@ -1450,9 +1411,7 @@ var TrieRouter = class {
 var Hono2 = class extends Hono {
   constructor(options = {}) {
     super(options);
-    this.router = options.router ?? new SmartRouter({
-      routers: [new RegExpRouter, new TrieRouter]
-    });
+    this.router = options.router ?? new SmartRouter({ routers: [new RegExpRouter, new TrieRouter] });
   }
 };
 // /zveltio-extension/node_modules/graphql/jsutils/devAssert.mjs
@@ -1928,31 +1887,57 @@ function stringToArray(str) {
   return array;
 }
 
-// /zveltio-extension/node_modules/graphql/jsutils/invariant.mjs
-function invariant(condition, message) {
-  const booleanCondition = Boolean(condition);
-  if (!booleanCondition) {
-    throw new Error(message != null ? message : "Unexpected invariant triggered.");
-  }
-}
-
 // /zveltio-extension/node_modules/graphql/language/location.mjs
-var LineRegExp = /\r\n|[\n\r]/g;
 function getLocation(source, position) {
-  let lastLineStart = 0;
+  const lineRegexp = /\r\n|[\n\r]/g;
   let line = 1;
-  for (const match of source.body.matchAll(LineRegExp)) {
-    typeof match.index === "number" || invariant(false);
-    if (match.index >= position) {
-      break;
-    }
-    lastLineStart = match.index + match[0].length;
-    line += 1;
+  let column = position + 1;
+  let match;
+  while ((match = lineRegexp.exec(source.body)) && match.index < position) {
+    line++;
+    column = position + 1 - (match.index + match[0].length);
   }
   return {
     line,
-    column: position + 1 - lastLineStart
+    column
   };
+}
+function getLocations(locations) {
+  if (locations.length < 2) {
+    return locations.map(({ source, start }) => getLocation(source, start));
+  }
+  const bySource = new Map;
+  locations.forEach(({ source, start }, index) => {
+    let positions = bySource.get(source);
+    if (positions === undefined) {
+      positions = [];
+      bySource.set(source, positions);
+    }
+    positions.push({
+      position: start,
+      index
+    });
+  });
+  const result = new Array(locations.length);
+  for (const [source, positions] of bySource) {
+    const lineRegexp = /\r\n|[\n\r]/g;
+    let match = lineRegexp.exec(source.body);
+    let line = 1;
+    let lastLineStart = 0;
+    positions.sort((a, b) => a.position - b.position);
+    for (const { position, index } of positions) {
+      while (match !== null && match.index < position) {
+        lastLineStart = match.index + match[0].length;
+        line++;
+        match = lineRegexp.exec(source.body);
+      }
+      result[index] = {
+        line,
+        column: position + 1 - lastLineStart
+      };
+    }
+  }
+  return result;
 }
 
 // /zveltio-extension/node_modules/graphql/language/printLocation.mjs
@@ -2027,7 +2012,10 @@ class GraphQLError extends Error {
     const nodeLocations = undefinedIfEmpty((_this$nodes = this.nodes) === null || _this$nodes === undefined ? undefined : _this$nodes.map((node) => node.loc).filter((loc) => loc != null));
     this.source = source !== null && source !== undefined ? source : nodeLocations === null || nodeLocations === undefined ? undefined : (_nodeLocations$ = nodeLocations[0]) === null || _nodeLocations$ === undefined ? undefined : _nodeLocations$.source;
     this.positions = positions !== null && positions !== undefined ? positions : nodeLocations === null || nodeLocations === undefined ? undefined : nodeLocations.map((loc) => loc.start);
-    this.locations = positions && source ? positions.map((pos) => getLocation(source, pos)) : nodeLocations === null || nodeLocations === undefined ? undefined : nodeLocations.map((loc) => getLocation(loc.source, loc.start));
+    this.locations = positions && source ? getLocations(positions.map((start) => ({
+      source,
+      start
+    }))) : nodeLocations && getLocations(nodeLocations);
     const originalExtensions = isObjectLike(originalError === null || originalError === undefined ? undefined : originalError.extensions) ? originalError === null || originalError === undefined ? undefined : originalError.extensions : undefined;
     this.extensions = (_ref = extensions !== null && extensions !== undefined ? extensions : originalExtensions) !== null && _ref !== undefined ? _ref : Object.create(null);
     Object.defineProperties(this, {
@@ -2403,455 +2391,434 @@ var escapeSequences = [
   "\\u009F"
 ];
 
-// /zveltio-extension/node_modules/graphql/language/visitor.mjs
-var BREAK = Object.freeze({});
-function visit(root, visitor, visitorKeys = QueryDocumentKeys) {
-  const enterLeaveMap = new Map;
-  for (const kind of Object.values(Kind)) {
-    enterLeaveMap.set(kind, getEnterLeaveForKind(visitor, kind));
-  }
-  let stack = undefined;
-  let inArray = Array.isArray(root);
-  let keys = [root];
-  let index = -1;
-  let edits = [];
-  let node = root;
-  let key = undefined;
-  let parent = undefined;
-  const path = [];
-  const ancestors = [];
+// /zveltio-extension/node_modules/graphql/language/reducer.mjs
+function reduce(root, reducer) {
+  const stack = [];
+  let frame = {
+    parent: [root],
+    keys: undefined,
+    results: [],
+    index: -1
+  };
+  let node;
   do {
-    index++;
-    const isLeaving = index === keys.length;
-    const isEdited = isLeaving && edits.length !== 0;
-    if (isLeaving) {
-      key = ancestors.length === 0 ? undefined : path[path.length - 1];
-      node = parent;
-      parent = ancestors.pop();
-      if (isEdited) {
-        if (inArray) {
-          node = node.slice();
-          let editOffset = 0;
-          for (const [editKey, editValue] of edits) {
-            const arrayKey = editKey - editOffset;
-            if (editValue === null) {
-              node.splice(arrayKey, 1);
-              editOffset++;
-            } else {
-              node[arrayKey] = editValue;
-            }
-          }
-        } else {
-          node = { ...node };
-          for (const [editKey, editValue] of edits) {
-            node[editKey] = editValue;
-          }
-        }
-      }
-      index = stack.index;
-      keys = stack.keys;
-      edits = stack.edits;
-      inArray = stack.inArray;
-      stack = stack.prev;
-    } else if (parent) {
-      key = inArray ? index : keys[index];
-      node = parent[key];
-      if (node === null || node === undefined) {
+    let kind;
+    frame.index++;
+    const length = frame.keys === undefined ? frame.parent.length : frame.keys.length;
+    if (frame.index === length) {
+      node = frame.results;
+      kind = frame.keys === undefined ? undefined : frame.results.kind;
+      frame = stack.pop();
+    } else {
+      node = frame.keys === undefined ? frame.parent[frame.index] : frame.parent[frame.keys[frame.index]];
+      if (node == null && stack.length !== 0) {
         continue;
       }
-      path.push(key);
-    }
-    let result;
-    if (!Array.isArray(node)) {
-      var _enterLeaveMap$get, _enterLeaveMap$get2;
-      isNode(node) || devAssert(false, `Invalid AST Node: ${inspect(node)}.`);
-      const visitFn = isLeaving ? (_enterLeaveMap$get = enterLeaveMap.get(node.kind)) === null || _enterLeaveMap$get === undefined ? undefined : _enterLeaveMap$get.leave : (_enterLeaveMap$get2 = enterLeaveMap.get(node.kind)) === null || _enterLeaveMap$get2 === undefined ? undefined : _enterLeaveMap$get2.enter;
-      result = visitFn === null || visitFn === undefined ? undefined : visitFn.call(visitor, node, key, parent, path, ancestors);
-      if (result === BREAK) {
-        break;
-      }
-      if (result === false) {
-        if (!isLeaving) {
-          path.pop();
+      if (Array.isArray(node)) {
+        if (node.length !== 0) {
+          stack.push(frame);
+          frame = {
+            parent: node,
+            keys: undefined,
+            results: [],
+            index: -1
+          };
           continue;
         }
-      } else if (result !== undefined) {
-        edits.push([key, result]);
-        if (!isLeaving) {
-          if (isNode(result)) {
-            node = result;
-          } else {
-            path.pop();
-            continue;
-          }
+      } else {
+        const parent = node;
+        kind = parent === null || parent === undefined ? undefined : parent.kind;
+        const keys = typeof kind === "string" ? QueryDocumentKeys[kind] : undefined;
+        if (!Array.isArray(keys)) {
+          throw new Error(`Invalid AST Node: ${inspect(node)}.`);
+        }
+        if (keys.length !== 0) {
+          stack.push(frame);
+          frame = {
+            parent,
+            keys,
+            results: { ...parent },
+            index: -1
+          };
+          continue;
         }
       }
     }
-    if (result === undefined && isEdited) {
-      edits.push([key, node]);
+    if (kind !== undefined) {
+      const reduceNode = reducer[kind];
+      node = reduceNode === null || reduceNode === undefined ? undefined : reduceNode(node);
     }
-    if (isLeaving) {
-      path.pop();
+    if (frame.keys === undefined) {
+      frame.results.push(node);
     } else {
-      var _node$kind;
-      stack = {
-        inArray,
-        index,
-        keys,
-        edits,
-        prev: stack
-      };
-      inArray = Array.isArray(node);
-      keys = inArray ? node : (_node$kind = visitorKeys[node.kind]) !== null && _node$kind !== undefined ? _node$kind : [];
-      index = -1;
-      edits = [];
-      if (parent) {
-        ancestors.push(parent);
-      }
-      parent = node;
+      frame.results[frame.keys[frame.index]] = node;
     }
-  } while (stack !== undefined);
-  if (edits.length !== 0) {
-    return edits[edits.length - 1][1];
-  }
-  return root;
-}
-function visitInParallel(visitors) {
-  const skipping = new Array(visitors.length).fill(null);
-  const mergedVisitor = Object.create(null);
-  for (const kind of Object.values(Kind)) {
-    let hasVisitor = false;
-    const enterList = new Array(visitors.length).fill(undefined);
-    const leaveList = new Array(visitors.length).fill(undefined);
-    for (let i = 0;i < visitors.length; ++i) {
-      const { enter, leave } = getEnterLeaveForKind(visitors[i], kind);
-      hasVisitor || (hasVisitor = enter != null || leave != null);
-      enterList[i] = enter;
-      leaveList[i] = leave;
-    }
-    if (!hasVisitor) {
-      continue;
-    }
-    const mergedEnterLeave = {
-      enter(...args) {
-        const node = args[0];
-        for (let i = 0;i < visitors.length; i++) {
-          if (skipping[i] === null) {
-            var _enterList$i;
-            const result = (_enterList$i = enterList[i]) === null || _enterList$i === undefined ? undefined : _enterList$i.apply(visitors[i], args);
-            if (result === false) {
-              skipping[i] = node;
-            } else if (result === BREAK) {
-              skipping[i] = BREAK;
-            } else if (result !== undefined) {
-              return result;
-            }
-          }
-        }
-      },
-      leave(...args) {
-        const node = args[0];
-        for (let i = 0;i < visitors.length; i++) {
-          if (skipping[i] === null) {
-            var _leaveList$i;
-            const result = (_leaveList$i = leaveList[i]) === null || _leaveList$i === undefined ? undefined : _leaveList$i.apply(visitors[i], args);
-            if (result === BREAK) {
-              skipping[i] = BREAK;
-            } else if (result !== undefined && result !== false) {
-              return result;
-            }
-          } else if (skipping[i] === node) {
-            skipping[i] = null;
-          }
-        }
-      }
-    };
-    mergedVisitor[kind] = mergedEnterLeave;
-  }
-  return mergedVisitor;
-}
-function getEnterLeaveForKind(visitor, kind) {
-  const kindVisitor = visitor[kind];
-  if (typeof kindVisitor === "object") {
-    return kindVisitor;
-  } else if (typeof kindVisitor === "function") {
-    return {
-      enter: kindVisitor,
-      leave: undefined
-    };
-  }
-  return {
-    enter: visitor.enter,
-    leave: visitor.leave
-  };
+  } while (stack.length !== 0);
+  return node;
 }
 
 // /zveltio-extension/node_modules/graphql/language/printer.mjs
-function print(ast) {
-  return visit(ast, printDocASTReducer);
+function print(ast, options) {
+  var _options$maxIndentDep;
+  return render(reduce(ast, printDocASTReducer), (_options$maxIndentDep = options === null || options === undefined ? undefined : options.maxIndentDepth) !== null && _options$maxIndentDep !== undefined ? _options$maxIndentDep : Infinity);
+}
+function printForError(ast) {
+  return print(ast, {
+    maxIndentDepth: 100
+  });
 }
 var MAX_LINE_LENGTH = 80;
-var printDocASTReducer = {
-  Name: {
-    leave: (node) => node.value
-  },
-  Variable: {
-    leave: (node) => "$" + node.name
-  },
-  Document: {
-    leave: (node) => join(node.definitions, `
 
-`)
-  },
-  OperationDefinition: {
-    leave(node) {
-      const varDefs = hasMultilineItems(node.variableDefinitions) ? wrap(`(
+class PrintBuffer {
+  next = undefined;
+  tail = this;
+  indentBefore = false;
+  dedentAfter = false;
+  constructor(value = "", isBlockString = false) {
+    this.length = value.length;
+    this.lines = value.includes(`
+`) ? value.split(`
+`) : value;
+    this.newlines = typeof this.lines === "string" ? 0 : this.lines.length - 1;
+    this.isBlockString = isBlockString;
+  }
+  append(result) {
+    if (result.length === 0) {
+      return this;
+    }
+    const next = typeof result === "string" ? new PrintBuffer(result) : result;
+    this.tail.next = next;
+    this.tail = next.tail;
+    this.length += next.length;
+    this.newlines += next.newlines;
+    return this;
+  }
+  indent() {
+    if (this.length === 0) {
+      return this;
+    }
+    this.indentBefore = true;
+    this.tail.dedentAfter = true;
+    this.length += 2 * (this.newlines + 1);
+    return this;
+  }
+}
+var EMPTY = new PrintBuffer;
+function render(buffer, maxDepth) {
+  let output = "";
+  let text = "";
+  let depth = 0;
+  let indentation = "";
+  let part = buffer;
+  while (part !== undefined) {
+    const lines = part.lines;
+    if (part.indentBefore) {
+      if (depth < maxDepth) {
+        indentation += "  ";
+        text += "  ";
+      }
+      depth++;
+    }
+    if (typeof lines === "string") {
+      text += lines;
+    } else {
+      text += lines[0];
+      const newline = !part.isBlockString && depth >= maxDepth ? " " : `
+` + indentation;
+      for (let i = 1;i < lines.length; i++) {
+        output += text;
+        text = newline + lines[i];
+      }
+    }
+    if (part.dedentAfter) {
+      depth--;
+      indentation = indentation.slice(0, depth * 2);
+    }
+    part = part.next;
+  }
+  return output + text;
+}
+var printDocASTReducer = {
+  Name: (node) => new PrintBuffer(node.value),
+  Variable: (node) => join(["$", node.name]),
+  Document: (node) => join(node.definitions, `
+
+`),
+  OperationDefinition(node) {
+    const varDefs = hasMultilineItems(node.variableDefinitions) ? wrap(`(
 `, join(node.variableDefinitions, `
 `), `
 )`) : wrap("(", join(node.variableDefinitions, ", "), ")");
-      const prefix = wrap("", node.description, `
-`) + join([
+    const prefix = join([
+      wrap("", node.description, `
+`),
+      join([
         node.operation,
         join([node.name, varDefs]),
         join(node.directives, " ")
-      ], " ");
-      return (prefix === "query" ? "" : prefix + " ") + node.selectionSet;
-    }
+      ], " ")
+    ]);
+    return join([
+      node.operation === "query" && prefix.length === node.operation.length ? "" : join([prefix, " "]),
+      node.selectionSet
+    ]);
   },
-  VariableDefinition: {
-    leave: ({ variable, type, defaultValue, directives, description }) => wrap("", description, `
-`) + variable + ": " + type + wrap(" = ", defaultValue) + wrap(" ", join(directives, " "))
+  VariableDefinition: ({
+    variable,
+    type,
+    defaultValue,
+    directives,
+    description
+  }) => join([
+    wrap("", description, `
+`),
+    variable,
+    ": ",
+    type,
+    wrap(" = ", defaultValue),
+    wrap(" ", join(directives, " "))
+  ]),
+  SelectionSet: ({ selections }) => block(selections),
+  Field({ alias, name, arguments: args, directives, selectionSet }) {
+    const prefix = join([wrap("", alias, ": "), name], "");
+    return join([
+      wrappedLineAndArgs(prefix, args),
+      wrap(" ", join(directives, " ")),
+      wrap(" ", selectionSet)
+    ]);
   },
-  SelectionSet: {
-    leave: ({ selections }) => block(selections)
-  },
-  Field: {
-    leave({ alias, name, arguments: args, directives, selectionSet }) {
-      const prefix = wrap("", alias, ": ") + name;
-      let argsLine = prefix + wrap("(", join(args, ", "), ")");
-      if (argsLine.length > MAX_LINE_LENGTH) {
-        argsLine = prefix + wrap(`(
-`, indent(join(args, `
-`)), `
-)`);
-      }
-      return join([argsLine, join(directives, " "), selectionSet], " ");
-    }
-  },
-  Argument: {
-    leave: ({ name, value }) => name + ": " + value
-  },
-  FragmentSpread: {
-    leave: ({ name, directives }) => "..." + name + wrap(" ", join(directives, " "))
-  },
-  InlineFragment: {
-    leave: ({ typeCondition, directives, selectionSet }) => join([
-      "...",
-      wrap("on ", typeCondition),
-      join(directives, " "),
-      selectionSet
-    ], " ")
-  },
-  FragmentDefinition: {
-    leave: ({
-      name,
-      typeCondition,
-      variableDefinitions,
-      directives,
-      selectionSet,
-      description
-    }) => wrap("", description, `
-`) + `fragment ${name}${wrap("(", join(variableDefinitions, ", "), ")")} ` + `on ${typeCondition} ${wrap("", join(directives, " "), " ")}` + selectionSet
-  },
-  IntValue: {
-    leave: ({ value }) => value
-  },
-  FloatValue: {
-    leave: ({ value }) => value
-  },
-  StringValue: {
-    leave: ({ value, block: isBlockString }) => isBlockString ? printBlockString(value) : printString(value)
-  },
-  BooleanValue: {
-    leave: ({ value }) => value ? "true" : "false"
-  },
-  NullValue: {
-    leave: () => "null"
-  },
-  EnumValue: {
-    leave: ({ value }) => value
-  },
-  ListValue: {
-    leave: ({ values }) => "[" + join(values, ", ") + "]"
-  },
-  ObjectValue: {
-    leave: ({ fields }) => "{" + join(fields, ", ") + "}"
-  },
-  ObjectField: {
-    leave: ({ name, value }) => name + ": " + value
-  },
-  Directive: {
-    leave: ({ name, arguments: args }) => "@" + name + wrap("(", join(args, ", "), ")")
-  },
-  NamedType: {
-    leave: ({ name }) => name
-  },
-  ListType: {
-    leave: ({ type }) => "[" + type + "]"
-  },
-  NonNullType: {
-    leave: ({ type }) => type + "!"
-  },
-  SchemaDefinition: {
-    leave: ({ description, directives, operationTypes }) => wrap("", description, `
-`) + join(["schema", join(directives, " "), block(operationTypes)], " ")
-  },
-  OperationTypeDefinition: {
-    leave: ({ operation, type }) => operation + ": " + type
-  },
-  ScalarTypeDefinition: {
-    leave: ({ description, name, directives }) => wrap("", description, `
-`) + join(["scalar", name, join(directives, " ")], " ")
-  },
-  ObjectTypeDefinition: {
-    leave: ({ description, name, interfaces, directives, fields }) => wrap("", description, `
-`) + join([
+  Argument: ({ name, value }) => join([name, ": ", value]),
+  FragmentSpread: ({ name, directives }) => join(["...", name, wrap(" ", join(directives, " "))]),
+  InlineFragment: ({ typeCondition, directives, selectionSet }) => join(["...", wrap("on ", typeCondition), join(directives, " "), selectionSet], " "),
+  FragmentDefinition: ({
+    name,
+    typeCondition,
+    variableDefinitions,
+    directives,
+    selectionSet,
+    description
+  }) => join([
+    wrap("", description, `
+`),
+    "fragment ",
+    name,
+    wrap("(", join(variableDefinitions, ", "), ")"),
+    " on ",
+    typeCondition,
+    " ",
+    wrap("", join(directives, " "), " "),
+    selectionSet
+  ]),
+  IntValue: ({ value }) => new PrintBuffer(value),
+  FloatValue: ({ value }) => new PrintBuffer(value),
+  StringValue: ({ value, block: isBlockString }) => new PrintBuffer(isBlockString === true ? printBlockString(value) : printString(value), isBlockString === true),
+  BooleanValue: ({ value }) => new PrintBuffer(value ? "true" : "false"),
+  NullValue: () => new PrintBuffer("null"),
+  EnumValue: ({ value }) => new PrintBuffer(value),
+  ListValue: ({ values }) => join(["[", join(values, ", "), "]"]),
+  ObjectValue: ({ fields }) => join(["{", join(fields, ", "), "}"]),
+  ObjectField: ({ name, value }) => join([name, ": ", value]),
+  Directive: ({ name, arguments: args }) => join(["@", name, wrap("(", join(args, ", "), ")")]),
+  NamedType: ({ name }) => name,
+  ListType: ({ type }) => join(["[", type, "]"]),
+  NonNullType: ({ type }) => join([type, "!"]),
+  SchemaDefinition: ({ description, directives, operationTypes }) => join([
+    wrap("", description, `
+`),
+    join(["schema", join(directives, " "), block(operationTypes)], " ")
+  ]),
+  OperationTypeDefinition: ({ operation, type }) => join([operation, ": ", type]),
+  ScalarTypeDefinition: ({ description, name, directives }) => join([
+    wrap("", description, `
+`),
+    join(["scalar", name, join(directives, " ")], " ")
+  ]),
+  ObjectTypeDefinition: ({
+    description,
+    name,
+    interfaces,
+    directives,
+    fields
+  }) => join([
+    wrap("", description, `
+`),
+    join([
       "type",
       name,
       wrap("implements ", join(interfaces, " & ")),
       join(directives, " "),
       block(fields)
     ], " ")
-  },
-  FieldDefinition: {
-    leave: ({ description, name, arguments: args, type, directives }) => wrap("", description, `
-`) + name + (hasMultilineItems(args) ? wrap(`(
-`, indent(join(args, `
-`)), `
-)`) : wrap("(", join(args, ", "), ")")) + ": " + type + wrap(" ", join(directives, " "))
-  },
-  InputValueDefinition: {
-    leave: ({ description, name, type, defaultValue, directives }) => wrap("", description, `
-`) + join([name + ": " + type, wrap("= ", defaultValue), join(directives, " ")], " ")
-  },
-  InterfaceTypeDefinition: {
-    leave: ({ description, name, interfaces, directives, fields }) => wrap("", description, `
-`) + join([
+  ]),
+  FieldDefinition: ({ description, name, arguments: args, type, directives }) => join([
+    wrap("", description, `
+`),
+    name,
+    hasMultilineItems(args) ? wrap(`(
+`, join(args, `
+`).indent(), `
+)`) : wrap("(", join(args, ", "), ")"),
+    ": ",
+    type,
+    wrap(" ", join(directives, " "))
+  ]),
+  InputValueDefinition: ({
+    description,
+    name,
+    type,
+    defaultValue,
+    directives
+  }) => join([
+    wrap("", description, `
+`),
+    name,
+    ": ",
+    type,
+    wrap(" = ", defaultValue),
+    wrap(" ", join(directives, " "))
+  ]),
+  InterfaceTypeDefinition: ({
+    description,
+    name,
+    interfaces,
+    directives,
+    fields
+  }) => join([
+    wrap("", description, `
+`),
+    join([
       "interface",
       name,
       wrap("implements ", join(interfaces, " & ")),
       join(directives, " "),
       block(fields)
     ], " ")
-  },
-  UnionTypeDefinition: {
-    leave: ({ description, name, directives, types }) => wrap("", description, `
-`) + join(["union", name, join(directives, " "), wrap("= ", join(types, " | "))], " ")
-  },
-  EnumTypeDefinition: {
-    leave: ({ description, name, directives, values }) => wrap("", description, `
-`) + join(["enum", name, join(directives, " "), block(values)], " ")
-  },
-  EnumValueDefinition: {
-    leave: ({ description, name, directives }) => wrap("", description, `
-`) + join([name, join(directives, " ")], " ")
-  },
-  InputObjectTypeDefinition: {
-    leave: ({ description, name, directives, fields }) => wrap("", description, `
-`) + join(["input", name, join(directives, " "), block(fields)], " ")
-  },
-  DirectiveDefinition: {
-    leave: ({
-      description,
-      name,
-      arguments: args,
-      directives,
-      repeatable,
-      locations
-    }) => wrap("", description, `
-`) + "directive @" + name + (hasMultilineItems(args) ? wrap(`(
-`, indent(join(args, `
-`)), `
-)`) : wrap("(", join(args, ", "), ")")) + wrap(" ", join(directives, " ")) + (repeatable ? " repeatable" : "") + " on " + join(locations, " | ")
-  },
-  SchemaExtension: {
-    leave: ({ directives, operationTypes }) => join(["extend schema", join(directives, " "), block(operationTypes)], " ")
-  },
-  ScalarTypeExtension: {
-    leave: ({ name, directives }) => join(["extend scalar", name, join(directives, " ")], " ")
-  },
-  ObjectTypeExtension: {
-    leave: ({ name, interfaces, directives, fields }) => join([
-      "extend type",
-      name,
-      wrap("implements ", join(interfaces, " & ")),
-      join(directives, " "),
-      block(fields)
-    ], " ")
-  },
-  InterfaceTypeExtension: {
-    leave: ({ name, interfaces, directives, fields }) => join([
-      "extend interface",
-      name,
-      wrap("implements ", join(interfaces, " & ")),
-      join(directives, " "),
-      block(fields)
-    ], " ")
-  },
-  UnionTypeExtension: {
-    leave: ({ name, directives, types }) => join([
-      "extend union",
-      name,
-      join(directives, " "),
-      wrap("= ", join(types, " | "))
-    ], " ")
-  },
-  EnumTypeExtension: {
-    leave: ({ name, directives, values }) => join(["extend enum", name, join(directives, " "), block(values)], " ")
-  },
-  InputObjectTypeExtension: {
-    leave: ({ name, directives, fields }) => join(["extend input", name, join(directives, " "), block(fields)], " ")
-  },
-  DirectiveExtension: {
-    leave: ({ name, directives }) => join(["extend directive @" + name, join(directives, " ")], " ")
-  },
-  TypeCoordinate: {
-    leave: ({ name }) => name
-  },
-  MemberCoordinate: {
-    leave: ({ name, memberName }) => join([name, wrap(".", memberName)])
-  },
-  ArgumentCoordinate: {
-    leave: ({ name, fieldName, argumentName }) => join([name, wrap(".", fieldName), wrap("(", argumentName, ":)")])
-  },
-  DirectiveCoordinate: {
-    leave: ({ name }) => join(["@", name])
-  },
-  DirectiveArgumentCoordinate: {
-    leave: ({ name, argumentName }) => join(["@", name, wrap("(", argumentName, ":)")])
-  }
+  ]),
+  UnionTypeDefinition: ({ description, name, directives, types }) => join([
+    wrap("", description, `
+`),
+    join(["union", name, join(directives, " "), wrap("= ", join(types, " | "))], " ")
+  ]),
+  EnumTypeDefinition: ({ description, name, directives, values }) => join([
+    wrap("", description, `
+`),
+    join(["enum", name, join(directives, " "), block(values)], " ")
+  ]),
+  EnumValueDefinition: ({ description, name, directives }) => join([
+    wrap("", description, `
+`),
+    join([name, join(directives, " ")], " ")
+  ]),
+  InputObjectTypeDefinition: ({ description, name, directives, fields }) => join([
+    wrap("", description, `
+`),
+    join(["input", name, join(directives, " "), block(fields)], " ")
+  ]),
+  DirectiveDefinition: ({
+    description,
+    name,
+    arguments: args,
+    directives,
+    repeatable,
+    locations
+  }) => join([
+    wrap("", description, `
+`),
+    "directive @",
+    name,
+    hasMultilineItems(args) ? wrap(`(
+`, join(args, `
+`).indent(), `
+)`) : wrap("(", join(args, ", "), ")"),
+    wrap(" ", join(directives, " ")),
+    repeatable ? " repeatable" : "",
+    " on ",
+    join(locations, " | ")
+  ]),
+  SchemaExtension: ({ directives, operationTypes }) => join(["extend schema", join(directives, " "), block(operationTypes)], " "),
+  ScalarTypeExtension: ({ name, directives }) => join(["extend scalar", name, join(directives, " ")], " "),
+  ObjectTypeExtension: ({ name, interfaces, directives, fields }) => join([
+    "extend type",
+    name,
+    wrap("implements ", join(interfaces, " & ")),
+    join(directives, " "),
+    block(fields)
+  ], " "),
+  InterfaceTypeExtension: ({ name, interfaces, directives, fields }) => join([
+    "extend interface",
+    name,
+    wrap("implements ", join(interfaces, " & ")),
+    join(directives, " "),
+    block(fields)
+  ], " "),
+  UnionTypeExtension: ({ name, directives, types }) => join([
+    "extend union",
+    name,
+    join(directives, " "),
+    wrap("= ", join(types, " | "))
+  ], " "),
+  EnumTypeExtension: ({ name, directives, values }) => join(["extend enum", name, join(directives, " "), block(values)], " "),
+  InputObjectTypeExtension: ({ name, directives, fields }) => join(["extend input", name, join(directives, " "), block(fields)], " "),
+  DirectiveExtension: ({ name, directives }) => join([join(["extend directive @", name]), join(directives, " ")], " "),
+  TypeCoordinate: ({ name }) => name,
+  MemberCoordinate: ({ name, memberName }) => join([name, wrap(".", memberName)]),
+  ArgumentCoordinate: ({ name, fieldName, argumentName }) => join([name, wrap(".", fieldName), wrap("(", argumentName, ":)")]),
+  DirectiveCoordinate: ({ name }) => join(["@", name]),
+  DirectiveArgumentCoordinate: ({ name, argumentName }) => join(["@", name, wrap("(", argumentName, ":)")])
 };
 function join(maybeArray, separator = "") {
-  var _maybeArray$filter$jo;
-  return (_maybeArray$filter$jo = maybeArray === null || maybeArray === undefined ? undefined : maybeArray.filter((x) => x).join(separator)) !== null && _maybeArray$filter$jo !== undefined ? _maybeArray$filter$jo : "";
+  if (maybeArray == null || maybeArray.length === 0) {
+    return EMPTY;
+  }
+  let result = EMPTY;
+  for (const item of maybeArray) {
+    if (item === undefined || item.length === 0) {
+      continue;
+    }
+    if (result.length === 0) {
+      result = typeof item === "string" ? new PrintBuffer(item) : item;
+    } else {
+      if (separator !== "") {
+        result.append(separator);
+      }
+      result.append(item);
+    }
+  }
+  return result;
+}
+function joinedLength(array, separator) {
+  let length = 0;
+  for (const item of array) {
+    if (item.length !== 0) {
+      length += (length === 0 ? 0 : separator.length) + item.length;
+    }
+  }
+  return length;
 }
 function block(array) {
   return wrap(`{
-`, indent(join(array, `
-`)), `
+`, join(array, `
+`).indent(), `
 }`);
 }
-function wrap(start, maybeString, end = "") {
-  return maybeString != null && maybeString !== "" ? start + maybeString + end : "";
-}
-function indent(str) {
-  return wrap("  ", str.replace(/\n/g, `
-  `));
+function wrap(start, maybeBuffer, end = "") {
+  return maybeBuffer != null && maybeBuffer.length !== 0 ? start === "" ? maybeBuffer.append(end) : new PrintBuffer(start).append(maybeBuffer).append(end) : EMPTY;
 }
 function hasMultilineItems(maybeArray) {
   var _maybeArray$some;
-  return (_maybeArray$some = maybeArray === null || maybeArray === undefined ? undefined : maybeArray.some((str) => str.includes(`
-`))) !== null && _maybeArray$some !== undefined ? _maybeArray$some : false;
+  return (_maybeArray$some = maybeArray === null || maybeArray === undefined ? undefined : maybeArray.some((result) => result.newlines !== 0)) !== null && _maybeArray$some !== undefined ? _maybeArray$some : false;
+}
+function wrappedLineAndArgs(prefix, args) {
+  if (args == null || args.length === 0) {
+    return prefix;
+  }
+  return join([
+    prefix,
+    prefix.length + joinedLength(args, ", ") + 2 > MAX_LINE_LENGTH ? wrap(`(
+`, join(args, `
+`).indent(), `
+)`) : wrap("(", join(args, ", "), ")")
+  ]);
 }
 
 // /zveltio-extension/node_modules/graphql/utilities/valueFromASTUntyped.mjs
@@ -3292,28 +3259,28 @@ class GraphQLEnumType {
     }
     return enumValue.name;
   }
-  parseValue(inputValue) {
+  parseValue(inputValue, hideSuggestions) {
     if (typeof inputValue !== "string") {
       const valueStr = inspect(inputValue);
-      throw new GraphQLError(`Enum "${this.name}" cannot represent non-string value: ${valueStr}.` + didYouMeanEnumValue(this, valueStr));
+      throw new GraphQLError(`Enum "${this.name}" cannot represent non-string value: ${valueStr}.` + (hideSuggestions ? "" : didYouMeanEnumValue(this, valueStr)));
     }
     const enumValue = this.getValue(inputValue);
     if (enumValue == null) {
-      throw new GraphQLError(`Value "${inputValue}" does not exist in "${this.name}" enum.` + didYouMeanEnumValue(this, inputValue));
+      throw new GraphQLError(`Value "${inputValue}" does not exist in "${this.name}" enum.` + (hideSuggestions ? "" : didYouMeanEnumValue(this, inputValue)));
     }
     return enumValue.value;
   }
-  parseLiteral(valueNode, _variables) {
+  parseLiteral(valueNode, _variables, hideSuggestions) {
     if (valueNode.kind !== Kind.ENUM) {
-      const valueStr = print(valueNode);
-      throw new GraphQLError(`Enum "${this.name}" cannot represent non-enum value: ${valueStr}.` + didYouMeanEnumValue(this, valueStr), {
+      const valueStr = printForError(valueNode);
+      throw new GraphQLError(`Enum "${this.name}" cannot represent non-enum value: ${valueStr}.` + (hideSuggestions ? "" : didYouMeanEnumValue(this, valueStr)), {
         nodes: valueNode
       });
     }
     const enumValue = this.getValue(valueNode.value);
     if (enumValue == null) {
-      const valueStr = print(valueNode);
-      throw new GraphQLError(`Value "${valueStr}" does not exist in "${this.name}" enum.` + didYouMeanEnumValue(this, valueStr), {
+      const valueStr = printForError(valueNode);
+      throw new GraphQLError(`Value "${valueStr}" does not exist in "${this.name}" enum.` + (hideSuggestions ? "" : didYouMeanEnumValue(this, valueStr)), {
         nodes: valueNode
       });
     }
@@ -3488,7 +3455,7 @@ var GraphQLInt = new GraphQLScalarType({
   },
   parseLiteral(valueNode) {
     if (valueNode.kind !== Kind.INT) {
-      throw new GraphQLError(`Int cannot represent non-integer value: ${print(valueNode)}`, {
+      throw new GraphQLError(`Int cannot represent non-integer value: ${printForError(valueNode)}`, {
         nodes: valueNode
       });
     }
@@ -3526,7 +3493,7 @@ var GraphQLFloat = new GraphQLScalarType({
   },
   parseLiteral(valueNode) {
     if (valueNode.kind !== Kind.FLOAT && valueNode.kind !== Kind.INT) {
-      throw new GraphQLError(`Float cannot represent non numeric value: ${print(valueNode)}`, valueNode);
+      throw new GraphQLError(`Float cannot represent non numeric value: ${printForError(valueNode)}`, valueNode);
     }
     return parseFloat(valueNode.value);
   }
@@ -3555,7 +3522,7 @@ var GraphQLString = new GraphQLScalarType({
   },
   parseLiteral(valueNode) {
     if (valueNode.kind !== Kind.STRING) {
-      throw new GraphQLError(`String cannot represent a non string value: ${print(valueNode)}`, {
+      throw new GraphQLError(`String cannot represent a non string value: ${printForError(valueNode)}`, {
         nodes: valueNode
       });
     }
@@ -3583,7 +3550,7 @@ var GraphQLBoolean = new GraphQLScalarType({
   },
   parseLiteral(valueNode) {
     if (valueNode.kind !== Kind.BOOLEAN) {
-      throw new GraphQLError(`Boolean cannot represent a non boolean value: ${print(valueNode)}`, {
+      throw new GraphQLError(`Boolean cannot represent a non boolean value: ${printForError(valueNode)}`, {
         nodes: valueNode
       });
     }
@@ -3614,7 +3581,7 @@ var GraphQLID = new GraphQLScalarType({
   },
   parseLiteral(valueNode) {
     if (valueNode.kind !== Kind.STRING && valueNode.kind !== Kind.INT) {
-      throw new GraphQLError("ID cannot represent a non-string and non-integer value: " + print(valueNode), {
+      throw new GraphQLError("ID cannot represent a non-string and non-integer value: " + printForError(valueNode), {
         nodes: valueNode
       });
     }
@@ -3759,6 +3726,14 @@ var specifiedDirectives = Object.freeze([
   GraphQLSpecifiedByDirective,
   GraphQLOneOfDirective
 ]);
+
+// /zveltio-extension/node_modules/graphql/jsutils/invariant.mjs
+function invariant(condition, message) {
+  const booleanCondition = Boolean(condition);
+  if (!booleanCondition) {
+    throw new Error(message != null ? message : "Unexpected invariant triggered.");
+  }
+}
 
 // /zveltio-extension/node_modules/graphql/jsutils/isIterableObject.mjs
 function isIterableObject(maybeIterable) {
@@ -5009,6 +4984,8 @@ class Lexer {
     this.token = startOfFileToken;
     this.line = 1;
     this.lineStart = 0;
+    this._maxComments = undefined;
+    this._commentCount = 0;
   }
   get [Symbol.toStringTag]() {
     return "Lexer";
@@ -5142,6 +5119,14 @@ function readNextToken(lexer, start) {
   return createToken(lexer, TokenKind.EOF, bodyLength, bodyLength);
 }
 function readComment(lexer, start) {
+  const maxComments = lexer._maxComments;
+  if (maxComments !== undefined) {
+    const nextCommentCount = lexer._commentCount + 1;
+    if (nextCommentCount > maxComments) {
+      throw syntaxError(lexer.source, start, `Document contains more than ${maxComments} comments. Parsing aborted.`);
+    }
+    lexer._commentCount = nextCommentCount;
+  }
   const body = lexer.source.body;
   const bodyLength = body.length;
   let position = start + 1;
@@ -5423,6 +5408,12 @@ class Parser {
     }
     this._options = _options;
     this._tokenCounter = 0;
+    this._lexer._maxComments = options === null || options === undefined ? undefined : options.maxComments;
+    this._lexer._commentCount = 0;
+    const maxSourceLength = options === null || options === undefined ? undefined : options.maxSourceLength;
+    if (maxSourceLength !== undefined && this._lexer.source.body.length > maxSourceLength) {
+      throw syntaxError(this._lexer.source, maxSourceLength, `Source contains more than ${maxSourceLength} UTF-16 code units. Parsing aborted.`);
+    }
   }
   get tokenCount() {
     return this._tokenCounter;
@@ -6301,12 +6292,12 @@ class Parser {
     return nodes;
   }
   advanceLexer() {
-    const { maxTokens } = this._options;
+    const { maxLexicalTokens = this._options.maxTokens } = this._options;
     const token = this._lexer.advance();
     if (token.kind !== TokenKind.EOF) {
       ++this._tokenCounter;
-      if (maxTokens !== undefined && this._tokenCounter > maxTokens) {
-        throw syntaxError(this._lexer.source, token.start, `Document contains more that ${maxTokens} tokens. Parsing aborted.`);
+      if (maxLexicalTokens !== undefined && this._tokenCounter > maxLexicalTokens) {
+        throw syntaxError(this._lexer.source, token.start, `Document contains more that ${maxLexicalTokens} tokens. Parsing aborted.`);
       }
     }
   }
@@ -6318,6 +6309,189 @@ function getTokenDesc(token) {
 function getTokenKindDesc(kind) {
   return isPunctuatorTokenKind(kind) ? `"${kind}"` : kind;
 }
+// /zveltio-extension/node_modules/graphql/language/visitor.mjs
+var BREAK = Object.freeze({});
+function visit(root, visitor, visitorKeys = QueryDocumentKeys) {
+  const enterLeaveMap = new Map;
+  for (const kind of Object.values(Kind)) {
+    enterLeaveMap.set(kind, getEnterLeaveForKind(visitor, kind));
+  }
+  let stack = undefined;
+  let inArray = Array.isArray(root);
+  let keys = [root];
+  let index = -1;
+  let edits = [];
+  let node = root;
+  let key = undefined;
+  let parent = undefined;
+  const path = [];
+  const ancestors = [];
+  do {
+    index++;
+    const isLeaving = index === keys.length;
+    const isEdited = isLeaving && edits.length !== 0;
+    if (isLeaving) {
+      key = ancestors.length === 0 ? undefined : path[path.length - 1];
+      node = parent;
+      parent = ancestors.pop();
+      if (isEdited) {
+        if (inArray) {
+          node = node.slice();
+          let editOffset = 0;
+          for (const [editKey, editValue] of edits) {
+            const arrayKey = editKey - editOffset;
+            if (editValue === null) {
+              node.splice(arrayKey, 1);
+              editOffset++;
+            } else {
+              node[arrayKey] = editValue;
+            }
+          }
+        } else {
+          node = { ...node };
+          for (const [editKey, editValue] of edits) {
+            node[editKey] = editValue;
+          }
+        }
+      }
+      index = stack.index;
+      keys = stack.keys;
+      edits = stack.edits;
+      inArray = stack.inArray;
+      stack = stack.prev;
+    } else if (parent) {
+      key = inArray ? index : keys[index];
+      node = parent[key];
+      if (node === null || node === undefined) {
+        continue;
+      }
+      path.push(key);
+    }
+    let result;
+    if (!Array.isArray(node)) {
+      var _enterLeaveMap$get, _enterLeaveMap$get2;
+      isNode(node) || devAssert(false, `Invalid AST Node: ${inspect(node)}.`);
+      const visitFn = isLeaving ? (_enterLeaveMap$get = enterLeaveMap.get(node.kind)) === null || _enterLeaveMap$get === undefined ? undefined : _enterLeaveMap$get.leave : (_enterLeaveMap$get2 = enterLeaveMap.get(node.kind)) === null || _enterLeaveMap$get2 === undefined ? undefined : _enterLeaveMap$get2.enter;
+      result = visitFn === null || visitFn === undefined ? undefined : visitFn.call(visitor, node, key, parent, path, ancestors);
+      if (result === BREAK) {
+        break;
+      }
+      if (result === false) {
+        if (!isLeaving) {
+          path.pop();
+          continue;
+        }
+      } else if (result !== undefined) {
+        edits.push([key, result]);
+        if (!isLeaving) {
+          if (isNode(result)) {
+            node = result;
+          } else {
+            path.pop();
+            continue;
+          }
+        }
+      }
+    }
+    if (result === undefined && isEdited) {
+      edits.push([key, node]);
+    }
+    if (isLeaving) {
+      path.pop();
+    } else {
+      var _node$kind;
+      stack = {
+        inArray,
+        index,
+        keys,
+        edits,
+        prev: stack
+      };
+      inArray = Array.isArray(node);
+      keys = inArray ? node : (_node$kind = visitorKeys[node.kind]) !== null && _node$kind !== undefined ? _node$kind : [];
+      index = -1;
+      edits = [];
+      if (parent) {
+        ancestors.push(parent);
+      }
+      parent = node;
+    }
+  } while (stack !== undefined);
+  if (edits.length !== 0) {
+    return edits[edits.length - 1][1];
+  }
+  return root;
+}
+function visitInParallel(visitors) {
+  const skipping = new Array(visitors.length).fill(null);
+  const mergedVisitor = Object.create(null);
+  for (const kind of Object.values(Kind)) {
+    let hasVisitor = false;
+    const enterList = new Array(visitors.length).fill(undefined);
+    const leaveList = new Array(visitors.length).fill(undefined);
+    for (let i = 0;i < visitors.length; ++i) {
+      const { enter, leave } = getEnterLeaveForKind(visitors[i], kind);
+      hasVisitor || (hasVisitor = enter != null || leave != null);
+      enterList[i] = enter;
+      leaveList[i] = leave;
+    }
+    if (!hasVisitor) {
+      continue;
+    }
+    const mergedEnterLeave = {
+      enter(...args) {
+        const node = args[0];
+        for (let i = 0;i < visitors.length; i++) {
+          if (skipping[i] === null) {
+            var _enterList$i;
+            const result = (_enterList$i = enterList[i]) === null || _enterList$i === undefined ? undefined : _enterList$i.apply(visitors[i], args);
+            if (result === false) {
+              skipping[i] = node;
+            } else if (result === BREAK) {
+              skipping[i] = BREAK;
+            } else if (result !== undefined) {
+              return result;
+            }
+          }
+        }
+      },
+      leave(...args) {
+        const node = args[0];
+        for (let i = 0;i < visitors.length; i++) {
+          if (skipping[i] === null) {
+            var _leaveList$i;
+            const result = (_leaveList$i = leaveList[i]) === null || _leaveList$i === undefined ? undefined : _leaveList$i.apply(visitors[i], args);
+            if (result === BREAK) {
+              skipping[i] = BREAK;
+            } else if (result !== undefined && result !== false) {
+              return result;
+            }
+          } else if (skipping[i] === node) {
+            skipping[i] = null;
+          }
+        }
+      }
+    };
+    mergedVisitor[kind] = mergedEnterLeave;
+  }
+  return mergedVisitor;
+}
+function getEnterLeaveForKind(visitor, kind) {
+  const kindVisitor = visitor[kind];
+  if (typeof kindVisitor === "object") {
+    return kindVisitor;
+  } else if (typeof kindVisitor === "function") {
+    return {
+      enter: kindVisitor,
+      leave: undefined
+    };
+  }
+  return {
+    enter: visitor.enter,
+    leave: visitor.leave
+  };
+}
+
 // /zveltio-extension/node_modules/graphql/language/predicates.mjs
 function isExecutableDefinitionNode(node) {
   return node.kind === Kind.OPERATION_DEFINITION || node.kind === Kind.FRAGMENT_DEFINITION;
@@ -6457,8 +6631,8 @@ function printPathArray(path) {
 }
 
 // /zveltio-extension/node_modules/graphql/utilities/coerceInputValue.mjs
-function coerceInputValue(inputValue, type, onError = defaultOnError) {
-  return coerceInputValueImpl(inputValue, type, onError, undefined);
+function coerceInputValue(inputValue, type, onError = defaultOnError, hideSuggestions) {
+  return coerceInputValueImpl(inputValue, type, onError, undefined, hideSuggestions);
 }
 function defaultOnError(path, invalidValue, error) {
   let errorPrefix = "Invalid value " + inspect(invalidValue);
@@ -6468,10 +6642,10 @@ function defaultOnError(path, invalidValue, error) {
   error.message = errorPrefix + ": " + error.message;
   throw error;
 }
-function coerceInputValueImpl(inputValue, type, onError, path) {
+function coerceInputValueImpl(inputValue, type, onError, path, hideSuggestions) {
   if (isNonNullType(type)) {
     if (inputValue != null) {
-      return coerceInputValueImpl(inputValue, type.ofType, onError, path);
+      return coerceInputValueImpl(inputValue, type.ofType, onError, path, hideSuggestions);
     }
     onError(pathToArray(path), inputValue, new GraphQLError(`Expected non-nullable type "${inspect(type)}" not to be null.`));
     return;
@@ -6484,10 +6658,12 @@ function coerceInputValueImpl(inputValue, type, onError, path) {
     if (isIterableObject(inputValue)) {
       return Array.from(inputValue, (itemValue, index) => {
         const itemPath = addPath(path, index, undefined);
-        return coerceInputValueImpl(itemValue, itemType, onError, itemPath);
+        return coerceInputValueImpl(itemValue, itemType, onError, itemPath, hideSuggestions);
       });
     }
-    return [coerceInputValueImpl(inputValue, itemType, onError, path)];
+    return [
+      coerceInputValueImpl(inputValue, itemType, onError, path, hideSuggestions)
+    ];
   }
   if (isInputObjectType(type)) {
     if (!isObjectLike(inputValue) || Array.isArray(inputValue)) {
@@ -6507,11 +6683,11 @@ function coerceInputValueImpl(inputValue, type, onError, path) {
         }
         continue;
       }
-      coercedValue[field.name] = coerceInputValueImpl(fieldValue, field.type, onError, addPath(path, field.name, type.name));
+      coercedValue[field.name] = coerceInputValueImpl(fieldValue, field.type, onError, addPath(path, field.name, type.name), hideSuggestions);
     }
     for (const fieldName of Object.keys(inputValue)) {
       if (!fieldDefs[fieldName]) {
-        const suggestions = suggestionList(fieldName, Object.keys(type.getFields()));
+        const suggestions = hideSuggestions ? [] : suggestionList(fieldName, Object.keys(type.getFields()));
         onError(pathToArray(path), inputValue, new GraphQLError(`Field "${fieldName}" is not defined by type "${type.name}".` + didYouMean(suggestions)));
       }
     }
@@ -6531,7 +6707,7 @@ function coerceInputValueImpl(inputValue, type, onError, path) {
   if (isLeafType(type)) {
     let parseResult;
     try {
-      parseResult = type.parseValue(inputValue);
+      parseResult = isEnumType(type) ? type.parseValue(inputValue, hideSuggestions) : type.parseValue(inputValue);
     } catch (error) {
       if (error instanceof GraphQLError) {
         onError(pathToArray(path), inputValue, error);
@@ -6557,7 +6733,7 @@ function valueFromAST(valueNode, type, variables) {
   }
   if (valueNode.kind === Kind.VARIABLE) {
     const variableName = valueNode.name.value;
-    if (variables == null || variables[variableName] === undefined || !hasOwnProperty(variables, variableName)) {
+    if (variables == null || !hasOwnProperty(variables, variableName) || variables[variableName] === undefined) {
       return;
     }
     const variableValue = variables[variableName];
@@ -6649,7 +6825,7 @@ function valueFromAST(valueNode, type, variables) {
   invariant(false, "Unexpected input type: " + inspect(type));
 }
 function isMissingVariable(valueNode, variables) {
-  return valueNode.kind === Kind.VARIABLE && (variables == null || variables[valueNode.name.value] === undefined || !hasOwnProperty(variables, valueNode.name.value));
+  return valueNode.kind === Kind.VARIABLE && (variables == null || !hasOwnProperty(variables, valueNode.name.value) || variables[valueNode.name.value] === undefined);
 }
 function hasOwnProperty(obj, prop) {
   return Object.prototype.hasOwnProperty.call(obj, prop);
@@ -6665,7 +6841,7 @@ function getVariableValues(schema, varDefNodes, inputs, options) {
         throw new GraphQLError("Too many errors processing variables, error limit reached. Execution aborted.");
       }
       errors.push(error);
-    });
+    }, options === null || options === undefined ? undefined : options.hideSuggestions);
     if (errors.length === 0) {
       return {
         coerced
@@ -6678,13 +6854,13 @@ function getVariableValues(schema, varDefNodes, inputs, options) {
     errors
   };
 }
-function coerceVariableValues(schema, varDefNodes, inputs, onError) {
+function coerceVariableValues(schema, varDefNodes, inputs, onError, hideSuggestions) {
   const coercedValues = Object.create(null);
   for (const varDefNode of varDefNodes) {
     const varName = varDefNode.variable.name.value;
     const varType = typeFromAST(schema, varDefNode.type);
     if (!isInputType(varType)) {
-      const varTypeStr = print(varDefNode.type);
+      const varTypeStr = printForError(varDefNode.type);
       onError(new GraphQLError(`Variable "$${varName}" expected value of type "${varTypeStr}" which cannot be used as an input type.`, {
         nodes: varDefNode.type
       }));
@@ -6718,7 +6894,7 @@ function coerceVariableValues(schema, varDefNodes, inputs, onError) {
         nodes: varDefNode,
         originalError: error
       }));
-    });
+    }, hideSuggestions);
   }
   return { ...coercedValues };
 }
@@ -6764,7 +6940,7 @@ function getArgumentValues(def, node, variableValues) {
     }
     const coercedValue = valueFromAST(valueNode, argType, variableValues);
     if (coercedValue === undefined) {
-      throw new GraphQLError(`Argument "${name}" has invalid value ${print(valueNode)}.`, {
+      throw new GraphQLError(`Argument "${name}" has invalid value ${printForError(valueNode)}.`, {
         nodes: valueNode
       });
     }
@@ -6784,9 +6960,9 @@ function hasOwnProperty2(obj, prop) {
 }
 
 // /zveltio-extension/node_modules/graphql/execution/collectFields.mjs
-function collectFields(schema, fragments, variableValues, runtimeType, selectionSet) {
+function collectFields(schema, fragments, variableValues, runtimeType, selectionSet, onSelectionSet) {
   const fields = new Map;
-  collectFieldsImpl(schema, fragments, variableValues, runtimeType, selectionSet, fields, new Set);
+  collectFieldsImpl(schema, fragments, variableValues, runtimeType, selectionSet, fields, new Set, onSelectionSet);
   return fields;
 }
 function collectSubfields(schema, fragments, variableValues, returnType, fieldNodes) {
@@ -6799,7 +6975,8 @@ function collectSubfields(schema, fragments, variableValues, returnType, fieldNo
   }
   return subFieldNodes;
 }
-function collectFieldsImpl(schema, fragments, variableValues, runtimeType, selectionSet, fields, visitedFragmentNames) {
+function collectFieldsImpl(schema, fragments, variableValues, runtimeType, selectionSet, fields, visitedFragmentNames, onSelectionSet) {
+  onSelectionSet === null || onSelectionSet === undefined || onSelectionSet(selectionSet);
   for (const selection of selectionSet.selections) {
     switch (selection.kind) {
       case Kind.FIELD: {
@@ -6819,7 +6996,7 @@ function collectFieldsImpl(schema, fragments, variableValues, runtimeType, selec
         if (!shouldIncludeNode(variableValues, selection) || !doesFragmentConditionMatch(schema, selection, runtimeType)) {
           continue;
         }
-        collectFieldsImpl(schema, fragments, variableValues, runtimeType, selection.selectionSet, fields, visitedFragmentNames);
+        collectFieldsImpl(schema, fragments, variableValues, runtimeType, selection.selectionSet, fields, visitedFragmentNames, onSelectionSet);
         break;
       }
       case Kind.FRAGMENT_SPREAD: {
@@ -6832,7 +7009,7 @@ function collectFieldsImpl(schema, fragments, variableValues, runtimeType, selec
         if (!fragment || !doesFragmentConditionMatch(schema, fragment, runtimeType)) {
           continue;
         }
-        collectFieldsImpl(schema, fragments, variableValues, runtimeType, fragment.selectionSet, fields, visitedFragmentNames);
+        collectFieldsImpl(schema, fragments, variableValues, runtimeType, fragment.selectionSet, fields, visitedFragmentNames, onSelectionSet);
         break;
       }
     }
@@ -6935,7 +7112,7 @@ function assertValidExecutionArguments(schema, document, rawVariableValues) {
   rawVariableValues == null || isObjectLike(rawVariableValues) || devAssert(false, "Variables must be provided as an Object where each property is a variable value. Perhaps look to see if an unparsed JSON string was provided.");
 }
 function buildExecutionContext(args) {
-  var _definition$name, _operation$variableDe, _options$maxCoercionE;
+  var _definition$name, _operation$variableDe, _options$maxCoercionE, _args$hideSuggestions;
   const {
     schema,
     document,
@@ -6978,7 +7155,8 @@ function buildExecutionContext(args) {
   }
   const variableDefinitions = (_operation$variableDe = operation.variableDefinitions) !== null && _operation$variableDe !== undefined ? _operation$variableDe : [];
   const coercedVariableValues = getVariableValues(schema, variableDefinitions, rawVariableValues !== null && rawVariableValues !== undefined ? rawVariableValues : {}, {
-    maxErrors: (_options$maxCoercionE = options === null || options === undefined ? undefined : options.maxCoercionErrors) !== null && _options$maxCoercionE !== undefined ? _options$maxCoercionE : 50
+    maxErrors: (_options$maxCoercionE = options === null || options === undefined ? undefined : options.maxCoercionErrors) !== null && _options$maxCoercionE !== undefined ? _options$maxCoercionE : 50,
+    hideSuggestions: (_args$hideSuggestions = args.hideSuggestions) !== null && _args$hideSuggestions !== undefined ? _args$hideSuggestions : false
   });
   if (coercedVariableValues.errors) {
     return coercedVariableValues.errors;
@@ -7242,19 +7420,28 @@ var defaultTypeResolver = function(value, contextValue, info, abstractType) {
   }
   const possibleTypes = info.schema.getPossibleTypes(abstractType);
   const promisedIsTypeOfResults = [];
-  for (let i = 0;i < possibleTypes.length; i++) {
-    const type = possibleTypes[i];
-    if (type.isTypeOf) {
-      const isTypeOfResult = type.isTypeOf(value, contextValue, info);
-      if (isPromise(isTypeOfResult)) {
-        promisedIsTypeOfResults[i] = isTypeOfResult;
-      } else if (isTypeOfResult) {
-        if (promisedIsTypeOfResults.length) {
-          Promise.allSettled(promisedIsTypeOfResults).catch(() => {});
+  try {
+    for (let i = 0;i < possibleTypes.length; i++) {
+      const type = possibleTypes[i];
+      if (type.isTypeOf) {
+        const isTypeOfResult = type.isTypeOf(value, contextValue, info);
+        if (isPromise(isTypeOfResult)) {
+          promisedIsTypeOfResults[i] = isTypeOfResult;
+        } else if (isTypeOfResult) {
+          if (promisedIsTypeOfResults.length) {
+            Promise.allSettled(promisedIsTypeOfResults).catch(() => {});
+          }
+          return type.name;
         }
-        return type.name;
       }
     }
+  } catch (error) {
+    if (promisedIsTypeOfResults.length) {
+      return Promise.allSettled(promisedIsTypeOfResults).then(() => {
+        throw error;
+      });
+    }
+    throw error;
   }
   if (promisedIsTypeOfResults.length) {
     return Promise.all(promisedIsTypeOfResults).then((isTypeOfResults) => {
@@ -7553,9 +7740,9 @@ function FieldsOnCorrectTypeRule(context) {
         if (!fieldDef) {
           const schema = context.getSchema();
           const fieldName = node.name.value;
-          let suggestion = didYouMean("to use an inline fragment on", getSuggestedTypeNames(schema, type, fieldName));
+          let suggestion = didYouMean("to use an inline fragment on", context.hideSuggestions ? [] : getSuggestedTypeNames(schema, type, fieldName));
           if (suggestion === "") {
-            suggestion = didYouMean(getSuggestedFieldNames(type, fieldName));
+            suggestion = didYouMean(context.hideSuggestions ? [] : getSuggestedFieldNames(type, fieldName));
           }
           context.reportError(new GraphQLError(`Cannot query field "${fieldName}" on type "${type.name}".` + suggestion, {
             nodes: node
@@ -7645,8 +7832,7 @@ function KnownArgumentNamesRule(context) {
       const parentType = context.getParentType();
       if (!argDef && fieldDef && parentType) {
         const argName = argNode.name.value;
-        const knownArgsNames = fieldDef.args.map((arg) => arg.name);
-        const suggestions = suggestionList(argName, knownArgsNames);
+        const suggestions = context.hideSuggestions ? [] : suggestionList(argName, fieldDef.args.map((arg) => arg.name));
         context.reportError(new GraphQLError(`Unknown argument "${argName}" on field "${parentType.name}.${fieldDef.name}".` + didYouMean(suggestions), {
           nodes: argNode
         }));
@@ -7659,14 +7845,14 @@ function KnownArgumentNamesOnDirectivesRule(context) {
   const schema = context.getSchema();
   const definedDirectives = schema ? schema.getDirectives() : specifiedDirectives;
   for (const directive of definedDirectives) {
-    directiveArgs[directive.name] = directive.args.map((arg) => arg.name);
+    directiveArgs[directive.name] = new Set(directive.args.map((arg) => arg.name));
   }
   const astDefinitions = context.getDocument().definitions;
   for (const def of astDefinitions) {
     if (def.kind === Kind.DIRECTIVE_DEFINITION) {
       var _def$arguments;
       const argsNodes = (_def$arguments = def.arguments) !== null && _def$arguments !== undefined ? _def$arguments : [];
-      directiveArgs[def.name.value] = argsNodes.map((arg) => arg.name.value);
+      directiveArgs[def.name.value] = new Set(argsNodes.map((arg) => arg.name.value));
     }
   }
   return {
@@ -7676,9 +7862,9 @@ function KnownArgumentNamesOnDirectivesRule(context) {
       if (directiveNode.arguments && knownArgs) {
         for (const argNode of directiveNode.arguments) {
           const argName = argNode.name.value;
-          if (!knownArgs.includes(argName)) {
-            const suggestions = suggestionList(argName, knownArgs);
-            context.reportError(new GraphQLError(`Unknown argument "${argName}" on directive "@${directiveName}".` + didYouMean(suggestions), {
+          if (!knownArgs.has(argName)) {
+            const suggestions = context.hideSuggestions ? [] : suggestionList(argName, Array.from(knownArgs));
+            context.reportError(new GraphQLError(`Unknown argument "${argName}" on directive "@${directiveName}".` + (context.hideSuggestions ? "" : didYouMean(suggestions)), {
               nodes: argNode
             }));
           }
@@ -7825,7 +8011,7 @@ function KnownTypeNamesRule(context) {
         if (isSDL && standardTypeNames.includes(typeName)) {
           return;
         }
-        const suggestedTypes = suggestionList(typeName, isSDL ? standardTypeNames.concat(typeNames) : typeNames);
+        const suggestedTypes = context.hideSuggestions ? [] : suggestionList(typeName, isSDL ? standardTypeNames.concat(typeNames) : typeNames);
         context.reportError(new GraphQLError(`Unknown type "${typeName}".` + didYouMean(suggestedTypes), {
           nodes: node
         }));
@@ -7882,22 +8068,31 @@ function LoneSchemaDefinitionRule(context) {
 // /zveltio-extension/node_modules/graphql/validation/rules/MaxIntrospectionDepthRule.mjs
 var MAX_LISTS_DEPTH = 3;
 function MaxIntrospectionDepthRule(context) {
-  function checkDepth(node, visitedFragments = Object.create(null), depth = 0) {
+  const checkedFragments = Object.create(null);
+  const exceededFragments = Object.create(null);
+  function checkDepth(node, visitedFragments, depth = 0) {
     if (node.kind === Kind.FRAGMENT_SPREAD) {
       const fragmentName = node.name.value;
-      if (visitedFragments[fragmentName] === true) {
+      const exceededEntryDepth = exceededFragments[fragmentName];
+      if (exceededEntryDepth !== undefined && exceededEntryDepth <= depth) {
+        return true;
+      }
+      const visitedEntryDepth = visitedFragments[fragmentName];
+      const checkedEntryDepth = checkedFragments[fragmentName];
+      if (visitedEntryDepth !== undefined && visitedEntryDepth >= depth || checkedEntryDepth !== undefined && checkedEntryDepth >= depth) {
         return false;
       }
       const fragment = context.getFragment(fragmentName);
       if (!fragment) {
         return false;
       }
-      try {
-        visitedFragments[fragmentName] = true;
-        return checkDepth(fragment, visitedFragments, depth);
-      } finally {
-        visitedFragments[fragmentName] = undefined;
+      visitedFragments[fragmentName] = depth;
+      if (checkDepth(fragment, visitedFragments, depth)) {
+        exceededFragments[fragmentName] = depth;
+        return true;
       }
+      checkedFragments[fragmentName] = depth;
+      return false;
     }
     if (node.kind === Kind.FIELD && (node.name.value === "fields" || node.name.value === "interfaces" || node.name.value === "possibleTypes" || node.name.value === "inputFields")) {
       depth++;
@@ -7917,7 +8112,8 @@ function MaxIntrospectionDepthRule(context) {
   return {
     Field(node) {
       if (node.name.value === "__schema" || node.name.value === "__type") {
-        if (checkDepth(node)) {
+        const visitedFragments = Object.create(null);
+        if (checkDepth(node, visitedFragments)) {
           context.reportError(new GraphQLError("Maximum introspection depth exceeded", {
             nodes: [node]
           }));
@@ -8014,15 +8210,10 @@ function NoUnusedFragmentsRule(context) {
     },
     Document: {
       leave() {
-        const fragmentNameUsed = Object.create(null);
-        for (const operation of operationDefs) {
-          for (const fragment of context.getRecursivelyReferencedFragments(operation)) {
-            fragmentNameUsed[fragment.name.value] = true;
-          }
-        }
+        const fragmentNameUsed = new Set(context.getRecursivelyReferencedFragmentsForOperations(operationDefs).map((fragment) => fragment.name.value));
         for (const fragmentDef of fragmentDefs) {
           const fragName = fragmentDef.name.value;
-          if (fragmentNameUsed[fragName] !== true) {
+          if (!fragmentNameUsed.has(fragName)) {
             context.reportError(new GraphQLError(`Fragment "${fragName}" is never used.`, {
               nodes: fragmentDef
             }));
@@ -8063,86 +8254,80 @@ function NoUnusedVariablesRule(context) {
   };
 }
 
-// /zveltio-extension/node_modules/graphql/utilities/sortValueNode.mjs
-function sortValueNode(valueNode) {
-  switch (valueNode.kind) {
-    case Kind.OBJECT:
-      return { ...valueNode, fields: sortFields(valueNode.fields) };
-    case Kind.LIST:
-      return { ...valueNode, values: valueNode.values.map(sortValueNode) };
-    case Kind.INT:
-    case Kind.FLOAT:
-    case Kind.STRING:
-    case Kind.BOOLEAN:
-    case Kind.NULL:
-    case Kind.ENUM:
-    case Kind.VARIABLE:
-      return valueNode;
-  }
-}
-function sortFields(fields) {
-  return fields.map((fieldNode) => ({
-    ...fieldNode,
-    value: sortValueNode(fieldNode.value)
-  })).sort((fieldA, fieldB) => naturalCompare(fieldA.name.value, fieldB.name.value));
-}
+// /zveltio-extension/node_modules/graphql/validation/validationAbortedError.mjs
+var validationAbortedError = new GraphQLError("Validation aborted.");
 
 // /zveltio-extension/node_modules/graphql/validation/rules/OverlappingFieldsCanBeMergedRule.mjs
-function reasonMessage(reason) {
-  if (Array.isArray(reason)) {
-    return reason.map(([responseName, subReason]) => `subfields "${responseName}" conflict because ` + reasonMessage(subReason)).join(" and ");
-  }
-  return reason;
-}
-function OverlappingFieldsCanBeMergedRule(context) {
-  const comparedFieldsAndFragmentPairs = new OrderedPairSet;
-  const comparedFragmentPairs = new PairSet;
-  const cachedFieldsAndFragmentNames = new Map;
+var MAX_CONFLICT_DETAIL_LENGTH = 1000;
+var MAX_CONFLICT_NODES = 20;
+var MAX_COMPLEXITY_BUDGET = 500000;
+function OverlappingFieldsCanBeMergedRule(validationContext) {
+  const ruleContext = {
+    comparedFragmentPairs: new PairSet,
+    cachedCollectFieldsResults: new Map,
+    stringifiedValues: new Map,
+    remainingComplexityBudget: MAX_COMPLEXITY_BUDGET
+  };
   return {
-    SelectionSet(selectionSet) {
-      const conflicts = findConflictsWithinSelectionSet(context, cachedFieldsAndFragmentNames, comparedFieldsAndFragmentPairs, comparedFragmentPairs, context.getParentType(), selectionSet);
-      for (const [[responseName, reason], fields1, fields2] of conflicts) {
-        const reasonMsg = reasonMessage(reason);
-        context.reportError(new GraphQLError(`Fields "${responseName}" conflict because ${reasonMsg}. Use different aliases on the fields to fetch both if this was intentional.`, {
+    SelectionSet(selectionSet, _key, parent) {
+      var _selectionSet$selecti;
+      if (parent && "kind" in parent && parent.kind === Kind.INLINE_FRAGMENT) {
+        return;
+      }
+      if (selectionSet.selections.length <= 1 && ((_selectionSet$selecti = selectionSet.selections[0]) === null || _selectionSet$selecti === undefined ? undefined : _selectionSet$selecti.kind) !== Kind.INLINE_FRAGMENT) {
+        return;
+      }
+      const conflicts = findConflictsWithinSelectionSet(validationContext, ruleContext, validationContext.getParentType(), selectionSet);
+      for (const { responseName, reason, fields1, fields2 } of conflicts) {
+        validationContext.reportError(new GraphQLError(`Fields "${maybeAbbreviate(responseName)}" conflict because ${reason}. Use different aliases on the fields to fetch both if this was intentional.`, {
           nodes: fields1.concat(fields2)
         }));
       }
     }
   };
 }
-function findConflictsWithinSelectionSet(context, cachedFieldsAndFragmentNames, comparedFieldsAndFragmentPairs, comparedFragmentPairs, parentType, selectionSet) {
+function findConflictsWithinSelectionSet(validationContext, ruleContext, parentType, selectionSet) {
   const conflicts = [];
-  const [fieldMap, fragmentNames] = getFieldsAndFragmentNames(context, cachedFieldsAndFragmentNames, parentType, selectionSet);
-  collectConflictsWithin(context, conflicts, cachedFieldsAndFragmentNames, comparedFieldsAndFragmentPairs, comparedFragmentPairs, fieldMap);
-  if (fragmentNames.length !== 0) {
-    for (let i = 0;i < fragmentNames.length; i++) {
-      collectConflictsBetweenFieldsAndFragment(context, conflicts, cachedFieldsAndFragmentNames, comparedFieldsAndFragmentPairs, comparedFragmentPairs, false, fieldMap, fragmentNames[i]);
-      for (let j = i + 1;j < fragmentNames.length; j++) {
-        collectConflictsBetweenFragments(context, conflicts, cachedFieldsAndFragmentNames, comparedFieldsAndFragmentPairs, comparedFragmentPairs, false, fragmentNames[i], fragmentNames[j]);
+  const collectFieldsResult = collectFields2(validationContext, ruleContext, parentType, selectionSet);
+  collectConflictsWithin(validationContext, conflicts, ruleContext, collectFieldsResult.groupedFieldSet);
+  if (collectFieldsResult.fragmentNames.length !== 0 && (collectFieldsResult.groupedFieldSet.size !== 0 || collectFieldsResult.fragmentNames.length > 1)) {
+    for (let i = 0;i < collectFieldsResult.fragmentNames.length; i++) {
+      collectConflictsBetweenFieldsAndFragment(validationContext, conflicts, ruleContext, false, collectFieldsResult, collectFieldsResult.fragmentNames[i]);
+      for (let j = i + 1;j < collectFieldsResult.fragmentNames.length; j++) {
+        collectConflictsBetweenFragments(validationContext, conflicts, ruleContext, false, collectFieldsResult.fragmentNames[i], collectFieldsResult.fragmentNames[j]);
       }
     }
   }
   return conflicts;
 }
-function collectConflictsBetweenFieldsAndFragment(context, conflicts, cachedFieldsAndFragmentNames, comparedFieldsAndFragmentPairs, comparedFragmentPairs, areMutuallyExclusive, fieldMap, fragmentName) {
-  if (comparedFieldsAndFragmentPairs.has(fieldMap, fragmentName, areMutuallyExclusive)) {
+function collectConflictsBetweenFieldsAndFragment(validationContext, conflicts, ruleContext, areMutuallyExclusive, collectFieldsResult, fragmentName) {
+  var _collectFieldsResult$;
+  spendComplexityBudget(ruleContext, 1);
+  if (collectFieldsResult.groupedFieldSet.size === 0) {
     return;
   }
-  comparedFieldsAndFragmentPairs.add(fieldMap, fragmentName, areMutuallyExclusive);
-  const fragment = context.getFragment(fragmentName);
+  const comparedFragments = (_collectFieldsResult$ = collectFieldsResult.comparedFragments) !== null && _collectFieldsResult$ !== undefined ? _collectFieldsResult$ : collectFieldsResult.comparedFragments = new Map;
+  const compared = comparedFragments.get(fragmentName);
+  if (compared === false || areMutuallyExclusive && compared === true) {
+    return;
+  }
+  comparedFragments.set(fragmentName, areMutuallyExclusive);
+  const fragment = validationContext.getFragment(fragmentName);
   if (!fragment) {
     return;
   }
-  const [fieldMap2, referencedFragmentNames] = getReferencedFieldsAndFragmentNames(context, cachedFieldsAndFragmentNames, fragment);
-  if (fieldMap === fieldMap2) {
+  const collectFieldsResult2 = collectFragmentFields(validationContext, ruleContext, fragment);
+  if (collectFieldsResult === collectFieldsResult2) {
     return;
   }
-  collectConflictsBetween(context, conflicts, cachedFieldsAndFragmentNames, comparedFieldsAndFragmentPairs, comparedFragmentPairs, areMutuallyExclusive, fieldMap, fieldMap2);
-  for (const referencedFragmentName of referencedFragmentNames) {
-    collectConflictsBetweenFieldsAndFragment(context, conflicts, cachedFieldsAndFragmentNames, comparedFieldsAndFragmentPairs, comparedFragmentPairs, areMutuallyExclusive, fieldMap, referencedFragmentName);
+  collectConflictsBetween(validationContext, conflicts, ruleContext, areMutuallyExclusive, collectFieldsResult, collectFieldsResult2);
+  for (const referencedFragmentName of collectFieldsResult2.fragmentNames) {
+    collectConflictsBetweenFieldsAndFragment(validationContext, conflicts, ruleContext, areMutuallyExclusive, collectFieldsResult, referencedFragmentName);
   }
 }
-function collectConflictsBetweenFragments(context, conflicts, cachedFieldsAndFragmentNames, comparedFieldsAndFragmentPairs, comparedFragmentPairs, areMutuallyExclusive, fragmentName1, fragmentName2) {
+function collectConflictsBetweenFragments(validationContext, conflicts, ruleContext, areMutuallyExclusive, fragmentName1, fragmentName2) {
+  spendComplexityBudget(ruleContext, 2);
+  const { comparedFragmentPairs } = ruleContext;
   if (fragmentName1 === fragmentName2) {
     return;
   }
@@ -8150,45 +8335,45 @@ function collectConflictsBetweenFragments(context, conflicts, cachedFieldsAndFra
     return;
   }
   comparedFragmentPairs.add(fragmentName1, fragmentName2, areMutuallyExclusive);
-  const fragment1 = context.getFragment(fragmentName1);
-  const fragment2 = context.getFragment(fragmentName2);
+  const fragment1 = validationContext.getFragment(fragmentName1);
+  const fragment2 = validationContext.getFragment(fragmentName2);
   if (!fragment1 || !fragment2) {
     return;
   }
-  const [fieldMap1, referencedFragmentNames1] = getReferencedFieldsAndFragmentNames(context, cachedFieldsAndFragmentNames, fragment1);
-  const [fieldMap2, referencedFragmentNames2] = getReferencedFieldsAndFragmentNames(context, cachedFieldsAndFragmentNames, fragment2);
-  collectConflictsBetween(context, conflicts, cachedFieldsAndFragmentNames, comparedFieldsAndFragmentPairs, comparedFragmentPairs, areMutuallyExclusive, fieldMap1, fieldMap2);
-  for (const referencedFragmentName2 of referencedFragmentNames2) {
-    collectConflictsBetweenFragments(context, conflicts, cachedFieldsAndFragmentNames, comparedFieldsAndFragmentPairs, comparedFragmentPairs, areMutuallyExclusive, fragmentName1, referencedFragmentName2);
+  const collectFieldsResult1 = collectFragmentFields(validationContext, ruleContext, fragment1);
+  const collectFieldsResult2 = collectFragmentFields(validationContext, ruleContext, fragment2);
+  collectConflictsBetween(validationContext, conflicts, ruleContext, areMutuallyExclusive, collectFieldsResult1, collectFieldsResult2);
+  for (const referencedFragmentName2 of collectFieldsResult2.fragmentNames) {
+    collectConflictsBetweenFragments(validationContext, conflicts, ruleContext, areMutuallyExclusive, fragmentName1, referencedFragmentName2);
   }
-  for (const referencedFragmentName1 of referencedFragmentNames1) {
-    collectConflictsBetweenFragments(context, conflicts, cachedFieldsAndFragmentNames, comparedFieldsAndFragmentPairs, comparedFragmentPairs, areMutuallyExclusive, referencedFragmentName1, fragmentName2);
+  for (const referencedFragmentName1 of collectFieldsResult1.fragmentNames) {
+    collectConflictsBetweenFragments(validationContext, conflicts, ruleContext, areMutuallyExclusive, referencedFragmentName1, fragmentName2);
   }
 }
-function findConflictsBetweenSubSelectionSets(context, cachedFieldsAndFragmentNames, comparedFieldsAndFragmentPairs, comparedFragmentPairs, areMutuallyExclusive, parentType1, selectionSet1, parentType2, selectionSet2) {
+function findConflictsBetweenSubSelectionSets(validationContext, ruleContext, areMutuallyExclusive, parentType1, selectionSet1, parentType2, selectionSet2) {
   const conflicts = [];
-  const [fieldMap1, fragmentNames1] = getFieldsAndFragmentNames(context, cachedFieldsAndFragmentNames, parentType1, selectionSet1);
-  const [fieldMap2, fragmentNames2] = getFieldsAndFragmentNames(context, cachedFieldsAndFragmentNames, parentType2, selectionSet2);
-  collectConflictsBetween(context, conflicts, cachedFieldsAndFragmentNames, comparedFieldsAndFragmentPairs, comparedFragmentPairs, areMutuallyExclusive, fieldMap1, fieldMap2);
-  for (const fragmentName2 of fragmentNames2) {
-    collectConflictsBetweenFieldsAndFragment(context, conflicts, cachedFieldsAndFragmentNames, comparedFieldsAndFragmentPairs, comparedFragmentPairs, areMutuallyExclusive, fieldMap1, fragmentName2);
+  const collectFieldsResult1 = collectFields2(validationContext, ruleContext, parentType1, selectionSet1);
+  const collectFieldsResult2 = collectFields2(validationContext, ruleContext, parentType2, selectionSet2);
+  collectConflictsBetween(validationContext, conflicts, ruleContext, areMutuallyExclusive, collectFieldsResult1, collectFieldsResult2);
+  for (const fragmentName2 of collectFieldsResult2.fragmentNames) {
+    collectConflictsBetweenFieldsAndFragment(validationContext, conflicts, ruleContext, areMutuallyExclusive, collectFieldsResult1, fragmentName2);
   }
-  for (const fragmentName1 of fragmentNames1) {
-    collectConflictsBetweenFieldsAndFragment(context, conflicts, cachedFieldsAndFragmentNames, comparedFieldsAndFragmentPairs, comparedFragmentPairs, areMutuallyExclusive, fieldMap2, fragmentName1);
+  for (const fragmentName1 of collectFieldsResult1.fragmentNames) {
+    collectConflictsBetweenFieldsAndFragment(validationContext, conflicts, ruleContext, areMutuallyExclusive, collectFieldsResult2, fragmentName1);
   }
-  for (const fragmentName1 of fragmentNames1) {
-    for (const fragmentName2 of fragmentNames2) {
-      collectConflictsBetweenFragments(context, conflicts, cachedFieldsAndFragmentNames, comparedFieldsAndFragmentPairs, comparedFragmentPairs, areMutuallyExclusive, fragmentName1, fragmentName2);
+  for (const fragmentName1 of collectFieldsResult1.fragmentNames) {
+    for (const fragmentName2 of collectFieldsResult2.fragmentNames) {
+      collectConflictsBetweenFragments(validationContext, conflicts, ruleContext, areMutuallyExclusive, fragmentName1, fragmentName2);
     }
   }
   return conflicts;
 }
-function collectConflictsWithin(context, conflicts, cachedFieldsAndFragmentNames, comparedFieldsAndFragmentPairs, comparedFragmentPairs, fieldMap) {
-  for (const [responseName, fields] of Object.entries(fieldMap)) {
+function collectConflictsWithin(validationContext, conflicts, ruleContext, groupedFieldSet) {
+  for (const [responseName, fields] of groupedFieldSet) {
     if (fields.length > 1) {
       for (let i = 0;i < fields.length; i++) {
         for (let j = i + 1;j < fields.length; j++) {
-          const conflict = findConflict(context, cachedFieldsAndFragmentNames, comparedFieldsAndFragmentPairs, comparedFragmentPairs, false, responseName, fields[i], fields[j]);
+          const conflict = findConflict(validationContext, ruleContext, false, responseName, fields[i], fields[j]);
           if (conflict) {
             conflicts.push(conflict);
           }
@@ -8197,96 +8382,184 @@ function collectConflictsWithin(context, conflicts, cachedFieldsAndFragmentNames
     }
   }
 }
-function collectConflictsBetween(context, conflicts, cachedFieldsAndFragmentNames, comparedFieldsAndFragmentPairs, comparedFragmentPairs, parentFieldsAreMutuallyExclusive, fieldMap1, fieldMap2) {
-  for (const [responseName, fields1] of Object.entries(fieldMap1)) {
-    const fields2 = fieldMap2[responseName];
-    if (fields2) {
-      for (const field1 of fields1) {
-        for (const field2 of fields2) {
-          const conflict = findConflict(context, cachedFieldsAndFragmentNames, comparedFieldsAndFragmentPairs, comparedFragmentPairs, parentFieldsAreMutuallyExclusive, responseName, field1, field2);
-          if (conflict) {
-            conflicts.push(conflict);
-          }
+function collectConflictsBetween(validationContext, conflicts, ruleContext, parentFieldsAreMutuallyExclusive, collectFieldsResult1, collectFieldsResult2) {
+  if (collectFieldsResult1.groupedFieldSet.size === 0 || collectFieldsResult2.groupedFieldSet.size === 0) {
+    return;
+  }
+  for (const { responseName, fields1, fields2 } of getOverlappingFields(ruleContext, collectFieldsResult1, collectFieldsResult2)) {
+    for (const field1 of fields1) {
+      for (const field2 of fields2) {
+        const conflict = findConflict(validationContext, ruleContext, parentFieldsAreMutuallyExclusive, responseName, field1, field2);
+        if (conflict) {
+          conflicts.push(conflict);
         }
       }
     }
   }
 }
-function findConflict(context, cachedFieldsAndFragmentNames, comparedFieldsAndFragmentPairs, comparedFragmentPairs, parentFieldsAreMutuallyExclusive, responseName, field1, field2) {
-  const [parentType1, node1, def1] = field1;
-  const [parentType2, node2, def2] = field2;
+function getOverlappingFields(ruleContext, collectFieldsResult1, collectFieldsResult2) {
+  var _collectFieldsResult;
+  const byCollectFieldsResult = (_collectFieldsResult = collectFieldsResult1.overlappingFields) !== null && _collectFieldsResult !== undefined ? _collectFieldsResult : collectFieldsResult1.overlappingFields = new Map;
+  const cached = byCollectFieldsResult.get(collectFieldsResult2);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const overlappingFields = [];
+  for (const [responseName, fields1] of collectFieldsResult1.groupedFieldSet) {
+    spendComplexityBudget(ruleContext, 1);
+    const fields2 = collectFieldsResult2.groupedFieldSet.get(responseName);
+    if (fields2 !== undefined) {
+      overlappingFields.push({
+        responseName,
+        fields1,
+        fields2
+      });
+    }
+  }
+  byCollectFieldsResult.set(collectFieldsResult2, overlappingFields);
+  return overlappingFields;
+}
+function findConflict(validationContext, ruleContext, parentFieldsAreMutuallyExclusive, responseName, fieldDetails1, fieldDetails2) {
+  const {
+    parentType: parentType1,
+    node: node1,
+    definition: def1
+  } = fieldDetails1;
+  const {
+    parentType: parentType2,
+    node: node2,
+    definition: def2
+  } = fieldDetails2;
   const areMutuallyExclusive = parentFieldsAreMutuallyExclusive || parentType1 !== parentType2 && isObjectType(parentType1) && isObjectType(parentType2);
+  spendComplexityBudget(ruleContext, 2);
+  if (fieldDetails1.isSimpleLeaf && fieldDetails2.isSimpleLeaf && (def1 === null || def1 === undefined ? undefined : def1.type) === (def2 === null || def2 === undefined ? undefined : def2.type) && node1.name.value === node2.name.value) {
+    return;
+  }
   if (!areMutuallyExclusive) {
-    const name1 = node1.name.value;
-    const name2 = node2.name.value;
-    if (name1 !== name2) {
-      return [
-        [responseName, `"${name1}" and "${name2}" are different fields`],
-        [node1],
-        [node2]
-      ];
+    const fieldInfo1 = getFieldInfo(fieldDetails1);
+    const fieldInfo2 = getFieldInfo(fieldDetails2);
+    let reason = fieldInfo1.comparisons.get(fieldInfo2);
+    if (reason === undefined) {
+      const name1 = node1.name.value;
+      const name2 = node2.name.value;
+      reason = name1 !== name2 ? `"${maybeAbbreviate(name1)}" and "${maybeAbbreviate(name2)}" are different fields` : sameArguments(ruleContext, fieldInfo1.arguments, fieldInfo2.arguments) ? null : "they have differing arguments";
+      fieldInfo1.comparisons.set(fieldInfo2, reason);
     }
-    if (!sameArguments(node1, node2)) {
-      return [
-        [responseName, "they have differing arguments"],
-        [node1],
-        [node2]
-      ];
+    if (reason !== null) {
+      return {
+        responseName,
+        reason,
+        fields1: [node1],
+        fields2: [node2]
+      };
     }
   }
   const type1 = def1 === null || def1 === undefined ? undefined : def1.type;
   const type2 = def2 === null || def2 === undefined ? undefined : def2.type;
-  if (type1 && type2 && doTypesConflict(type1, type2)) {
-    return [
-      [
-        responseName,
-        `they return conflicting types "${inspect(type1)}" and "${inspect(type2)}"`
-      ],
-      [node1],
-      [node2]
-    ];
+  if (type1 && type2 && doTypesConflict(ruleContext, type1, type2)) {
+    var _fieldInfo1$typeStrin, _fieldInfo2$typeStrin;
+    const fieldInfo1 = getFieldInfo(fieldDetails1);
+    const fieldInfo2 = getFieldInfo(fieldDetails2);
+    const type1String = (_fieldInfo1$typeStrin = fieldInfo1.typeString) !== null && _fieldInfo1$typeStrin !== undefined ? _fieldInfo1$typeStrin : fieldInfo1.typeString = inspect(type1);
+    const type2String = (_fieldInfo2$typeStrin = fieldInfo2.typeString) !== null && _fieldInfo2$typeStrin !== undefined ? _fieldInfo2$typeStrin : fieldInfo2.typeString = inspect(type2);
+    return {
+      responseName,
+      reason: `they return conflicting types "${type1String}" and "${type2String}"`,
+      fields1: [node1],
+      fields2: [node2]
+    };
   }
   const selectionSet1 = node1.selectionSet;
   const selectionSet2 = node2.selectionSet;
   if (selectionSet1 && selectionSet2) {
-    const conflicts = findConflictsBetweenSubSelectionSets(context, cachedFieldsAndFragmentNames, comparedFieldsAndFragmentPairs, comparedFragmentPairs, areMutuallyExclusive, getNamedType(type1), selectionSet1, getNamedType(type2), selectionSet2);
+    const conflicts = findConflictsBetweenSubSelectionSets(validationContext, ruleContext, areMutuallyExclusive, getFieldInfo(fieldDetails1).namedType, selectionSet1, getFieldInfo(fieldDetails2).namedType, selectionSet2);
     return subfieldConflicts(conflicts, responseName, node1, node2);
   }
 }
-function sameArguments(node1, node2) {
-  const args1 = node1.arguments;
-  const args2 = node2.arguments;
-  if (args1 === undefined || args1.length === 0) {
-    return args2 === undefined || args2.length === 0;
+function getFieldInfo(fieldDetails) {
+  if (fieldDetails.info === undefined) {
+    var _fieldDetails$definit;
+    fieldDetails.info = {
+      comparisons: new Map,
+      namedType: getNamedType((_fieldDetails$definit = fieldDetails.definition) === null || _fieldDetails$definit === undefined ? undefined : _fieldDetails$definit.type),
+      arguments: getArgumentInfo(fieldDetails.node.arguments)
+    };
   }
-  if (args2 === undefined || args2.length === 0) {
+  return fieldDetails.info;
+}
+function getArgumentInfo(args) {
+  if (args === undefined || args.length === 0) {
+    return;
+  }
+  const values = new Map;
+  for (const { name, value } of args) {
+    values.set(name.value, value);
+  }
+  return {
+    nodes: args,
+    values
+  };
+}
+function sameArguments(ruleContext, argumentInfo1, argumentInfo2) {
+  if (argumentInfo1 === undefined) {
+    return argumentInfo2 === undefined;
+  }
+  if (argumentInfo1.nodes.length !== (argumentInfo2 === null || argumentInfo2 === undefined ? undefined : argumentInfo2.nodes.length)) {
     return false;
   }
-  if (args1.length !== args2.length) {
-    return false;
-  }
-  const values2 = new Map(args2.map(({ name, value }) => [name.value, value]));
-  return args1.every((arg1) => {
-    const value1 = arg1.value;
+  const values2 = argumentInfo2.values;
+  return argumentInfo1.nodes.every((arg1) => {
+    spendComplexityBudget(ruleContext, 1);
     const value2 = values2.get(arg1.name.value);
     if (value2 === undefined) {
       return false;
     }
-    return stringifyValue(value1) === stringifyValue(value2);
+    return stringifyValue(ruleContext, arg1.value) === stringifyValue(ruleContext, value2);
   });
 }
-function stringifyValue(value) {
-  return print(sortValueNode(value));
+function stringifyValue(ruleContext, value) {
+  const cached = ruleContext.stringifiedValues.get(value);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const result = JSON.stringify(value, (_key, node) => {
+    if (!isNode(node)) {
+      return node;
+    }
+    switch (node.kind) {
+      case Kind.VARIABLE:
+        return [node.kind, node.name.value];
+      case Kind.OBJECT:
+        return [
+          node.kind,
+          node.fields.slice().sort((first, second) => first.name.value < second.name.value ? -1 : first.name.value > second.name.value ? 1 : 0)
+        ];
+      case Kind.OBJECT_FIELD:
+        return [node.name.value, node.value];
+      case Kind.LIST:
+        return [node.kind, node.values];
+      case Kind.STRING:
+        return [node.kind, node.value, node.block === true];
+      default:
+        return [node.kind, "value" in node ? node.value : null];
+    }
+  });
+  ruleContext.stringifiedValues.set(value, result);
+  return result;
 }
-function doTypesConflict(type1, type2) {
+function doTypesConflict(ruleContext, type1, type2) {
+  if (type1 === type2) {
+    return false;
+  }
+  spendComplexityBudget(ruleContext, 1);
   if (isListType(type1)) {
-    return isListType(type2) ? doTypesConflict(type1.ofType, type2.ofType) : true;
+    return isListType(type2) ? doTypesConflict(ruleContext, type1.ofType, type2.ofType) : true;
   }
   if (isListType(type2)) {
     return true;
   }
   if (isNonNullType(type1)) {
-    return isNonNullType(type2) ? doTypesConflict(type1.ofType, type2.ofType) : true;
+    return isNonNullType(type2) ? doTypesConflict(ruleContext, type1.ofType, type2.ofType) : true;
   }
   if (isNonNullType(type2)) {
     return true;
@@ -8296,49 +8569,62 @@ function doTypesConflict(type1, type2) {
   }
   return false;
 }
-function getFieldsAndFragmentNames(context, cachedFieldsAndFragmentNames, parentType, selectionSet) {
-  const cached = cachedFieldsAndFragmentNames.get(selectionSet);
+function collectFields2(validationContext, ruleContext, parentType, selectionSet) {
+  const { cachedCollectFieldsResults } = ruleContext;
+  let bySelectionSet = cachedCollectFieldsResults.get(parentType);
+  if (bySelectionSet === undefined) {
+    bySelectionSet = new Map;
+    cachedCollectFieldsResults.set(parentType, bySelectionSet);
+  }
+  const cached = bySelectionSet.get(selectionSet);
   if (cached) {
     return cached;
   }
-  const nodeAndDefs = Object.create(null);
-  const fragmentNames = Object.create(null);
-  _collectFieldsAndFragmentNames(context, parentType, selectionSet, nodeAndDefs, fragmentNames);
-  const result = [nodeAndDefs, Object.keys(fragmentNames)];
-  cachedFieldsAndFragmentNames.set(selectionSet, result);
+  const fieldDetails = new Map;
+  const fragmentNames = new Set;
+  collectFieldsImpl2(validationContext, parentType, selectionSet, fieldDetails, fragmentNames);
+  const result = {
+    groupedFieldSet: fieldDetails,
+    fragmentNames: [...fragmentNames]
+  };
+  bySelectionSet.set(selectionSet, result);
   return result;
 }
-function getReferencedFieldsAndFragmentNames(context, cachedFieldsAndFragmentNames, fragment) {
-  const cached = cachedFieldsAndFragmentNames.get(fragment.selectionSet);
-  if (cached) {
-    return cached;
-  }
-  const fragmentType = typeFromAST(context.getSchema(), fragment.typeCondition);
-  return getFieldsAndFragmentNames(context, cachedFieldsAndFragmentNames, fragmentType, fragment.selectionSet);
+function collectFragmentFields(validationContext, ruleContext, fragment) {
+  const fragmentType = typeFromAST(validationContext.getSchema(), fragment.typeCondition);
+  return collectFields2(validationContext, ruleContext, fragmentType, fragment.selectionSet);
 }
-function _collectFieldsAndFragmentNames(context, parentType, selectionSet, nodeAndDefs, fragmentNames) {
+function collectFieldsImpl2(validationContext, parentType, selectionSet, fieldDetails, fragmentNames) {
   for (const selection of selectionSet.selections) {
     switch (selection.kind) {
       case Kind.FIELD: {
+        var _selection$arguments$, _selection$arguments;
         const fieldName = selection.name.value;
         let fieldDef;
         if (isObjectType(parentType) || isInterfaceType(parentType)) {
           fieldDef = parentType.getFields()[fieldName];
         }
         const responseName = selection.alias ? selection.alias.value : fieldName;
-        if (!nodeAndDefs[responseName]) {
-          nodeAndDefs[responseName] = [];
+        let fieldDetailsList = fieldDetails.get(responseName);
+        if (fieldDetailsList === undefined) {
+          fieldDetailsList = [];
+          fieldDetails.set(responseName, fieldDetailsList);
         }
-        nodeAndDefs[responseName].push([parentType, selection, fieldDef]);
+        fieldDetailsList.push({
+          parentType,
+          node: selection,
+          definition: fieldDef,
+          isSimpleLeaf: ((_selection$arguments$ = (_selection$arguments = selection.arguments) === null || _selection$arguments === undefined ? undefined : _selection$arguments.length) !== null && _selection$arguments$ !== undefined ? _selection$arguments$ : 0) === 0 && !selection.selectionSet
+        });
         break;
       }
       case Kind.FRAGMENT_SPREAD:
-        fragmentNames[selection.name.value] = true;
+        fragmentNames.add(selection.name.value);
         break;
       case Kind.INLINE_FRAGMENT: {
         const typeCondition = selection.typeCondition;
-        const inlineFragmentType = typeCondition ? typeFromAST(context.getSchema(), typeCondition) : parentType;
-        _collectFieldsAndFragmentNames(context, inlineFragmentType, selection.selectionSet, nodeAndDefs, fragmentNames);
+        const inlineFragmentType = typeCondition ? typeFromAST(validationContext.getSchema(), typeCondition) : parentType;
+        collectFieldsImpl2(validationContext, inlineFragmentType, selection.selectionSet, fieldDetails, fragmentNames);
         break;
       }
     }
@@ -8346,19 +8632,51 @@ function _collectFieldsAndFragmentNames(context, parentType, selectionSet, nodeA
 }
 function subfieldConflicts(conflicts, responseName, node1, node2) {
   if (conflicts.length > 0) {
-    return [
-      [responseName, conflicts.map(([reason]) => reason)],
-      [node1, ...conflicts.map(([, fields1]) => fields1).flat()],
-      [node2, ...conflicts.map(([, , fields2]) => fields2).flat()]
-    ];
+    let message = "";
+    for (const { responseName: name, reason } of conflicts) {
+      message += (message === "" ? "" : " and ") + `subfields "${maybeAbbreviate(name)}" conflict because ${reason}`;
+      if (message.length > MAX_CONFLICT_DETAIL_LENGTH) {
+        break;
+      }
+    }
+    return {
+      responseName,
+      reason: maybeAbbreviate(message),
+      fields1: collectConflictNodes(node1, conflicts, "fields1"),
+      fields2: collectConflictNodes(node2, conflicts, "fields2")
+    };
+  }
+}
+function collectConflictNodes(node, conflicts, side) {
+  const nodes = [node];
+  for (const conflict of conflicts) {
+    const remaining = MAX_CONFLICT_NODES - nodes.length;
+    const retainedNodes = conflict[side].slice(-remaining);
+    nodes.push(...retainedNodes);
+    if (nodes.length === MAX_CONFLICT_NODES) {
+      break;
+    }
+  }
+  return nodes;
+}
+function maybeAbbreviate(text) {
+  return text.length > MAX_CONFLICT_DETAIL_LENGTH ? text.slice(0, MAX_CONFLICT_DETAIL_LENGTH) + "..." : text;
+}
+function spendComplexityBudget(ruleContext, cost) {
+  ruleContext.remainingComplexityBudget -= cost;
+  if (ruleContext.remainingComplexityBudget < 0) {
+    throw validationAbortedError;
   }
 }
 
-class OrderedPairSet {
+class PairSet {
   constructor() {
     this._data = new Map;
   }
   has(a, b, weaklyPresent) {
+    return this._has(a, b, weaklyPresent) || this._has(b, a, weaklyPresent);
+  }
+  _has(a, b, weaklyPresent) {
     var _this$_data$get;
     const result = (_this$_data$get = this._data.get(a)) === null || _this$_data$get === undefined ? undefined : _this$_data$get.get(b);
     if (result === undefined) {
@@ -8372,22 +8690,6 @@ class OrderedPairSet {
       this._data.set(a, new Map([[b, weaklyPresent]]));
     } else {
       map.set(b, weaklyPresent);
-    }
-  }
-}
-
-class PairSet {
-  constructor() {
-    this._orderedPairSet = new OrderedPairSet;
-  }
-  has(a, b, weaklyPresent) {
-    return a < b ? this._orderedPairSet.has(a, b, weaklyPresent) : this._orderedPairSet.has(b, a, weaklyPresent);
-  }
-  add(a, b, weaklyPresent) {
-    if (a < b) {
-      this._orderedPairSet.add(a, b, weaklyPresent);
-    } else {
-      this._orderedPairSet.add(b, a, weaklyPresent);
     }
   }
 }
@@ -8625,6 +8927,22 @@ function ScalarLeafsRule(context) {
 
 // /zveltio-extension/node_modules/graphql/validation/rules/SingleFieldSubscriptionsRule.mjs
 function SingleFieldSubscriptionsRule(context) {
+  let fragments;
+  function reserveSelectionSetWork(selectionSet) {
+    context.spendFragmentWork(selectionSet.selections.length);
+    for (const selection of selectionSet.selections) {
+      const directives = selection.directives;
+      if (directives !== undefined) {
+        context.spendFragmentWork(directives.length);
+        for (const directive of directives) {
+          if (directive.name.value === "skip" || directive.name.value === "include") {
+            var _directive$arguments$, _directive$arguments;
+            context.spendFragmentWork((_directive$arguments$ = (_directive$arguments = directive.arguments) === null || _directive$arguments === undefined ? undefined : _directive$arguments.length) !== null && _directive$arguments$ !== undefined ? _directive$arguments$ : 0);
+          }
+        }
+      }
+    }
+  }
   return {
     OperationDefinition(node) {
       if (node.operation === "subscription") {
@@ -8633,14 +8951,17 @@ function SingleFieldSubscriptionsRule(context) {
         if (subscriptionType) {
           const operationName = node.name ? node.name.value : null;
           const variableValues = Object.create(null);
-          const document = context.getDocument();
-          const fragments = Object.create(null);
-          for (const definition of document.definitions) {
-            if (definition.kind === Kind.FRAGMENT_DEFINITION) {
-              fragments[definition.name.value] = definition;
+          if (fragments === undefined) {
+            fragments = Object.create(null);
+            const definitions = context.getDocument().definitions;
+            context.spendFragmentWork(definitions.length);
+            for (const definition of definitions) {
+              if (definition.kind === Kind.FRAGMENT_DEFINITION) {
+                fragments[definition.name.value] = definition;
+              }
             }
           }
-          const fields = collectFields(schema, fragments, variableValues, subscriptionType, node.selectionSet);
+          const fields = collectFields(schema, fragments, variableValues, subscriptionType, node.selectionSet, reserveSelectionSetWork);
           if (fields.size > 1) {
             const fieldSelectionLists = [...fields.values()];
             const extraFieldSelectionLists = fieldSelectionLists.slice(1);
@@ -9089,7 +9410,7 @@ function ValuesOfCorrectTypeRule(context) {
       const parentType = getNamedType(context.getParentInputType());
       const fieldType = context.getInputType();
       if (!fieldType && isInputObjectType(parentType)) {
-        const suggestions = suggestionList(node.name.value, Object.keys(parentType.getFields()));
+        const suggestions = context.hideSuggestions ? [] : suggestionList(node.name.value, Object.keys(parentType.getFields()));
         context.reportError(new GraphQLError(`Field "${node.name.value}" is not defined by type "${parentType.name}".` + didYouMean(suggestions), {
           nodes: node
         }));
@@ -9098,7 +9419,7 @@ function ValuesOfCorrectTypeRule(context) {
     NullValue(node) {
       const type = context.getInputType();
       if (isNonNullType(type)) {
-        context.reportError(new GraphQLError(`Expected value of type "${inspect(type)}", found ${print(node)}.`, {
+        context.reportError(new GraphQLError(`Expected value of type "${inspect(type)}", found ${printForError(node)}.`, {
           nodes: node
         }));
       }
@@ -9118,16 +9439,16 @@ function isValidValueNode(context, node) {
   const type = getNamedType(locationType);
   if (!isLeafType(type)) {
     const typeStr = inspect(locationType);
-    context.reportError(new GraphQLError(`Expected value of type "${typeStr}", found ${print(node)}.`, {
+    context.reportError(new GraphQLError(`Expected value of type "${typeStr}", found ${printForError(node)}.`, {
       nodes: node
     }));
     return;
   }
   try {
-    const parseResult = type.parseLiteral(node, undefined);
+    const parseResult = isEnumType(type) ? type.parseLiteral(node, undefined, context.hideSuggestions) : type.parseLiteral(node, undefined);
     if (parseResult === undefined) {
       const typeStr = inspect(locationType);
-      context.reportError(new GraphQLError(`Expected value of type "${typeStr}", found ${print(node)}.`, {
+      context.reportError(new GraphQLError(`Expected value of type "${typeStr}", found ${printForError(node)}.`, {
         nodes: node
       }));
     }
@@ -9136,7 +9457,7 @@ function isValidValueNode(context, node) {
     if (error instanceof GraphQLError) {
       context.reportError(error);
     } else {
-      context.reportError(new GraphQLError(`Expected value of type "${typeStr}", found ${print(node)}; ` + error.message, {
+      context.reportError(new GraphQLError(`Expected value of type "${typeStr}", found ${printForError(node)}; ` + error.message, {
         nodes: node,
         originalError: error
       }));
@@ -9277,13 +9598,42 @@ var specifiedSDLRules = Object.freeze([
   ProvidedRequiredArgumentsOnDirectivesRule
 ]);
 
+// /zveltio-extension/node_modules/graphql/jsutils/SetMap.mjs
+class SetMap {
+  constructor() {
+    this._entries = new Map;
+    this._memberIds = new Map;
+    this._nextMemberId = 0;
+  }
+  get(members) {
+    return this._entries.get(this._key(members));
+  }
+  set(members, value) {
+    this._entries.set(this._key(members), value);
+  }
+  _key(members) {
+    const ids = [];
+    for (const member of members) {
+      let id = this._memberIds.get(member);
+      if (id === undefined) {
+        id = this._nextMemberId++;
+        this._memberIds.set(member, id);
+      }
+      ids.push(id);
+    }
+    ids.sort((id1, id2) => id1 - id2);
+    return ids.join(",");
+  }
+}
+
 // /zveltio-extension/node_modules/graphql/validation/ValidationContext.mjs
 class ASTValidationContext {
+  _remainingFragmentWork = 50000;
   constructor(ast, onError) {
     this._ast = ast;
     this._fragments = undefined;
     this._fragmentSpreads = new Map;
-    this._recursivelyReferencedFragments = new Map;
+    this._recursivelyReferencedFragments = new SetMap;
     this._onError = onError;
   }
   get [Symbol.toStringTag]() {
@@ -9330,37 +9680,48 @@ class ASTValidationContext {
     return spreads;
   }
   getRecursivelyReferencedFragments(operation) {
-    let fragments = this._recursivelyReferencedFragments.get(operation);
+    return this.getRecursivelyReferencedFragmentsForOperations([operation]);
+  }
+  getRecursivelyReferencedFragmentsForOperations(operations) {
+    const fragmentNames = new Set(operations.flatMap(({ selectionSet }) => this.getFragmentSpreads(selectionSet).map(({ name }) => name.value)));
+    let fragments = this._recursivelyReferencedFragments.get(fragmentNames);
     if (!fragments) {
       fragments = [];
-      const collectedNames = Object.create(null);
-      const nodesToVisit = [operation.selectionSet];
-      let node;
-      while (node = nodesToVisit.pop()) {
-        for (const spread of this.getFragmentSpreads(node)) {
-          const fragName = spread.name.value;
-          if (collectedNames[fragName] !== true) {
-            collectedNames[fragName] = true;
-            const fragment = this.getFragment(fragName);
-            if (fragment) {
-              fragments.push(fragment);
-              nodesToVisit.push(fragment.selectionSet);
-            }
+      this.spendFragmentWork(fragmentNames.size);
+      const collectedNames = new Set(fragmentNames);
+      for (const fragName of collectedNames) {
+        const fragment = this.getFragment(fragName);
+        if (fragment) {
+          fragments.push(fragment);
+          const spreads = this.getFragmentSpreads(fragment.selectionSet);
+          this.spendFragmentWork(spreads.length);
+          for (const spread of spreads) {
+            collectedNames.add(spread.name.value);
           }
         }
       }
-      this._recursivelyReferencedFragments.set(operation, fragments);
+      this._recursivelyReferencedFragments.set(fragmentNames, fragments);
     }
     return fragments;
   }
+  spendFragmentWork(cost) {
+    this._remainingFragmentWork -= cost;
+    if (this._remainingFragmentWork < 0) {
+      throw validationAbortedError;
+    }
+  }
 }
 class ValidationContext extends ASTValidationContext {
-  constructor(schema, ast, typeInfo, onError) {
+  constructor(schema, ast, typeInfo, onError, hideSuggestions) {
     super(ast, onError);
+    this._hideSuggestions = hideSuggestions !== null && hideSuggestions !== undefined ? hideSuggestions : false;
     this._schema = schema;
     this._typeInfo = typeInfo;
     this._variableUsages = new Map;
     this._recursiveVariableUsages = new Map;
+  }
+  get hideSuggestions() {
+    return this._hideSuggestions;
   }
   get [Symbol.toStringTag]() {
     return "ValidationContext";
@@ -9392,10 +9753,19 @@ class ValidationContext extends ASTValidationContext {
   getRecursiveVariableUsages(operation) {
     let usages = this._recursiveVariableUsages.get(operation);
     if (!usages) {
-      usages = this.getVariableUsages(operation);
-      for (const frag of this.getRecursivelyReferencedFragments(operation)) {
-        usages = usages.concat(this.getVariableUsages(frag));
+      const fragments = this.getRecursivelyReferencedFragments(operation);
+      let fragmentUsages = this._recursiveVariableUsages.get(fragments);
+      if (!fragmentUsages) {
+        this.spendFragmentWork(fragments.length);
+        fragmentUsages = fragments.flatMap((frag) => {
+          const localUsages = this.getVariableUsages(frag);
+          this.spendFragmentWork(localUsages.length);
+          return localUsages;
+        });
+        this._recursiveVariableUsages.set(fragments, fragmentUsages);
       }
+      this.spendFragmentWork(fragmentUsages.length);
+      usages = this.getVariableUsages(operation).concat(fragmentUsages);
       this._recursiveVariableUsages.set(operation, usages);
     }
     return usages;
@@ -9429,8 +9799,9 @@ class ValidationContext extends ASTValidationContext {
 // /zveltio-extension/node_modules/graphql/validation/validate.mjs
 var QueryDocumentKeysToValidate = mapValue(QueryDocumentKeys, (keys) => keys.filter((key) => key !== "description"));
 function validate(schema, documentAST, rules = specifiedRules, options, typeInfo = new TypeInfo(schema)) {
-  var _options$maxErrors;
+  var _options$maxErrors, _options$hideSuggesti;
   const maxErrors = (_options$maxErrors = options === null || options === undefined ? undefined : options.maxErrors) !== null && _options$maxErrors !== undefined ? _options$maxErrors : 100;
+  const hideSuggestions = (_options$hideSuggesti = options === null || options === undefined ? undefined : options.hideSuggestions) !== null && _options$hideSuggesti !== undefined ? _options$hideSuggesti : false;
   documentAST || devAssert(false, "Must provide document.");
   assertValidSchema(schema);
   const abortObj = Object.freeze({});
@@ -9441,12 +9812,14 @@ function validate(schema, documentAST, rules = specifiedRules, options, typeInfo
       throw abortObj;
     }
     errors.push(error);
-  });
+  }, hideSuggestions);
   const visitor = visitInParallel(rules.map((rule) => rule(context)));
   try {
     visit(documentAST, visitWithTypeInfo(typeInfo, visitor), QueryDocumentKeysToValidate);
   } catch (e) {
-    if (e !== abortObj) {
+    if (e === validationAbortedError) {
+      errors.push(validationAbortedError);
+    } else if (e !== abortObj) {
       throw e;
     }
   }
@@ -13328,5 +13701,5 @@ var engine_default = extension;
 export {
   engine_default as default
 };
-// @zveltio-bundled hono@4.13.8
-// @zveltio-bundled kysely@0.29.7
+// @zveltio-bundled hono@4.13.17
+// @zveltio-bundled kysely@0.29.8

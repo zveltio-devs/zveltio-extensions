@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.2 (2026-11-09)
+
+- build: repacked with hono 4.13.17 and kysely 0.29.8, in lockstep with the engine; no behaviour change
+
 ## 2.0.1 (2026-11-04)
 
 - fix: a CSV value in quotes may hold line breaks (RFC 4180). The file was split into lines before parsing, so a quoted multi-line value became two broken rows

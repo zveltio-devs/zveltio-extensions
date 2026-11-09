@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.12 (2026-11-09)
+
+- build: repacked with hono 4.13.17 and kysely 0.29.8, in lockstep with the engine; no behaviour change
+
 ## 1.2.11 (2026-11-08)
 
 - `ai` is an optional dependency, no longer a required one: AI is opt-in

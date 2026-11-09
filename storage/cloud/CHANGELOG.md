@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.14 (2026-11-09)
+
+- build: repacked with hono 4.13.17 and kysely 0.29.8, in lockstep with the engine; no behaviour change
+
 ## 1.1.13 (2026-11-03)
 
 - fix: `/favorites` creates its own table `zv_media_favorites` (migration 005, the content/media 1.x definition); it relied on content/media 1.x creating it, and content/media 2.0.0 no longer does

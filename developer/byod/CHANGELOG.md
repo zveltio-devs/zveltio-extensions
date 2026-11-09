@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.1 (2026-11-09)
+
+- build: repacked with hono 4.13.17 and kysely 0.29.8, in lockstep with the engine; no behaviour change
+
 ## 2.0.0 (2026-11-05)
 
 - feat!: scan profiles and scan history are the collections `byod_profiles` and `byod_scans`, declared in `schema/collections/` and created and owned by the engine; no SQL migrations. **Upgrade step:** 2.0.0 does not read `zvd_byod_scan_profiles` or `zvd_byod_scan_history` (an extension reaches only its declared collections), so saved profiles and past scans are not carried over: recreate the profiles in Studio (BYOD Import). The 1.x tables are left in place
