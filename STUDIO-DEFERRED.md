@@ -27,7 +27,6 @@ Tier-3 pages appear only where the product calls for them (e.g.
 | `geospatial/postgis` | geofences CRUD | **Explore shipped** (`/admin/geospatial/postgis/explore`) — near/cluster/bbox | MapView |
 | `projects/management` | projects CRUD | **Kanban shipped** (`/admin/projects/management/kanban`) | Drag → PATCH status |
 | `projects/helpdesk` | tickets list/create/reply | Live conversation panel | |
-| `search` | indexes CRUD | Interactive `/q` playground | |
 | `i18n/translations` | keys + locales CRUD | Translation matrix editor | |
 
 ---

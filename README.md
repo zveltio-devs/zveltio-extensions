@@ -66,14 +66,11 @@ for end-user applications. Import them directly:
 | `integrations` | `api-connector` |
 | `operations` | `assets`, `inventory`, `pos`, `traceability` |
 | `projects` | `helpdesk`, `management` |
-| `search` | `search` |
 | `sms` | `sms` |
 | `storage` | `cloud` |
 | `workflow` | `approvals`, `checklists` |
 
-**Catalog size:** 54 official extensions across 23 categories
-(52 with database migrations + tenant RLS, 2 stateless / API-only:
-`content/pdf-viewer` and extensions without DB tables).
+**Catalog size:** 52 official extensions across 22 categories.
 
 Admin Studio pages are **SDUI schemas** unless listed in [STUDIO-DEFERRED.md](./STUDIO-DEFERRED.md).
 
