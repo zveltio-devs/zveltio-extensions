@@ -149,6 +149,9 @@ export class Imap {
     if (tls === 'starttls') {
       if (!c.caps.has('STARTTLS')) throw new ImapError('the IMAP server does not offer STARTTLS');
       await c.run(['STARTTLS']);
+      // Anything already buffered arrived in plaintext and would be read as if
+      // it came over TLS (STARTTLS response injection, CVE-2011-0411 class).
+      if (c.wire.pending) throw new ImapError('the IMAP server sent data after STARTTLS; refusing to continue');
       await c.wire.startTls();
       await c.capability();
     }

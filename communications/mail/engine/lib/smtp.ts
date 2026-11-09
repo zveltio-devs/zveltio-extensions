@@ -91,6 +91,8 @@ export async function sendMail(
     if (tls === 'starttls') {
       if (!ext.some((l) => l.toUpperCase() === 'STARTTLS')) throw new SmtpError('the SMTP server does not offer STARTTLS', 0);
       await say(w, 'STARTTLS', [220]);
+      // Buffered plaintext would be read as if it came over TLS (response injection).
+      if (w.pending) throw new SmtpError('the SMTP server sent data after STARTTLS; refusing to continue', 0);
       await w.startTls();
       ext = await say(w, `EHLO ${heloName}`, [250]);
     }

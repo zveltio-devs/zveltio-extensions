@@ -280,3 +280,46 @@ describe('MIME', () => {
     );
   });
 });
+
+describe('STARTTLS', () => {
+  /** A peer that answers STARTTLS and, in the same packet, injects a plaintext reply. */
+  function stream(script: (line: string) => string): JobTcpStream {
+    const out: Uint8Array[] = [];
+    let first = true;
+    return {
+      async read() {
+        if (first) {
+          first = false;
+          return new TextEncoder().encode(script(''));
+        }
+        return out.shift() ?? null;
+      },
+      async write(d) {
+        const line = typeof d === 'string' ? d : new TextDecoder().decode(d);
+        out.push(new TextEncoder().encode(script(line.trim())));
+      },
+      async startTls() {
+        throw new Error('must not upgrade');
+      },
+      async close() {},
+    };
+  }
+
+  it('SMTP refuses plaintext buffered behind the STARTTLS reply', async () => {
+    const s = stream((l) =>
+      l === '' ? '220 hi\r\n' : l.startsWith('EHLO') ? '250-x\r\n250 STARTTLS\r\n' : l === 'STARTTLS' ? '220 go\r\n250 AUTH PLAIN\r\n' : '250 ok\r\n',
+    );
+    await expect(sendMail(s, 'starttls', null, { from: 'a@x.test', to: ['b@x.test'] }, new Uint8Array())).rejects.toThrow(/after STARTTLS/);
+  });
+
+  it('IMAP refuses plaintext buffered behind the STARTTLS reply', async () => {
+    const s = stream((l) => {
+      if (l === '') return '* OK hi\r\n';
+      const tag = l.split(' ')[0];
+      if (l.endsWith('CAPABILITY')) return `* CAPABILITY IMAP4rev1 STARTTLS\r\n${tag} OK done\r\n`;
+      if (l.endsWith('STARTTLS')) return `${tag} OK go\r\n* CAPABILITY IMAP4rev1 AUTH=PLAIN\r\n`;
+      return `${tag} OK\r\n`;
+    });
+    await expect(Imap.open(s, 'starttls')).rejects.toThrow(/after STARTTLS/);
+  });
+});

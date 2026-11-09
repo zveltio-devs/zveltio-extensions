@@ -8383,6 +8383,8 @@ class Imap {
       if (!c.caps.has("STARTTLS"))
         throw new ImapError("the IMAP server does not offer STARTTLS");
       await c.run(["STARTTLS"]);
+      if (c.wire.pending)
+        throw new ImapError("the IMAP server sent data after STARTTLS; refusing to continue");
       await c.wire.startTls();
       await c.capability();
     }
@@ -8643,6 +8645,8 @@ async function sendMail(stream, tls, auth, env, raw, heloName = "zveltio.invalid
       if (!ext.some((l) => l.toUpperCase() === "STARTTLS"))
         throw new SmtpError("the SMTP server does not offer STARTTLS", 0);
       await say(w, "STARTTLS", [220]);
+      if (w.pending)
+        throw new SmtpError("the SMTP server sent data after STARTTLS; refusing to continue", 0);
       await w.startTls();
       ext = await say(w, `EHLO ${heloName}`, [250]);
     }
