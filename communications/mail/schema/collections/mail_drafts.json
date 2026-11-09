@@ -1,0 +1,134 @@
+{
+  "name": "mail_drafts",
+  "fields": [
+    {
+      "name": "account_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "mail_accounts"
+      }
+    },
+    {
+      "name": "identity_id",
+      "type": "m2o",
+      "options": {
+        "related_collection": "mail_identities"
+      }
+    },
+    {
+      "name": "to_addresses",
+      "type": "json"
+    },
+    {
+      "name": "cc_addresses",
+      "type": "json"
+    },
+    {
+      "name": "bcc_addresses",
+      "type": "json"
+    },
+    {
+      "name": "subject",
+      "type": "text"
+    },
+    {
+      "name": "body_text",
+      "type": "textarea"
+    },
+    {
+      "name": "body_html",
+      "type": "textarea"
+    },
+    {
+      "name": "in_reply_to",
+      "type": "text"
+    },
+    {
+      "name": "references_header",
+      "type": "textarea"
+    },
+    {
+      "name": "original_message_id",
+      "type": "m2o",
+      "options": {
+        "related_collection": "mail_messages"
+      }
+    },
+    {
+      "name": "attachments",
+      "type": "json"
+    },
+    {
+      "name": "priority",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "normal",
+      "options": {
+        "values": [
+          "high",
+          "normal",
+          "low"
+        ]
+      }
+    },
+    {
+      "name": "request_read_receipt",
+      "type": "boolean",
+      "defaultValue": false
+    },
+    {
+      "name": "send_status",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "draft",
+      "writtenBy": "actions",
+      "options": {
+        "values": [
+          "draft",
+          "queued",
+          "sending",
+          "failed"
+        ]
+      }
+    },
+    {
+      "name": "send_error",
+      "type": "textarea",
+      "writtenBy": "actions"
+    }
+  ],
+  "relations": [
+    {
+      "name": "mail_drafts_account_id",
+      "type": "m2o",
+      "field": "account_id",
+      "target": "mail_accounts",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "mail_drafts_identity_id",
+      "type": "m2o",
+      "field": "identity_id",
+      "target": "mail_identities",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "mail_drafts_original_message_id",
+      "type": "m2o",
+      "field": "original_message_id",
+      "target": "mail_messages",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

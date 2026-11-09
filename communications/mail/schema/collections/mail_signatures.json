@@ -1,0 +1,23 @@
+{
+  "name": "mail_signatures",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "body_html",
+      "type": "textarea"
+    },
+    {
+      "name": "body_text",
+      "type": "textarea"
+    },
+    {
+      "name": "is_default",
+      "type": "boolean",
+      "defaultValue": false
+    }
+  ]
+}

@@ -1,5 +1,63 @@
 # Changelog
 
+## 2.0.0 (2026-11-09)
+
+Ported to the extension model (RFC v3). Needs engine 3.0.0-beta.109 (the TCP
+relay, ADR 0026 amendment, and `host.files`, ADR 0031).
+
+- feat!: accounts, folders, messages, attachments, drafts, identities,
+  signatures, filters and contacts are the collections `mail_accounts`,
+  `mail_folders`, `mail_messages`, `mail_attachments`, `mail_drafts`,
+  `mail_identities`, `mail_signatures`, `mail_filters` and `mail_contacts`,
+  declared in `schema/collections/`, created and owned by the engine and served
+  by the data API; no SQL migrations. The 1.x tables (`zv_mail_*`) are no longer
+  read or written, their rows are not carried over, and they are left in place:
+  add the accounts again, and the first sync reads the mail back from the server.
+- feat!: the extension talks to a mail server only from jobs in the engine's
+  Deno runner (`sync`, `send`, `apply`), over streams the engine relays to a
+  `host:port` an operator bound to the tcp slot `mail`. Until the operator binds
+  the IMAP and SMTP `host:port` of an account, its sync answers "No mail server
+  is allowed yet" and reaches nothing. imapflow, mailparser and nodemailer are
+  gone: the IMAP and SMTP clients are this extension's own, over the relay.
+- feat!: the hand-written `/ext/communications/mail/*` routes are gone. Plain
+  edits are the data API; the rest are the actions `sync`, `send`, `setFlags`,
+  `moveMessages`, `deleteMessages`, `createFolder`, `renameFolder` and
+  `deleteFolder` (`POST /ext/communications/mail/actions/<name>`), each gated on
+  `execute` on its collection. An action records what was asked and queues the
+  job; the job's outcome is on the row (`mail_accounts.sync_status` and
+  `sync_error`, `mail_drafts.send_status` and `send_error`).
+- feat!: who sees which mailbox is the engine's rules. Mail is private to its
+  owner only with the operator's row rules `* created_by eq user_id` on the
+  `mail_*` collections; a job writes as the user whose action queued it
+  (ADR 0028), so the rows it creates carry that user. Passwords are `secret`
+  fields: the data API never returns them.
+- fix: a message's HTML is sanitized when it is stored, not only in Studio:
+  every reader of `mail_messages.body_html` (the data API, an export) gets inert
+  HTML. 1.x served it raw (HIGH).
+- feat!: attachments are engine files. A sync stores each attachment as a
+  private file of the user who queued it (`host.files`, capability `files`) and
+  records its id in `mail_attachments.file_id`; Studio downloads it through
+  `/api/storage`. An attachment the engine will not store (its size, the
+  quota, a type `/api/storage/upload` refuses) is listed without content, to be
+  opened in the webmail. To send one, Studio uploads it with
+  `/api/storage/upload` and the draft lists it in `attachments`; the job reads
+  it as its author, and a file the author cannot read fails the send.
+- feat!: no background sync. A job is queued by a user's action, so mail is
+  fetched when the inbox is open (on open, every 5 minutes, and on Sync), not
+  while nobody looks; filters run at that sync. A sync stops at its budget (850
+  collection calls, 48 MiB read) and says so in `sync_more`; Studio continues it.
+  A folder's first sync imports its newest 50 messages.
+- feat!: sending saves a draft and queues it; the job sends it, files a copy in
+  Sent (except on Gmail and Microsoft 365, which file their own), remembers the
+  recipients as contacts and deletes the draft. A send whose server never
+  confirmed the message is marked failed with "it may have been delivered", and
+  is not retried.
+- feat!: dropped: OAuth2 sign-in (Gmail, Outlook), Sieve upload of filters,
+  read receipts sent on request, `.eml` download, quota, AI summarize and reply
+  (the `ai` extension), `/stats`, `/search` (the data API's `search`) and the
+  admin settings. Filters run locally at sync with `mark_read`, `mark_starred`,
+  `move` and `delete`.
+
 ## 1.2.12 (2026-11-09)
 
 - build: repacked with hono 4.13.17 and kysely 0.29.8, in lockstep with the engine; no behaviour change

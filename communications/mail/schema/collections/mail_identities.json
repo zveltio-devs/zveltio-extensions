@@ -1,0 +1,61 @@
+{
+  "name": "mail_identities",
+  "fields": [
+    {
+      "name": "account_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "mail_accounts"
+      }
+    },
+    {
+      "name": "email_address",
+      "type": "email",
+      "required": true
+    },
+    {
+      "name": "display_name",
+      "type": "text"
+    },
+    {
+      "name": "reply_to",
+      "type": "email"
+    },
+    {
+      "name": "is_default",
+      "type": "boolean",
+      "defaultValue": false
+    },
+    {
+      "name": "signature_id",
+      "type": "m2o",
+      "options": {
+        "related_collection": "mail_signatures"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "name": "mail_identities_account_id",
+      "type": "m2o",
+      "field": "account_id",
+      "target": "mail_accounts",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "mail_identities_signature_id",
+      "type": "m2o",
+      "field": "signature_id",
+      "target": "mail_signatures",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

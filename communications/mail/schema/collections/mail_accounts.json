@@ -1,0 +1,125 @@
+{
+  "name": "mail_accounts",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "email_address",
+      "type": "email",
+      "required": true
+    },
+    {
+      "name": "display_name",
+      "type": "text"
+    },
+    {
+      "name": "imap_host",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "imap_port",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 993
+    },
+    {
+      "name": "imap_tls",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "implicit",
+      "options": {
+        "values": [
+          "implicit",
+          "starttls",
+          "none"
+        ]
+      }
+    },
+    {
+      "name": "imap_user",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "imap_password",
+      "type": "secret"
+    },
+    {
+      "name": "smtp_host",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "smtp_port",
+      "type": "integer",
+      "required": true,
+      "defaultValue": 465
+    },
+    {
+      "name": "smtp_tls",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "implicit",
+      "options": {
+        "values": [
+          "implicit",
+          "starttls",
+          "none"
+        ]
+      }
+    },
+    {
+      "name": "smtp_user",
+      "type": "text"
+    },
+    {
+      "name": "smtp_password",
+      "type": "secret"
+    },
+    {
+      "name": "is_default",
+      "type": "boolean",
+      "defaultValue": false
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "defaultValue": true
+    },
+    {
+      "name": "sync_status",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "idle",
+      "writtenBy": "actions",
+      "options": {
+        "values": [
+          "idle",
+          "queued",
+          "syncing",
+          "error"
+        ]
+      }
+    },
+    {
+      "name": "sync_more",
+      "type": "boolean",
+      "defaultValue": false,
+      "writtenBy": "actions"
+    },
+    {
+      "name": "sync_error",
+      "type": "textarea",
+      "writtenBy": "actions"
+    },
+    {
+      "name": "last_sync_at",
+      "type": "datetime",
+      "writtenBy": "actions"
+    }
+  ]
+}

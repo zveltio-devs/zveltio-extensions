@@ -1,0 +1,49 @@
+{
+  "name": "mail_filters",
+  "fields": [
+    {
+      "name": "account_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "mail_accounts"
+      }
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "is_active",
+      "type": "boolean",
+      "defaultValue": true
+    },
+    {
+      "name": "sort_order",
+      "type": "integer",
+      "defaultValue": 0
+    },
+    {
+      "name": "conditions",
+      "type": "json"
+    },
+    {
+      "name": "actions",
+      "type": "json"
+    }
+  ],
+  "relations": [
+    {
+      "name": "mail_filters_account_id",
+      "type": "m2o",
+      "field": "account_id",
+      "target": "mail_accounts",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

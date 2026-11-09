@@ -1,0 +1,155 @@
+{
+  "name": "mail_messages",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "account_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "mail_accounts"
+      }
+    },
+    {
+      "name": "folder_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "mail_folders"
+      }
+    },
+    {
+      "name": "uid",
+      "type": "integer",
+      "required": true
+    },
+    {
+      "name": "message_id",
+      "type": "text",
+      "indexed": true
+    },
+    {
+      "name": "in_reply_to",
+      "type": "text"
+    },
+    {
+      "name": "references_header",
+      "type": "textarea"
+    },
+    {
+      "name": "from_address",
+      "type": "text"
+    },
+    {
+      "name": "from_name",
+      "type": "text"
+    },
+    {
+      "name": "to_addresses",
+      "type": "json"
+    },
+    {
+      "name": "cc_addresses",
+      "type": "json"
+    },
+    {
+      "name": "reply_to",
+      "type": "text"
+    },
+    {
+      "name": "subject",
+      "type": "text"
+    },
+    {
+      "name": "body_text",
+      "type": "textarea"
+    },
+    {
+      "name": "body_html",
+      "type": "textarea"
+    },
+    {
+      "name": "snippet",
+      "type": "text"
+    },
+    {
+      "name": "priority",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "normal",
+      "options": {
+        "values": [
+          "high",
+          "normal",
+          "low"
+        ]
+      }
+    },
+    {
+      "name": "is_read",
+      "type": "boolean",
+      "defaultValue": false
+    },
+    {
+      "name": "is_starred",
+      "type": "boolean",
+      "defaultValue": false
+    },
+    {
+      "name": "has_attachments",
+      "type": "boolean",
+      "defaultValue": false
+    },
+    {
+      "name": "read_receipt_requested",
+      "type": "boolean",
+      "defaultValue": false
+    },
+    {
+      "name": "size",
+      "type": "integer"
+    },
+    {
+      "name": "sent_at",
+      "type": "datetime"
+    },
+    {
+      "name": "received_at",
+      "type": "datetime",
+      "indexed": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "mail_messages_account_id",
+      "type": "m2o",
+      "field": "account_id",
+      "target": "mail_accounts",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "mail_messages_folder_id",
+      "type": "m2o",
+      "field": "folder_id",
+      "target": "mail_folders",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "indexes": [
+    {
+      "fields": [
+        "folder_id",
+        "uid"
+      ],
+      "unique": true
+    }
+  ]
+}
