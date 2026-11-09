@@ -23,7 +23,7 @@
     "@types/sanitize-html": "^2.16.2",
     "bun-types": "latest",
     "dompurify": "3.4.17",
-    "graphql": "^16.14.2",
+    "graphql": "^16.15.0",
     "hoodiecrow-imap": "^2.1.0",
     "imapflow": "^1.7.8",
     "ldapts": "^7.4.0",
