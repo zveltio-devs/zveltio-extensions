@@ -3,7 +3,7 @@
   "displayName": "Document Templates",
   "category": "content",
   "description": "HTML templates with {{variable}} interpolation, rendered to PDF as the caller",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "zveltioMinVersion": "3.0.0-beta.99",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-document-templates",
@@ -42,7 +42,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "9c91dfb4b238045dfdbc8126a5a6096b3e135b88382485663e5826bb6db7cd9e",
+    "engineSha256": "0f085404a17c5ede532d786d69f26a28a097f1866bcd799b6703a3f093118251",
     "sourceSha256": "72a70cd0f091064675727505f74c14d386b96c046d773f50034b702f49017a56",
     "schemaSha256": "17e66e04a795ff00e5957d096deb4d42181a926a20b343f5bffa16135b8db510"
   }

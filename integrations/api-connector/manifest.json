@@ -3,7 +3,7 @@
   "displayName": "API Connector",
   "category": "integrations",
   "description": "No-code HTTP integrations: call external REST APIs on hosts the operator allows, with retries, OAuth2 and a call log; receive signed incoming webhooks",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "zveltioMinVersion": "3.0.0-beta.105",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-api-connector",
@@ -187,7 +187,7 @@
     }
   ],
   "integrity": {
-    "engineSha256": "a793c9dace826f6713055ce52ed5d2b06159966d4b8935c1149f62c8bd594efa",
+    "engineSha256": "c6d034cf5ef5c6ff047de71268773cfbc9352fae987ef55955f94a33f648d7a2",
     "sourceSha256": "fc51d8d913d223a3ebafc6f5bf48f7eb14ee2f945f9cec4c4d5dbb2dfa2ebc03",
     "schemaSha256": "098ea2183cfaada6aa27816fe29c61f549ec18ea934333a1366cbab7ae55ffc8",
     "jobsSha256": "c0680162cfbb72cbb922a9aeeb4d8740b52e9c36c489886f021f3d5fb69e045e"

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.3 (2026-11-09)
+
+- build: repacked with hono 4.13.17 and kysely 0.29.8, in lockstep with the engine; no behaviour change
+
 ## 2.0.2 (2026-11-08)
 
 - Needs engine 3.0.0-beta.105, the first that judges validation rules on a

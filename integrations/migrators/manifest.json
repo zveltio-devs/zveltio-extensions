@@ -3,7 +3,7 @@
   "displayName": "Data Migrators",
   "category": "integrations",
   "description": "Import your data from HubSpot, Notion and Airtable into Zveltio collections, through the data API as the importing user",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "zveltioMinVersion": "3.0.0-beta.103",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-migrators",
@@ -177,7 +177,7 @@
     }
   ],
   "integrity": {
-    "engineSha256": "2fef64978c2366e25947a92f7a583327d49a19b7e1cc018e3a96b6ae0cf01706",
+    "engineSha256": "62c65e6211b33f82d73baf360f305c5edb1d23b52b00878e450db79af0011d99",
     "sourceSha256": "8e5deca24e43989dae0b712a9d42d5e64e0cf898c9dbbe7c3bcb98db7d6770b9",
     "schemaSha256": "39d7d5a7147c9978ae1cb396f15244587b211a96d646cf80c773b8e8ca0de0b0",
     "jobsSha256": "7fa330571e26ec7746437b3b4da5a17003232d186a32c31aaf9c0f8515510201"

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.1 (2026-11-09)
+
+- build: repacked with hono 4.13.17 and kysely 0.29.8, in lockstep with the engine; no behaviour change
+
 ## 2.0.0 (2026-11-02)
 
 - feat!: the register is 13 collections declared in `schema/collections/` and created and owned by the engine (`trace_suppliers`, `trace_items`, `trace_locations`, `trace_recipes`, `trace_recipe_items` as plain edits; `trace_lots`, `trace_lot_decisions`, `trace_production_orders`, `trace_haccp_checks`, `trace_lot_consumptions`, `trace_movements`, `trace_recalls`, `trace_dispatches` written only by the actions); no SQL migrations

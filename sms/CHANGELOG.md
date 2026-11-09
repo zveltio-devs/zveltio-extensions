@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.1 (2026-11-09)
+
+- build: repacked with hono 4.13.17 and kysely 0.29.8, in lockstep with the engine; no behaviour change
+
 ## 2.0.0 (2026-11-07)
 
 Rebuilt on the engine's extension model (phase D): no own tables, no own SQL,

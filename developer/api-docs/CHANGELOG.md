@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.1 (2026-11-09)
+
+- build: repacked with hono 4.13.17 and kysely 0.29.8, in lockstep with the engine; no behaviour change
+
 ## 2.1.0 (2026-11-03)
 
 - feat: the actions `publish` and `unpublish` (`POST /ext/developer/api-docs/actions/<name>`, body `{ "id" }`) restore 1.x's publish: `publish` sets `is_published` and stamps `published_at` with today's date in the tenant's time zone; `unpublish` clears `is_published` and keeps the date. Each refuses with 409 an entry already in the state it asks for. Both are gated on `execute` on `apidoc_changelogs`, granted by the operator

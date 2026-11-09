@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.1 (2026-11-09)
+
+- build: repacked with hono 4.13.17 and kysely 0.29.8, in lockstep with the engine; no behaviour change
+
 ## 2.0.0 (2026-11-04)
 
 - feat!: generated documents, numbering sequences and signatures are the declared collections `generated_documents`, `document_number_sequences` and `document_signatures`, created and owned by the engine and served by the data API; no SQL migrations. The 1.x tables `zv_generated_docs`, `zv_document_sign_requests`, `zv_document_access_log` and `zv_document_number_sequences` are no longer read or written and their rows are not carried over

@@ -3,7 +3,7 @@
   "displayName": "API Documentation",
   "category": "developer",
   "description": "Swagger UI over the data API: each visitor sees the collections they may read",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "zveltioMinVersion": "3.0.0-beta.96",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-api-docs",
@@ -34,7 +34,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "0aef991a9f00231f4bed7d6bf367061e602aebb59a3d6b9183aa084dfcb8ff83",
+    "engineSha256": "0655be9cf428d657bd98be6d1c45d35c294782755d3b32e0000fdd776812dc18",
     "sourceSha256": "861e550cf3cdf50d0414cdbff283168664595fe49f49275f58c683dc39e26df5",
     "schemaSha256": "8a140f1880329319eb85985654b4fa48446637f3c731034fa3ffdf49ffdd2c46"
   },

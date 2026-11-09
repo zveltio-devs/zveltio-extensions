@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.1 (2026-11-09)
+
+- build: repacked with hono 4.13.17 and kysely 0.29.8, in lockstep with the engine; no behaviour change
+
 ## 2.0.0 (2026-11-03)
 
 - feat!: an export reads through the data API as the exporting user (`ctx.internals.listRecords`, paged by cursor): the caller's grants, row policies, extension alters, entity access and column permissions decide what is exported, the answer `GET /api/data` gives them. The 1.x admin-only gate and the `export` permission resource are gone; who may export a collection is who may read it

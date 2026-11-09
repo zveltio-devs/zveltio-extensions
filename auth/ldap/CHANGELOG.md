@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.1 (2026-11-09)
+
+- build: repacked with hono 4.13.17 and kysely 0.29.8, in lockstep with the engine; no behaviour change
+
 ## 2.1.0 (2026-11-06)
 
 - feat: `bind_password` is a `secret` field (ADR 0024): encrypted at rest, served to no one on any read path, god included, and read back decrypted by this extension alone. A reader of `ldap_settings` no longer reads it, so no grant needs restricting for it. Studio's form leaves it empty when editing: leave it empty to keep the stored password, type one to replace it. Needs engine 3.0.0-beta.103

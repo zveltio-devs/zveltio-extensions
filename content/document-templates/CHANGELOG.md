@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.1 (2026-11-09)
+
+- build: repacked with hono 4.13.17 and kysely 0.29.8, in lockstep with the engine; no behaviour change
+
 ## 2.0.0 (2026-11-04)
 
 - feat!: templates and the render log are the declared collections `document_templates` and `document_renders`, created and owned by the engine and served by the data API; no SQL migrations. The 1.x tables `zv_document_templates`, `zv_document_renders`, `zv_document_template_versions`, `zv_document_template_access` and `zv_document_render_jobs` are no longer read or written and their rows are not carried over

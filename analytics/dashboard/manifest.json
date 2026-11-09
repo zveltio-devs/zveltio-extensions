@@ -3,7 +3,7 @@
   "displayName": "Dashboards",
   "category": "analytics",
   "description": "Role-aware, per-user home dashboards — IT sets a default layout per role, each user personalizes within their permissions",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "zveltioMinVersion": "3.0.0-beta.96",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-dashboard",
@@ -39,7 +39,7 @@
     "dashboard_layouts"
   ],
   "integrity": {
-    "engineSha256": "2197cd0063dc384a9a8c947792776d458baf79b6b0cd87dce710f5451216017e",
+    "engineSha256": "584f27b9cd8231d3cb6a595b0ea605f74152e07c60e289245faa503ac0bfcc24",
     "sourceSha256": "0b8c6255d41431951eeeca69214ea637450f561375d4891e438a5dc92a31ef66",
     "schemaSha256": "51c4cb48ece78c4a75f2ff63054023661cfa73570277fcc649a3b856b1a9252a"
   }

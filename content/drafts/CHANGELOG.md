@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.1 (2026-11-09)
+
+- build: repacked with hono 4.13.17 and kysely 0.29.8, in lockstep with the engine; no behaviour change
+
 ## 2.1.0 (2026-11-04)
 
 - fix: `reviewDraft` approves the draft as it is once its row is locked. It read the draft, then wrote `approved_data` from that read, so an edit committing in between was approved unseen; the review status is now written first (with its `expect`), the draft read again under the lock, and `approved_data` taken from that read
