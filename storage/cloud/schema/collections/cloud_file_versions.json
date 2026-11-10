@@ -1,0 +1,35 @@
+{
+  "name": "cloud_file_versions",
+  "fields": [
+    {
+      "name": "file_id",
+      "type": "uuid",
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "version",
+      "type": "integer",
+      "required": true
+    },
+    {
+      "name": "version_file_id",
+      "type": "uuid",
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "note",
+      "type": "text"
+    }
+  ],
+  "indexes": [
+    {
+      "fields": [
+        "file_id",
+        "version"
+      ],
+      "unique": true
+    }
+  ]
+}

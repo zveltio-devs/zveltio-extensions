@@ -5,75 +5,29 @@
   "newLabel": "common.new",
   "resources": [
     {
-      "id": "files",
-      "label": "storage.cloud.tab.files",
-      "icon": "Folder",
-      "dataSource": "/ext/storage/cloud/files",
-      "dataPath": "data",
-      "search": {
-        "param": "path",
-        "placeholder": "storage.cloud.root"
-      },
+      "id": "versions",
+      "label": "storage.cloud.tab.versions",
+      "icon": "History",
+      "dataSource": "/api/data/cloud_file_versions?sort=created_at&order=desc&limit=100",
+      "dataPath": "records",
       "columns": [
-        {
-          "key": "name",
-          "label": "common.col.name"
-        },
-        {
-          "key": "is_folder",
-          "label": "storage.cloud.col.folder",
-          "type": "boolean"
-        },
-        {
-          "key": "size",
-          "label": "storage.cloud.col.size"
-        },
-        {
-          "key": "updated_at",
-          "label": "storage.cloud.col.modified",
-          "type": "date"
-        }
-      ],
-      "rowActions": [
-        {
-          "id": "download",
-          "kind": "download",
-          "icon": "Download",
-          "label": "common.download",
-          "endpoint": "/ext/storage/cloud/files/{id}/download"
-        },
-        {
-          "id": "delete",
-          "icon": "Trash2",
-          "variant": "text-error",
-          "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/ext/storage/cloud/files/{id}",
-          "confirm": "storage.cloud.confirmDeleteFile"
-        }
-      ]
-    },
-    {
-      "id": "shares",
-      "label": "storage.cloud.tab.shares",
-      "icon": "Share2",
-      "dataSource": "/ext/storage/cloud/shares",
-      "dataPath": "shares",
-      "columns": [
-        {
-          "key": "id",
-          "label": "common.col.number",
-          "type": "mono"
-        },
         {
           "key": "file_id",
           "label": "storage.cloud.col.fileId",
           "type": "mono"
         },
         {
-          "key": "expires_at",
-          "label": "storage.cloud.col.expires",
-          "type": "date"
+          "key": "version",
+          "label": "storage.cloud.col.version"
+        },
+        {
+          "key": "version_file_id",
+          "label": "storage.cloud.col.versionFileId",
+          "type": "mono"
+        },
+        {
+          "key": "note",
+          "label": "storage.cloud.col.note"
         },
         {
           "key": "created_at",
@@ -83,22 +37,93 @@
       ],
       "rowActions": [
         {
-          "id": "revoke",
+          "id": "restore",
+          "icon": "RotateCcw",
+          "label": "storage.cloud.restore",
+          "method": "POST",
+          "endpoint": "/ext/storage/cloud/actions/restoreVersion",
+          "body": {
+            "version_id": "{id}"
+          },
+          "confirm": "storage.cloud.confirmRestore"
+        }
+      ],
+      "form": {
+        "endpoint": "/ext/storage/cloud/files/{file_id}/versions",
+        "submit": {
+          "kind": "upload"
+        },
+        "fields": [
+          {
+            "name": "file_id",
+            "label": "storage.cloud.col.fileId",
+            "required": true,
+            "mono": true,
+            "colSpan": 2
+          },
+          {
+            "name": "file",
+            "label": "storage.cloud.col.file",
+            "type": "file",
+            "required": true,
+            "colSpan": 2
+          },
+          {
+            "name": "note",
+            "label": "storage.cloud.col.note",
+            "colSpan": 2
+          }
+        ]
+      }
+    },
+    {
+      "id": "favorites",
+      "label": "storage.cloud.tab.favorites",
+      "icon": "Star",
+      "dataSource": "/api/data/cloud_favorites?sort=created_at&order=desc&limit=100",
+      "dataPath": "records",
+      "columns": [
+        {
+          "key": "file_id",
+          "label": "storage.cloud.col.fileId",
+          "type": "mono"
+        },
+        {
+          "key": "created_at",
+          "label": "common.col.created",
+          "type": "date"
+        }
+      ],
+      "rowActions": [
+        {
+          "id": "delete",
           "icon": "Trash2",
           "variant": "text-error",
           "label": "common.delete",
           "method": "DELETE",
-          "endpoint": "/ext/storage/cloud/shares/{id}",
-          "confirm": "storage.cloud.confirmRevokeShare"
+          "endpoint": "/api/data/cloud_favorites/{id}",
+          "confirm": "ext.confirmDelete"
         }
-      ]
+      ],
+      "form": {
+        "endpoint": "/api/data/cloud_favorites",
+        "fields": [
+          {
+            "name": "file_id",
+            "label": "storage.cloud.col.fileId",
+            "required": true,
+            "mono": true,
+            "colSpan": 2
+          }
+        ]
+      }
     },
     {
       "id": "retention",
       "label": "storage.cloud.tab.retention",
       "icon": "Clock",
-      "dataSource": "/ext/storage/cloud/retention-policies",
-      "dataPath": "policies",
+      "dataSource": "/api/data/cloud_retention_policies?sort=name&order=asc&limit=500",
+      "dataPath": "records",
       "columns": [
         {
           "key": "name",
@@ -116,21 +141,31 @@
         {
           "key": "delete_after_days",
           "label": "storage.cloud.col.deleteAfterDays"
+        },
+        {
+          "key": "is_active",
+          "label": "storage.cloud.col.active",
+          "type": "boolean"
         }
       ],
       "rowActions": [
+        {
+          "id": "edit",
+          "kind": "edit",
+          "label": "common.edit"
+        },
         {
           "id": "delete",
           "icon": "Trash2",
           "variant": "text-error",
           "label": "common.delete",
           "method": "DELETE",
-          "endpoint": "/ext/storage/cloud/retention-policies/{id}",
+          "endpoint": "/api/data/cloud_retention_policies/{id}",
           "confirm": "storage.cloud.confirmDeletePolicy"
         }
       ],
       "form": {
-        "endpoint": "/ext/storage/cloud/retention-policies",
+        "endpoint": "/api/data/cloud_retention_policies",
         "fields": [
           {
             "name": "name",
@@ -160,83 +195,20 @@
             "name": "delete_after_days",
             "label": "storage.cloud.col.deleteAfterDays",
             "type": "number",
+            "colSpan": 1
+          },
+          {
+            "name": "archive_after_days",
+            "label": "storage.cloud.col.archiveAfterDays",
+            "type": "number",
+            "colSpan": 1
+          },
+          {
+            "name": "is_active",
+            "label": "storage.cloud.col.active",
+            "type": "boolean",
+            "default": true,
             "colSpan": 2
-          }
-        ]
-      }
-    },
-    {
-      "id": "quotas",
-      "label": "storage.cloud.tab.quotas",
-      "icon": "Gauge",
-      "dataSource": "/ext/storage/cloud/admin/quotas",
-      "dataPath": "quotas",
-      "columns": [
-        {
-          "key": "role_name",
-          "label": "common.col.role"
-        },
-        {
-          "key": "user_id",
-          "label": "common.col.user",
-          "type": "mono"
-        },
-        {
-          "key": "quota_bytes",
-          "label": "storage.cloud.col.quotaBytes"
-        },
-        {
-          "key": "max_file_size_bytes",
-          "label": "storage.cloud.col.maxFileSize"
-        }
-      ],
-      "rowActions": [
-        {
-          "id": "delete",
-          "icon": "Trash2",
-          "variant": "text-error",
-          "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/ext/storage/cloud/admin/quotas/{id}",
-          "confirm": "storage.cloud.confirmDeleteQuota"
-        }
-      ],
-      "form": {
-        "endpoint": "/ext/storage/cloud/admin/quotas",
-        "fields": [
-          {
-            "name": "role_name",
-            "label": "common.col.role",
-            "colSpan": 1
-          },
-          {
-            "name": "user_id",
-            "label": "common.col.user",
-            "mono": true,
-            "colSpan": 1
-          },
-          {
-            "name": "quota_bytes",
-            "label": "storage.cloud.col.quotaBytes",
-            "type": "number",
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "max_file_size_bytes",
-            "label": "storage.cloud.col.maxFileSize",
-            "type": "number",
-            "colSpan": 1,
-            "default": 104857600
-          },
-          {
-            "name": "allowed_extensions",
-            "label": "storage.cloud.col.allowedExtensions",
-            "type": "json",
-            "mono": true,
-            "rows": 2,
-            "colSpan": 2,
-            "default": "[]"
           }
         ]
       }
