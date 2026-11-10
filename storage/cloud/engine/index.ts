@@ -1,46 +1,22 @@
-import type { ZveltioExtension, ExtensionContext } from '@zveltio/sdk/extension';
-import { join } from 'path';
-import { cloudRoutes, makePublicShareHandler } from './routes.js';
-import { purgeExpiredTrash } from './lib/trash.js';
-import { setConfig } from './lib/config.js';
+import type { ZveltioExtension } from '@zveltio/sdk/extension';
+import { cloudActions } from './versions.js';
+import { cloudRoutes } from './routes.js';
+
+// Files, folders, uploads, downloads, deletes, visibility and quotas are the
+// engine's own `/api/storage`. What this extension adds is collections it
+// declares in `schema/collections/` — version history, favorites, retention
+// policies — which the engine creates, owns the rules of and serves through the
+// data API; one route, where a new version's bytes and its history row commit
+// together; and one action, restoring an older version.
 const extension: ZveltioExtension = {
   name: 'storage/cloud',
   category: 'storage',
-  // S3-01: sub-app mounted at /ext/storage/cloud by the engine.
-  // /share/:token stays on the global app via ctx.registerPublicRoute()
-  // because shared file links are user-facing URLs that must not move.
   mountStrategy: 'subapp',
 
-  getMigrations() {
-    return [
-      join(import.meta.dir, 'migrations/001_initial.sql'),
-      join(import.meta.dir, 'migrations/002_tenant_rls.sql'),
-      join(import.meta.dir, 'migrations/003_tenant_scoped_unique_keys.sql'),
-      join(import.meta.dir, 'migrations/004_hash_access_log_share_tokens.sql'),
-      join(import.meta.dir, 'migrations/005_media_favorites.sql'),
-    ];
-  },
+  actions: cloudActions,
 
   async register(app, ctx) {
-    // Host-resolved config (S3 settings + public URL) before anything reads it.
-    setConfig(ctx.config);
-
-    // Sub-app: cloud admin/file CRUD lives under /ext/storage/cloud/...
     app.route('/', cloudRoutes(ctx));
-
-    // Public CDN-style download endpoint. Lives on the engine's global app
-    // so existing share links (e.g. /share/abc123 sent to recipients) keep
-    // working — the URL must not move with the rest of the extension.
-    ctx.registerPublicRoute({
-      method: 'GET',
-      path: '/share/:token',
-      handler: makePublicShareHandler(ctx),
-    });
-
-    // Register trash purge so flow-scheduler can call it daily at 03:30
-    ctx.internals.extensionRegistry.registerTrashPurgeHandler(async (db: any) => {
-      await purgeExpiredTrash(db);
-    });
   },
 };
 
