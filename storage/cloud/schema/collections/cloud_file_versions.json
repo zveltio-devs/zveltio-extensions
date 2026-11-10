@@ -1,5 +1,6 @@
 {
   "name": "cloud_file_versions",
+  "defaultGrants": false,
   "fields": [
     {
       "name": "file_id",
