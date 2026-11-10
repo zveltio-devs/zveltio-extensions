@@ -1,5 +1,5 @@
 import { ActionRefusal, type ExtensionAction } from '@zveltio/sdk/extension';
-import { ACCOUNTS, DRAFTS, FOLDERS, MESSAGES, STALE_MS } from './mail.js';
+import { ACCOUNTS, ATTACHMENTS, DRAFTS, FOLDERS, MESSAGES, STALE_MS } from './mail.js';
 
 // The engine runs every action as the caller, through the data API, in the
 // request's transaction: what the caller cannot read, an action cannot find.
@@ -61,8 +61,44 @@ const send: ExtensionAction = async (input, host) => {
   }
   await account(host, String(d.account_id));
   await host.collections.update(DRAFTS, d.id, { send_status: 'queued', send_error: null }, { expect: { send_status: [String(d.send_status)] } });
-  await host.enqueue('send', { draft_id: d.id });
+  // Attachments are files the caller hands this send in `$files.read` (ADR
+  // 0032); the engine checked them as the caller, and the job reads only those.
+  const attached = Array.isArray(d.attachments) && d.attachments.length > 0;
+  await enqueueWithFiles(host, 'send', { draft_id: d.id }, attached, '$files.read with the ids of the draft\'s attachments');
   return { queued: true };
+};
+
+/** `enqueue`, handing the request's `$files` to the job when `files`; a request that carried none is the caller's mistake. */
+async function enqueueWithFiles(host: Host, job: string, input: Row, files: boolean, what: string): Promise<string> {
+  try {
+    return await host.enqueue(job, input, files ? { files: true } : undefined);
+  } catch (err) {
+    if (files && /carried no \$files/.test(String((err as Error)?.message))) {
+      throw new ActionRefusal(400, 'files_required', `Hand ${what}.`);
+    }
+    throw err;
+  }
+}
+
+/**
+ * Download one received attachment into the caller's files: the job fetches its
+ * part from the mail server and stores it as the file the caller asked for in
+ * `$files.write` (its name and the part's size as `maxBytes`). Answers the id
+ * the file will have; the row's `file_id` holds it once stored.
+ */
+const fetchAttachment: ExtensionAction = async (input, host) => {
+  const { attachment_id } = input as { attachment_id: string };
+  const a = (await host.collections.read(ATTACHMENTS, attachment_id)) as Row | null;
+  if (!a) throw new ActionRefusal(404, 'attachment_not_found', 'No such attachment.');
+  if (a.file_id) return { queued: false, file_id: a.file_id };
+  const updated = Date.parse(String(a.updated_at ?? ''));
+  if (a.fetch_status === 'queued' && Date.now() - updated < STALE_MS) return { queued: false, fetch_status: 'queued' };
+  const m = (await host.collections.read(MESSAGES, String(a.message_id))) as Row | null;
+  if (!m) throw new ActionRefusal(404, 'message_not_found', 'No such message.');
+  await account(host, String(m.account_id));
+  await host.collections.update(ATTACHMENTS, a.id, { fetch_status: 'queued', fetch_error: null }, { expect: { fetch_status: [a.fetch_status ?? null] } });
+  const file_id = await enqueueWithFiles(host, 'fetchAttachment', { attachment_id: a.id }, true, '$files.write with the attachment\'s name and size');
+  return { queued: true, file_id };
 };
 
 const setFlags: ExtensionAction = async (input, host) => {
@@ -127,4 +163,4 @@ const deleteFolder: ExtensionAction = async (input, host) => {
   return { queued: true };
 };
 
-export const mailActions = { sync, send, setFlags, moveMessages, deleteMessages, createFolder, renameFolder, deleteFolder };
+export const mailActions = { sync, send, fetchAttachment, setFlags, moveMessages, deleteMessages, createFolder, renameFolder, deleteFolder };

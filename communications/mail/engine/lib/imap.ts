@@ -127,6 +127,54 @@ export interface Fetched {
   raw?: Uint8Array;
 }
 
+/** One leaf of a BODYSTRUCTURE (RFC 3501 §7.4.2): where it is and what it is, not its bytes. */
+export interface Leaf {
+  /** The part's section for `BODY[<section>]`: `1`, `2.1`... */
+  section: string;
+  /** `type/subtype`, lower-cased. */
+  type: string;
+  params: Record<string, string>;
+  id: string | null;
+  /** Content-Transfer-Encoding, lower-cased. */
+  encoding: string;
+  /** Encoded octets: never below the decoded size. */
+  size: number;
+  disposition: string | null;
+  dparams: Record<string, string>;
+}
+
+const pairs = (v: Val | undefined): Record<string, string> => {
+  const o: Record<string, string> = {};
+  if (Array.isArray(v)) for (let i = 0; i + 1 < v.length; i += 2) o[str(v[i]).toLowerCase()] = str(v[i + 1]);
+  return o;
+};
+
+/** Every leaf of a BODYSTRUCTURE, depth first; a message/rfc822 part is one leaf (its own `.eml`). */
+export function leaves(v: Val, section = ''): Leaf[] {
+  if (!Array.isArray(v)) return [];
+  if (Array.isArray(v[0])) {
+    const out: Leaf[] = [];
+    for (let n = 0; n < v.length && Array.isArray(v[n]); n++) out.push(...leaves(v[n]!, section ? `${section}.${n + 1}` : String(n + 1)));
+    return out;
+  }
+  const type = `${str(v[0])}/${str(v[1])}`.toLowerCase();
+  // Extension data starts after `lines` for text/*, after envelope, body and lines for message/rfc822.
+  const md5 = type.startsWith('text/') ? 8 : type === 'message/rfc822' ? 10 : 7;
+  const disp = v[md5 + 1];
+  return [
+    {
+      section: section || '1',
+      type,
+      params: pairs(v[2]),
+      id: str(v[3]) || null,
+      encoding: str(v[5]).toLowerCase() || '7bit',
+      size: Number(str(v[6])) || 0,
+      disposition: Array.isArray(disp) ? str(disp[0]).toLowerCase() || null : null,
+      dparams: Array.isArray(disp) ? pairs(disp[1]) : {},
+    },
+  ];
+}
+
 export class Imap {
   private seq = 0;
   caps = new Set<string>();
@@ -295,13 +343,38 @@ export class Imap {
     return m?.raw ?? null;
   }
 
-  /** Only the header block, for a message too large to fetch whole. */
-  async header(uid: number): Promise<Uint8Array | null> {
-    const [m] = this.fetched(await this.run([`UID FETCH ${uid} (UID BODY.PEEK[HEADER])`]), 'BODY[HEADER]').filter((x) => x.uid === uid);
-    return m?.raw ?? null;
+  /** The header block and the BODYSTRUCTURE's leaves: enough to list a message without its parts. */
+  async structure(uid: number): Promise<{ header: Uint8Array; leaves: Leaf[] } | null> {
+    const res = await this.run([`UID FETCH ${uid} (UID BODYSTRUCTURE BODY.PEEK[HEADER])`]);
+    for (const r of res) {
+      if (str(r[1]).toUpperCase() !== 'FETCH') continue;
+      const it = fetchItems(r[2] ?? null);
+      if (Number(str(it.get('UID'))) !== uid) continue;
+      const h = it.get('BODY[HEADER]');
+      return { header: h instanceof Uint8Array ? h : enc.encode(str(h)), leaves: leaves(it.get('BODYSTRUCTURE') ?? null) };
+    }
+    return null;
   }
 
-  private fetched(res: Val[][], bodyKey = 'BODY[]'): Fetched[] {
+  /** These parts of one message, still transfer-encoded, by section; without setting \Seen. */
+  async parts(uid: number, sections: string[]): Promise<Map<string, Uint8Array>> {
+    const out = new Map<string, Uint8Array>();
+    if (!sections.every((s) => /^\d+(\.\d+)*$/.test(s))) throw new ImapError(`not a part section: ${sections.join(' ')}`);
+    if (!sections.length) return out;
+    const res = await this.run([`UID FETCH ${uid} (UID ${sections.map((s) => `BODY.PEEK[${s}]`).join(' ')})`]);
+    for (const r of res) {
+      if (str(r[1]).toUpperCase() !== 'FETCH') continue;
+      const it = fetchItems(r[2] ?? null);
+      if (Number(str(it.get('UID'))) !== uid) continue;
+      for (const s of sections) {
+        const v = it.get(`BODY[${s}]`);
+        if (v !== undefined && v !== null) out.set(s, v instanceof Uint8Array ? v : enc.encode(str(v)));
+      }
+    }
+    return out;
+  }
+
+  private fetched(res: Val[][]): Fetched[] {
     const out: Fetched[] = [];
     for (const r of res) {
       if (str(r[1]).toUpperCase() !== 'FETCH') continue;
@@ -309,7 +382,7 @@ export class Imap {
       const uid = Number(str(it.get('UID')));
       if (!uid) continue;
       const flags = it.get('FLAGS');
-      const raw = it.get(bodyKey);
+      const raw = it.get('BODY[]');
       out.push({
         uid,
         flags: Array.isArray(flags) ? flags.map((f) => str(f)) : [],

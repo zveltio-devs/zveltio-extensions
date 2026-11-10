@@ -114,6 +114,37 @@
       ]
     },
     {
+      "name": "fetchAttachment",
+      "permission": {
+        "resource": "mail_attachments",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "attachment_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "attachment_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "mail_attachments",
+        "mail_messages",
+        "mail_accounts"
+      ],
+      "writes": [
+        "mail_attachments"
+      ],
+      "enqueues": [
+        "fetchAttachment"
+      ]
+    },
+    {
       "name": "setFlags",
       "permission": {
         "resource": "mail_messages",
@@ -402,6 +433,42 @@
       "timeoutSeconds": 300
     },
     {
+      "name": "fetchAttachment",
+      "input": {
+        "type": "object",
+        "required": [
+          "attachment_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "attachment_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "mail_attachments",
+        "mail_messages",
+        "mail_folders",
+        "mail_accounts"
+      ],
+      "writes": [
+        "mail_attachments"
+      ],
+      "egressSlots": [
+        {
+          "name": "mail",
+          "kind": "tcp"
+        }
+      ],
+      "retry": {
+        "limit": 1,
+        "backoff": true
+      },
+      "timeoutSeconds": 300
+    },
+    {
       "name": "apply",
       "input": {
         "type": "object",
@@ -478,9 +545,9 @@
     }
   ],
   "integrity": {
-    "engineSha256": "e4f54d336588785f34e7ca046e17062fd14af1cf59d1a7059989fc0508ba14a5",
-    "sourceSha256": "3835bd9bf68c04611f68c690287f786145da0345759ca47ec50c7da50c07236a",
-    "schemaSha256": "f50f21733799b53115db6aa987730a7a6048d641a7a62ea428804f7c53c9335d",
-    "jobsSha256": "1d3560c775e73dc9077b31ded81c303dd3a8b3825f9128d4acb63be77d78827c"
+    "engineSha256": "0bec0eafe46fc51bfe1b320335be21d340320fce6376f5cb422c30103d44a22b",
+    "sourceSha256": "976bb691a12290047bdf58bc31e0e9286789a2387e7c48a6d78bef8549cc16b9",
+    "schemaSha256": "c12f0b664bd925ba007df14456d2c60685194363034a4448a244f5b5d91238e6",
+    "jobsSha256": "9f0e274f796b63027712b1a60b7695239635b0e88049fac8e948688f5fc1c82c"
   }
 }

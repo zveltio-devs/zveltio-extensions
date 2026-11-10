@@ -3,7 +3,7 @@
 ## 2.0.0 (2026-11-09)
 
 Ported to the extension model (RFC v3). Needs engine 3.0.0-beta.109 (the TCP
-relay, ADR 0026 amendment, and `host.files`, ADR 0031).
+relay, ADR 0026 amendment, and the file grants of ADR 0032).
 
 - feat!: accounts, folders, messages, attachments, drafts, identities,
   signatures, filters and contacts are the collections `mail_accounts`,
@@ -34,14 +34,24 @@ relay, ADR 0026 amendment, and `host.files`, ADR 0031).
 - fix: a message's HTML is sanitized when it is stored, not only in Studio:
   every reader of `mail_messages.body_html` (the data API, an export) gets inert
   HTML. 1.x served it raw (HIGH).
-- feat!: attachments are engine files. A sync stores each attachment as a
-  private file of the user who queued it (`host.files`, capability `files`) and
-  records its id in `mail_attachments.file_id`; Studio downloads it through
-  `/api/storage`. An attachment the engine will not store (its size, the
-  quota, a type `/api/storage/upload` refuses) is listed without content, to be
-  opened in the webmail. To send one, Studio uploads it with
-  `/api/storage/upload` and the draft lists it in `attachments`; the job reads
-  it as its author, and a file the author cannot read fails the send.
+- feat!: a mail client, not a mirror (ADR 0032). A sync keeps headers, flags
+  and the text and HTML body in the collections, as a cache for the list,
+  search and opening a message, and fetches no attachment: a
+  `mail_attachments` row holds its name, type, size and where it is on the
+  server (the message's folder and UID, the MIME `section` and transfer
+  `encoding` from BODYSTRUCTURE), and `file_id` stays empty. Downloading is the
+  action `fetchAttachment`: Studio calls it with
+  `$files.write = { name, maxBytes: size }`, and its job fetches that one part
+  (`BODY.PEEK[<section>]`), stores it as the user's own file and records its id
+  in `file_id` (`fetch_status` / `fetch_error` say how it went); Studio then
+  serves it through `/api/storage`. A name `/api/storage/upload` refuses
+  (`.eml`, `.ics`, no extension...) cannot be downloaded this way.
+- feat!: sending an attachment: Studio uploads it from the device through
+  `/api/storage/upload` as the user, the draft lists its id in `attachments`,
+  and `send` is called with `$files.read` set to those ids; the job reads only
+  those files, and one that is gone or no longer readable fails the send. Once
+  the draft is sent Studio deletes those uploads; a send that never completes
+  leaves them in the user's files.
 - feat!: no background sync. A job is queued by a user's action, so mail is
   fetched when the inbox is open (on open, every 5 minutes, and on Sync), not
   while nobody looks; filters run at that sync. A sync stops at its budget (850

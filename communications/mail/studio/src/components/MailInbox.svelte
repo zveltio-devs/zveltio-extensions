@@ -64,7 +64,18 @@ type MsgSummary = {
   received_at?: string | null;
 };
 
-type Attachment = { id: string; filename: string; mime_type?: string; size?: number; file_id?: string | null };
+type Attachment = {
+  id: string;
+  filename: string;
+  mime_type?: string;
+  size?: number;
+  file_id?: string | null;
+  fetch_status?: 'queued' | 'failed' | null;
+  fetch_error?: string | null;
+};
+
+/** Stored files handed to the job an action queues (ADR 0032): beside the input, checked by the engine as the caller. */
+type Files = { read?: string[]; write?: { name: string; maxBytes: number } };
 
 type MsgDetail = MsgSummary & {
   message_id?: string | null;
@@ -105,7 +116,8 @@ const t = (key: string, fallback: string) => m[key]?.() ?? fallback;
 const errText = (err: unknown, key: string, fallback: string) => (err instanceof Error ? err.message : t(key, fallback));
 const filter = (f: Record<string, unknown>) => encodeURIComponent(JSON.stringify(f));
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const action = <T = unknown>(name: string, body: Record<string, unknown>) => api.post<T>(`${ACTIONS}/${name}`, body);
+const action = <T = unknown>(name: string, body: Record<string, unknown>, files?: Files) =>
+  api.post<T>(`${ACTIONS}/${name}`, files ? { ...body, $files: files } : body);
 
 const activeAccount = $derived(accounts.find((a) => a.id === accountId) ?? null);
 const activeFolder = $derived(folders.find((f) => f.id === folderId) ?? null);
@@ -341,7 +353,8 @@ async function sendMail(): Promise<void> {
       original_message_id: replyTo?.id ?? null,
       attachments: composeFiles,
     });
-    await action('send', { draft_id: draft.id });
+    const uploads = composeFiles.map((f) => f.file_id);
+    await action('send', { draft_id: draft.id }, uploads.length ? { read: uploads } : undefined);
     for (let i = 0; i < 90; i++) {
       await sleep(2000);
       let d: { send_status?: string; send_error?: string | null } | null = null;
@@ -351,6 +364,9 @@ async function sendMail(): Promise<void> {
         d = null; // the job deletes a sent draft
       }
       if (!d) {
+        // Sent: the device uploads were only the way into the job. A send that
+        // never completes leaves them in the user's files, for the user to delete.
+        for (const id of uploads) await api.delete(`/api/storage/${id}`).catch(() => undefined);
         toast.success(t('communications.mail.ui.sent', 'Sent'));
         composing = false;
         return;
@@ -366,17 +382,38 @@ async function sendMail(): Promise<void> {
   }
 }
 
+let downloading = $state<string | null>(null);
+
+/**
+ * Open an attachment. One not yet downloaded is fetched from the mail server by
+ * a job, into the user's own files, under its name and at most its part's size.
+ */
 async function downloadAttachment(att: Attachment): Promise<void> {
-  if (!att.file_id) return;
+  if (downloading) return;
+  downloading = att.id;
   try {
-    const r = await api.get<{ url: string }>(`/api/storage/${att.file_id}/signed-url`);
+    let fileId = att.file_id ?? null;
+    if (!fileId) {
+      await action('fetchAttachment', { attachment_id: att.id }, { write: { name: att.filename, maxBytes: Math.max(1, att.size ?? 0) } });
+      for (let i = 0; i < 90 && !fileId; i++) {
+        await sleep(2000);
+        const row = await api.get<Attachment>(`${DATA}/mail_attachments/${att.id}`);
+        if (row.fetch_status === 'failed') throw new Error(row.fetch_error || t('communications.mail.error.download', 'Download failed'));
+        fileId = row.file_id ?? null;
+      }
+      if (!fileId) throw new Error(t('communications.mail.error.download', 'Download failed'));
+      att.file_id = fileId;
+    }
+    const r = await api.get<{ url: string }>(`/api/storage/${fileId}/signed-url`);
     const a = document.createElement('a');
     a.href = r.url;
     a.download = att.filename || 'attachment';
     a.rel = 'noopener';
     a.click();
   } catch (err) {
-    toast.error(errText(err, 'communications.mail.error.failed', 'Failed'));
+    toast.error(errText(err, 'communications.mail.error.download', 'Download failed'));
+  } finally {
+    downloading = null;
   }
 }
 
@@ -615,8 +652,8 @@ $effect(() => {
               <button
                 type="button"
                 class="btn btn-ghost btn-xs"
-                disabled={!att.file_id}
-                title={att.file_id ? '' : t('communications.mail.ui.attachmentNotStored', 'Not stored; open it in your webmail')}
+                disabled={downloading !== null}
+                title={downloading === att.id ? t('communications.mail.ui.downloading', 'Downloading…') : ''}
                 onclick={() => void downloadAttachment(att)}
               >
                 <Paperclip size={10} />

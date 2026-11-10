@@ -8,7 +8,7 @@
 import type { ExtensionJob, JobHost, JobTcpStream } from '@zveltio/sdk/extension';
 import { Imap, encodeMailbox, type Fetched, type Folder } from './lib/imap.js';
 import { sendMail, SmtpError } from './lib/smtp.js';
-import { buildMessage, parseMessage, type Address, type Parsed } from './lib/mime.js';
+import { buildMessage, decodeTransfer, parseListed, partText, splitParts, type Address, type Parsed, type PartRef } from './lib/mime.js';
 import { ACCOUNTS, ATTACHMENTS, CONTACTS, DRAFTS, FILTERS, FOLDERS, IDENTITIES, MESSAGES, SLOT } from './mail.js';
 
 type Row = Record<string, any>;
@@ -17,8 +17,8 @@ type Row = Record<string, any>;
 const CALL_BUDGET = 850;
 /** Bytes a sync reads before it stops (the relay allows 64 MiB a run). */
 const BYTE_BUDGET = 48 * 1024 * 1024;
-/** Above this a message is stored from its header alone. */
-const MAX_MESSAGE = 25 * 1024 * 1024;
+/** Above this a message's text parts are not fetched: it is stored from its header alone. */
+const MAX_TEXT = 5 * 1024 * 1024;
 /** A folder's first sync imports its newest messages only. */
 const FIRST_SYNC = 50;
 /** Local messages per folder whose flags a sync reconciles with the server. */
@@ -187,7 +187,7 @@ function matches(c: Row, p: Parsed, size: number): boolean {
 
 const has = (m: Fetched, flag: string) => m.flags.some((f) => f.toLowerCase() === flag);
 
-async function insertMessage(run: Run, acct: Row, folder: Row, m: Fetched, p: Parsed, v: Verdict, headerOnly: boolean) {
+async function insertMessage(run: Run, acct: Row, folder: Row, m: Fetched, p: Parsed, parts: PartRef[], v: Verdict, headerOnly: boolean) {
   const date = m.internalDate ? Date.parse(m.internalDate) : Number.NaN;
   let row: Row;
   try {
@@ -204,13 +204,13 @@ async function insertMessage(run: Run, acct: Row, folder: Row, m: Fetched, p: Pa
       cc_addresses: p.cc,
       reply_to: p.replyTo,
       subject: p.subject,
-      body_text: headerOnly ? `(This message is ${Math.round(m.size / 1048576)} MiB; open it in your mail server's webmail.)` : p.text,
+      body_text: headerOnly ? `(This message's text is over ${MAX_TEXT / 1048576} MiB; open it in your mail server's webmail.)` : p.text,
       body_html: headerOnly ? null : p.html,
       snippet: p.snippet,
       priority: p.priority,
       is_read: has(m, '\\seen') || v.read === true,
       is_starred: has(m, '\\flagged') || v.star === true,
-      has_attachments: p.attachments.some((a) => !a.inline),
+      has_attachments: parts.some((a) => !a.inline),
       read_receipt_requested: p.readReceipt,
       size: m.size,
       sent_at: p.date,
@@ -222,19 +222,10 @@ async function insertMessage(run: Run, acct: Row, folder: Row, m: Fetched, p: Pa
     if (dup) return;
     throw err;
   }
-  const files = run.host.files;
-  for (const a of p.attachments) {
+  // Where each attachment is, not its bytes: `fetchAttachment` reads one part
+  // from the server when its user asks (ADR 0032).
+  for (const a of parts) {
     if (run.spent) break;
-    let fileId: string | null = null;
-    if (files) {
-      run.calls++;
-      try {
-        fileId = (await files.put(a.filename, a.content)).id;
-      } catch {
-        // Over a size or quota limit, or a type the engine does not store:
-        // listed without its content, to be opened in the webmail.
-      }
-    }
     await run.insert(ATTACHMENTS, {
       message_id: row.id,
       filename: a.filename,
@@ -242,7 +233,9 @@ async function insertMessage(run: Run, acct: Row, folder: Row, m: Fetched, p: Pa
       size: a.size,
       content_id: a.contentId,
       is_inline: a.inline,
-      file_id: fileId,
+      section: a.section,
+      encoding: a.encoding,
+      file_id: null,
     });
   }
 }
@@ -295,10 +288,15 @@ async function syncFolder(run: Run, imap: Imap, acct: Row, folder: Row, filters:
       more = true;
       break;
     }
-    const headerOnly = m.size > MAX_MESSAGE;
-    const raw = headerOnly ? await imap.header(m.uid) : await imap.body(m.uid);
-    if (raw) {
-      const p = await parseMessage(raw);
+    const listed = await imap.structure(m.uid);
+    if (listed) {
+      // The header, and the text of the body parts; attachments stay on the server.
+      const { text, html, attachments } = splitParts(listed.leaves);
+      const body = [text, html].filter((l) => l !== null);
+      const headerOnly = body.reduce((n, l) => n + l.size, 0) > MAX_TEXT;
+      const got = headerOnly ? new Map<string, Uint8Array>() : await imap.parts(m.uid, body.map((l) => l.section));
+      const textOf = (l: typeof text) => (l && got.has(l.section) ? partText(got.get(l.section)!, l) : null);
+      const p = await parseListed(listed.header, textOf(text), textOf(html));
       const v = judge(rules, p, m.size);
       if (v.delete) {
         await imap.expunge([m.uid]);
@@ -308,7 +306,7 @@ async function syncFolder(run: Run, imap: Imap, acct: Row, folder: Row, filters:
       } else {
         const add = [...(v.read && !has(m, '\\seen') ? ['\\Seen'] : []), ...(v.star && !has(m, '\\flagged') ? ['\\Flagged'] : [])];
         if (add.length) await imap.store([m.uid], '+', add);
-        await insertMessage(run, acct, folder, m, p, v, headerOnly);
+        await insertMessage(run, acct, folder, m, p, attachments, v, headerOnly);
       }
     }
     lastUid = m.uid;
@@ -392,13 +390,17 @@ const send: ExtensionJob = async (input, host) => {
     const bcc = addressList(draft.bcc_addresses);
     if (!to.length && !cc.length && !bcc.length) throw new Error('The draft has no recipient.');
 
+    // The files its user handed this send in `$files.read` (ADR 0032), and no others.
     const attached = Array.isArray(draft.attachments) ? (draft.attachments as Row[]) : [];
     const files = host.files;
     if (attached.length && !files) throw new Error('This engine cannot hand a job its files; attachments need 3.0.0-beta.109 or later.');
     const attachments = [];
     for (const a of attached) {
-      const f = await files!.get(String(a.file_id));
-      if (!f) throw new Error(`The attachment ${String(a.filename ?? a.file_id)} is gone or not yours.`);
+      const name = String(a.filename ?? a.file_id);
+      const f = await files!.get(String(a.file_id)).catch((err) => {
+        throw new Error(`The attachment ${name} was not handed to this send: ${message(err)}`);
+      });
+      if (!f) throw new Error(`The attachment ${name} is gone, or no longer yours to read.`);
       attachments.push({ filename: String(a.filename || f.name), mimeType: String(a.mime_type || f.contentType), content: f.bytes });
     }
 
@@ -548,4 +550,37 @@ const apply: ExtensionJob = async (input, host) => {
   }
 };
 
-export default { sync, send, apply };
+/**
+ * Download one attachment: its part, fetched from the server, stored as the one
+ * file its user asked for in `$files.write` (ADR 0032), and its id recorded on
+ * the row. Queued by the `fetchAttachment` action (`fetch_status` `queued`).
+ * A retried run's put answers the file an earlier attempt stored.
+ */
+const fetchAttachment: ExtensionJob = async (input, host) => {
+  const run = new Run(host);
+  const att = await run.read(ATTACHMENTS, (input as { attachment_id: string }).attachment_id);
+  if (!att || att.file_id) return;
+  let imap: Imap | null = null;
+  try {
+    const msg = await run.read(MESSAGES, String(att.message_id));
+    const folder = msg && (await run.read(FOLDERS, String(msg.folder_id)));
+    const acct = msg && (await run.read(ACCOUNTS, String(msg.account_id)));
+    if (!msg || !folder) throw new Error('The message is gone.');
+    if (!acct?.is_active) throw new Error('The account is gone or inactive.');
+    if (!host.files) throw new Error('This engine cannot hand a job its files; downloads need 3.0.0-beta.109 or later.');
+    imap = await imapOf(run, acct);
+    const sel = await imap.select(String(folder.path));
+    // Another UIDVALIDITY: the UID now names another message.
+    if (String(sel.uidValidity) !== String(folder.uid_validity)) throw new Error('The folder changed on the mail server: sync, then try again.');
+    const raw = (await imap.parts(Number(msg.uid), [String(att.section)])).get(String(att.section));
+    if (!raw) throw new Error('The message is no longer on the mail server.');
+    const file = await host.files.put(decodeTransfer(raw, String(att.encoding ?? '')));
+    await run.update(ATTACHMENTS, att.id, { file_id: file.id, fetch_status: null, fetch_error: null });
+  } catch (err) {
+    await run.update(ATTACHMENTS, att.id, { fetch_status: 'failed', fetch_error: message(err) });
+  } finally {
+    await imap?.logout();
+  }
+};
+
+export default { sync, send, apply, fetchAttachment };

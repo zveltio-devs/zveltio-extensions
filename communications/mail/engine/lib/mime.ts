@@ -2,7 +2,8 @@
 // HTML body is sanitized here, once, before it is stored, so every reader of
 // `mail_messages.body_html` (Studio, the data API, an export) gets inert HTML.
 
-import PostalMime from 'postal-mime';
+import PostalMime, { decodeWords } from 'postal-mime';
+import type { Leaf } from './imap.js';
 import sanitizeHtml from 'sanitize-html';
 
 const enc = new TextEncoder();
@@ -106,6 +107,126 @@ export async function parseMessage(raw: Uint8Array): Promise<Parsed> {
       };
     }),
   };
+}
+
+// ── Parts, as a BODYSTRUCTURE lists them ─────────────────────────────────────
+
+/** A part's bytes without their Content-Transfer-Encoding (base64, quoted-printable; anything else as is). */
+export function decodeTransfer(bytes: Uint8Array, encoding: string): Uint8Array {
+  if (encoding === 'base64') {
+    let s = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    s = s.replace(/[^A-Za-z0-9+/]/g, '');
+    const bin = atob(s.slice(0, s.length - (s.length % 4 === 1 ? 1 : 0)));
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  if (encoding === 'quoted-printable') {
+    const out = new Uint8Array(bytes.length);
+    let n = 0;
+    const hex = (c: number | undefined) => c !== undefined && /[0-9A-Fa-f]/.test(String.fromCharCode(c));
+    for (let i = 0; i < bytes.length; i++) {
+      const b = bytes[i]!;
+      if (b !== 0x3d) {
+        out[n++] = b;
+      } else if (bytes[i + 1] === 0x0d && bytes[i + 2] === 0x0a) {
+        i += 2; // soft line break
+      } else if (bytes[i + 1] === 0x0a) {
+        i += 1;
+      } else if (hex(bytes[i + 1]) && hex(bytes[i + 2])) {
+        out[n++] = parseInt(String.fromCharCode(bytes[i + 1]!, bytes[i + 2]!), 16);
+        i += 2;
+      } else {
+        out[n++] = b;
+      }
+    }
+    return out.subarray(0, n);
+  }
+  return bytes;
+}
+
+/** A text part as a string: transfer encoding off, then its charset (UTF-8 when unknown). */
+export function partText(bytes: Uint8Array, leaf: Pick<Leaf, 'encoding' | 'params'>): string {
+  const raw = decodeTransfer(bytes, leaf.encoding);
+  try {
+    return new TextDecoder(leaf.params.charset || 'utf-8').decode(raw);
+  } catch {
+    return new TextDecoder().decode(raw);
+  }
+}
+
+/** A MIME parameter: plain, RFC 2047 encoded-words, or RFC 2231 (`name*`, `name*0*`...). */
+function param(o: Record<string, string>, name: string): string | null {
+  if (o[name]) return decodeWords(o[name]);
+  const keys = Object.keys(o)
+    .filter((k) => k === `${name}*` || new RegExp(`^${name}\\*\\d+\\*?$`).test(k))
+    .sort((a, b) => Number(a.split('*')[1] || 0) - Number(b.split('*')[1] || 0));
+  if (!keys.length) return null;
+  const joined = keys.map((k) => o[k]).join('');
+  const m = /^([^']*)'[^']*'(.*)$/.exec(joined);
+  if (!m) return joined;
+  const bytes: number[] = [];
+  for (let i = 0; i < m[2]!.length; i++) {
+    const h = m[2]!.slice(i + 1, i + 3);
+    if (m[2]![i] === '%' && /^[0-9A-Fa-f]{2}$/.test(h)) {
+      bytes.push(parseInt(h, 16));
+      i += 2;
+    } else bytes.push(m[2]!.charCodeAt(i) & 0xff);
+  }
+  try {
+    return new TextDecoder(m[1] || 'utf-8').decode(new Uint8Array(bytes));
+  } catch {
+    return new TextDecoder().decode(new Uint8Array(bytes));
+  }
+}
+
+export interface PartRef {
+  section: string;
+  encoding: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  contentId: string | null;
+  inline: boolean;
+}
+
+/**
+ * A message's leaves split into its body (the first plain and first HTML part
+ * that are not attachments) and its attachments, each with where it is.
+ */
+export function splitParts(all: Leaf[]): { text: Leaf | null; html: Leaf | null; attachments: PartRef[] } {
+  let text: Leaf | null = null;
+  let html: Leaf | null = null;
+  const attachments: PartRef[] = [];
+  for (const l of all) {
+    const name = param(l.dparams, 'filename') ?? param(l.params, 'name');
+    const body = l.disposition !== 'attachment' && !name && (l.type === 'text/plain' || l.type === 'text/html');
+    if (body) {
+      if (l.type === 'text/plain' && !text) text = l;
+      else if (l.type === 'text/html' && !html) html = l;
+      continue;
+    }
+    const sub = l.type === 'message/rfc822' ? 'eml' : (l.type.split('/')[1] ?? '');
+    attachments.push({
+      section: l.section,
+      encoding: l.encoding,
+      filename: name?.replace(/[\r\n/\\]/g, '_') || `attachment${/^[a-z0-9]{1,8}$/.test(sub) ? `.${sub}` : ''}`,
+      mimeType: l.type,
+      size: l.size,
+      contentId: l.id ? l.id.replace(/^<|>$/g, '') : null,
+      inline: l.disposition === 'inline' || (l.disposition === null && !!l.id),
+    });
+  }
+  return { text, html, attachments };
+}
+
+/** A message from its header and the text of its body parts (a sync fetches nothing more). */
+export async function parseListed(header: Uint8Array, text: string | null, html: string | null): Promise<Parsed> {
+  const p = await parseMessage(header);
+  const clean = html ? cleanHtml(html) : null;
+  const plain = text ?? (clean ? clean.replace(/<[^>]*>/g, ' ') : '');
+  return { ...p, text, html: clean, snippet: plain.replace(/\s+/g, ' ').trim().slice(0, 200), attachments: [] };
 }
 
 // ── Writing ──────────────────────────────────────────────────────────────────

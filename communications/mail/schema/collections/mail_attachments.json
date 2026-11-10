@@ -34,8 +34,31 @@
       "defaultValue": false
     },
     {
+      "name": "section",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "encoding",
+      "type": "text"
+    },
+    {
       "name": "file_id",
       "type": "uuid"
+    },
+    {
+      "name": "fetch_status",
+      "type": "enum",
+      "options": {
+        "values": [
+          "queued",
+          "failed"
+        ]
+      }
+    },
+    {
+      "name": "fetch_error",
+      "type": "text"
     }
   ],
   "relations": [

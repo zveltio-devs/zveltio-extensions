@@ -8362,6 +8362,38 @@ function fetchItems(v) {
   return m;
 }
 var str = (v) => typeof v === "string" ? v : v instanceof Uint8Array ? new TextDecoder().decode(v) : "";
+var pairs = (v) => {
+  const o = {};
+  if (Array.isArray(v))
+    for (let i = 0;i + 1 < v.length; i += 2)
+      o[str(v[i]).toLowerCase()] = str(v[i + 1]);
+  return o;
+};
+function leaves(v, section = "") {
+  if (!Array.isArray(v))
+    return [];
+  if (Array.isArray(v[0])) {
+    const out = [];
+    for (let n = 0;n < v.length && Array.isArray(v[n]); n++)
+      out.push(...leaves(v[n], section ? `${section}.${n + 1}` : String(n + 1)));
+    return out;
+  }
+  const type = `${str(v[0])}/${str(v[1])}`.toLowerCase();
+  const md5 = type.startsWith("text/") ? 8 : type === "message/rfc822" ? 10 : 7;
+  const disp = v[md5 + 1];
+  return [
+    {
+      section: section || "1",
+      type,
+      params: pairs(v[2]),
+      id: str(v[3]) || null,
+      encoding: str(v[5]).toLowerCase() || "7bit",
+      size: Number(str(v[6])) || 0,
+      disposition: Array.isArray(disp) ? str(disp[0]).toLowerCase() || null : null,
+      dparams: Array.isArray(disp) ? pairs(disp[1]) : {}
+    }
+  ];
+}
 
 class Imap {
   seq = 0;
@@ -8517,11 +8549,41 @@ class Imap {
     const [m] = this.fetched(await this.run([`UID FETCH ${uid} (UID BODY.PEEK[])`])).filter((x) => x.uid === uid);
     return m?.raw ?? null;
   }
-  async header(uid) {
-    const [m] = this.fetched(await this.run([`UID FETCH ${uid} (UID BODY.PEEK[HEADER])`]), "BODY[HEADER]").filter((x) => x.uid === uid);
-    return m?.raw ?? null;
+  async structure(uid) {
+    const res = await this.run([`UID FETCH ${uid} (UID BODYSTRUCTURE BODY.PEEK[HEADER])`]);
+    for (const r of res) {
+      if (str(r[1]).toUpperCase() !== "FETCH")
+        continue;
+      const it = fetchItems(r[2] ?? null);
+      if (Number(str(it.get("UID"))) !== uid)
+        continue;
+      const h = it.get("BODY[HEADER]");
+      return { header: h instanceof Uint8Array ? h : enc2.encode(str(h)), leaves: leaves(it.get("BODYSTRUCTURE") ?? null) };
+    }
+    return null;
   }
-  fetched(res, bodyKey = "BODY[]") {
+  async parts(uid, sections) {
+    const out = new Map;
+    if (!sections.every((s) => /^\d+(\.\d+)*$/.test(s)))
+      throw new ImapError(`not a part section: ${sections.join(" ")}`);
+    if (!sections.length)
+      return out;
+    const res = await this.run([`UID FETCH ${uid} (UID ${sections.map((s) => `BODY.PEEK[${s}]`).join(" ")})`]);
+    for (const r of res) {
+      if (str(r[1]).toUpperCase() !== "FETCH")
+        continue;
+      const it = fetchItems(r[2] ?? null);
+      if (Number(str(it.get("UID"))) !== uid)
+        continue;
+      for (const s of sections) {
+        const v = it.get(`BODY[${s}]`);
+        if (v !== undefined && v !== null)
+          out.set(s, v instanceof Uint8Array ? v : enc2.encode(str(v)));
+      }
+    }
+    return out;
+  }
+  fetched(res) {
     const out = [];
     for (const r of res) {
       if (str(r[1]).toUpperCase() !== "FETCH")
@@ -8531,7 +8593,7 @@ class Imap {
       if (!uid)
         continue;
       const flags = it.get("FLAGS");
-      const raw = it.get(bodyKey);
+      const raw = it.get("BODY[]");
       out.push({
         uid,
         flags: Array.isArray(flags) ? flags.map((f) => str(f)) : [],
@@ -12578,6 +12640,107 @@ async function parseMessage(raw) {
     })
   };
 }
+function decodeTransfer(bytes, encoding) {
+  if (encoding === "base64") {
+    let s = "";
+    for (let i = 0;i < bytes.length; i += 32768)
+      s += String.fromCharCode(...bytes.subarray(i, i + 32768));
+    s = s.replace(/[^A-Za-z0-9+/]/g, "");
+    const bin = atob(s.slice(0, s.length - (s.length % 4 === 1 ? 1 : 0)));
+    const out = new Uint8Array(bin.length);
+    for (let i = 0;i < bin.length; i++)
+      out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  if (encoding === "quoted-printable") {
+    const out = new Uint8Array(bytes.length);
+    let n = 0;
+    const hex = (c) => c !== undefined && /[0-9A-Fa-f]/.test(String.fromCharCode(c));
+    for (let i = 0;i < bytes.length; i++) {
+      const b = bytes[i];
+      if (b !== 61) {
+        out[n++] = b;
+      } else if (bytes[i + 1] === 13 && bytes[i + 2] === 10) {
+        i += 2;
+      } else if (bytes[i + 1] === 10) {
+        i += 1;
+      } else if (hex(bytes[i + 1]) && hex(bytes[i + 2])) {
+        out[n++] = parseInt(String.fromCharCode(bytes[i + 1], bytes[i + 2]), 16);
+        i += 2;
+      } else {
+        out[n++] = b;
+      }
+    }
+    return out.subarray(0, n);
+  }
+  return bytes;
+}
+function partText(bytes, leaf) {
+  const raw = decodeTransfer(bytes, leaf.encoding);
+  try {
+    return new TextDecoder(leaf.params.charset || "utf-8").decode(raw);
+  } catch {
+    return new TextDecoder().decode(raw);
+  }
+}
+function param(o, name) {
+  if (o[name])
+    return decodeWords(o[name]);
+  const keys = Object.keys(o).filter((k) => k === `${name}*` || new RegExp(`^${name}\\*\\d+\\*?$`).test(k)).sort((a, b) => Number(a.split("*")[1] || 0) - Number(b.split("*")[1] || 0));
+  if (!keys.length)
+    return null;
+  const joined = keys.map((k) => o[k]).join("");
+  const m = /^([^']*)'[^']*'(.*)$/.exec(joined);
+  if (!m)
+    return joined;
+  const bytes = [];
+  for (let i = 0;i < m[2].length; i++) {
+    const h = m[2].slice(i + 1, i + 3);
+    if (m[2][i] === "%" && /^[0-9A-Fa-f]{2}$/.test(h)) {
+      bytes.push(parseInt(h, 16));
+      i += 2;
+    } else
+      bytes.push(m[2].charCodeAt(i) & 255);
+  }
+  try {
+    return new TextDecoder(m[1] || "utf-8").decode(new Uint8Array(bytes));
+  } catch {
+    return new TextDecoder().decode(new Uint8Array(bytes));
+  }
+}
+function splitParts(all) {
+  let text = null;
+  let html = null;
+  const attachments = [];
+  for (const l of all) {
+    const name = param(l.dparams, "filename") ?? param(l.params, "name");
+    const body = l.disposition !== "attachment" && !name && (l.type === "text/plain" || l.type === "text/html");
+    if (body) {
+      if (l.type === "text/plain" && !text)
+        text = l;
+      else if (l.type === "text/html" && !html)
+        html = l;
+      continue;
+    }
+    const sub = l.type === "message/rfc822" ? "eml" : l.type.split("/")[1] ?? "";
+    attachments.push({
+      section: l.section,
+      encoding: l.encoding,
+      filename: name?.replace(/[\r\n/\\]/g, "_") || `attachment${/^[a-z0-9]{1,8}$/.test(sub) ? `.${sub}` : ""}`,
+      mimeType: l.type,
+      size: l.size,
+      contentId: l.id ? l.id.replace(/^<|>$/g, "") : null,
+      inline: l.disposition === "inline" || l.disposition === null && !!l.id
+    });
+  }
+  return { text, html, attachments };
+}
+async function parseListed(header, text, html) {
+  const p = await parseMessage(header);
+  const clean = html ? cleanHtml(html) : null;
+  const plain = text ?? (clean ? clean.replace(/<[^>]*>/g, " ") : "");
+  return { ...p, text, html: clean, snippet: plain.replace(/\s+/g, " ").trim().slice(0, 200), attachments: [] };
+}
 function encodeWord(v) {
   if (/^[\x20-\x7e]*$/.test(v))
     return v;
@@ -12681,7 +12844,7 @@ var STALE_MS = 15 * 60000;
 // engine/jobs.ts
 var CALL_BUDGET = 850;
 var BYTE_BUDGET = 48 * 1024 * 1024;
-var MAX_MESSAGE = 25 * 1024 * 1024;
+var MAX_TEXT = 5 * 1024 * 1024;
 var FIRST_SYNC = 50;
 var RECONCILE = 500;
 var VIRTUAL = ["\\all", "\\flagged", "\\important"];
@@ -12829,7 +12992,7 @@ function matches(c, p, size) {
   }
 }
 var has = (m, flag) => m.flags.some((f) => f.toLowerCase() === flag);
-async function insertMessage(run, acct, folder, m, p, v, headerOnly) {
+async function insertMessage(run, acct, folder, m, p, parts, v, headerOnly) {
   const date = m.internalDate ? Date.parse(m.internalDate) : Number.NaN;
   let row;
   try {
@@ -12846,13 +13009,13 @@ async function insertMessage(run, acct, folder, m, p, v, headerOnly) {
       cc_addresses: p.cc,
       reply_to: p.replyTo,
       subject: p.subject,
-      body_text: headerOnly ? `(This message is ${Math.round(m.size / 1048576)} MiB; open it in your mail server's webmail.)` : p.text,
+      body_text: headerOnly ? `(This message's text is over ${MAX_TEXT / 1048576} MiB; open it in your mail server's webmail.)` : p.text,
       body_html: headerOnly ? null : p.html,
       snippet: p.snippet,
       priority: p.priority,
       is_read: has(m, "\\seen") || v.read === true,
       is_starred: has(m, "\\flagged") || v.star === true,
-      has_attachments: p.attachments.some((a) => !a.inline),
+      has_attachments: parts.some((a) => !a.inline),
       read_receipt_requested: p.readReceipt,
       size: m.size,
       sent_at: p.date,
@@ -12864,17 +13027,9 @@ async function insertMessage(run, acct, folder, m, p, v, headerOnly) {
       return;
     throw err;
   }
-  const files = run.host.files;
-  for (const a of p.attachments) {
+  for (const a of parts) {
     if (run.spent)
       break;
-    let fileId = null;
-    if (files) {
-      run.calls++;
-      try {
-        fileId = (await files.put(a.filename, a.content)).id;
-      } catch {}
-    }
     await run.insert(ATTACHMENTS, {
       message_id: row.id,
       filename: a.filename,
@@ -12882,7 +13037,9 @@ async function insertMessage(run, acct, folder, m, p, v, headerOnly) {
       size: a.size,
       content_id: a.contentId,
       is_inline: a.inline,
-      file_id: fileId
+      section: a.section,
+      encoding: a.encoding,
+      file_id: null
     });
   }
 }
@@ -12930,10 +13087,14 @@ async function syncFolder(run, imap, acct, folder, filters) {
       more = true;
       break;
     }
-    const headerOnly = m.size > MAX_MESSAGE;
-    const raw = headerOnly ? await imap.header(m.uid) : await imap.body(m.uid);
-    if (raw) {
-      const p = await parseMessage(raw);
+    const listed = await imap.structure(m.uid);
+    if (listed) {
+      const { text, html, attachments } = splitParts(listed.leaves);
+      const body = [text, html].filter((l) => l !== null);
+      const headerOnly = body.reduce((n, l) => n + l.size, 0) > MAX_TEXT;
+      const got = headerOnly ? new Map : await imap.parts(m.uid, body.map((l) => l.section));
+      const textOf = (l) => l && got.has(l.section) ? partText(got.get(l.section), l) : null;
+      const p = await parseListed(listed.header, textOf(text), textOf(html));
       const v = judge(rules, p, m.size);
       if (v.delete) {
         await imap.expunge([m.uid]);
@@ -12943,7 +13104,7 @@ async function syncFolder(run, imap, acct, folder, filters) {
         const add = [...v.read && !has(m, "\\seen") ? ["\\Seen"] : [], ...v.star && !has(m, "\\flagged") ? ["\\Flagged"] : []];
         if (add.length)
           await imap.store([m.uid], "+", add);
-        await insertMessage(run, acct, folder, m, p, v, headerOnly);
+        await insertMessage(run, acct, folder, m, p, attachments, v, headerOnly);
       }
     }
     lastUid = m.uid;
@@ -13027,9 +13188,12 @@ var send = async (input, host) => {
       throw new Error("This engine cannot hand a job its files; attachments need 3.0.0-beta.109 or later.");
     const attachments = [];
     for (const a of attached) {
-      const f = await files.get(String(a.file_id));
+      const name = String(a.filename ?? a.file_id);
+      const f = await files.get(String(a.file_id)).catch((err) => {
+        throw new Error(`The attachment ${name} was not handed to this send: ${message(err)}`);
+      });
       if (!f)
-        throw new Error(`The attachment ${String(a.filename ?? a.file_id)} is gone or not yours.`);
+        throw new Error(`The attachment ${name} is gone, or no longer yours to read.`);
       attachments.push({ filename: String(a.filename || f.name), mimeType: String(a.mime_type || f.contentType), content: f.bytes });
     }
     ({ raw } = buildMessage({
@@ -13156,7 +13320,38 @@ var apply = async (input, host) => {
     await imap?.logout();
   }
 };
-var jobs_default = { sync, send, apply };
+var fetchAttachment = async (input, host) => {
+  const run = new Run(host);
+  const att = await run.read(ATTACHMENTS, input.attachment_id);
+  if (!att || att.file_id)
+    return;
+  let imap = null;
+  try {
+    const msg = await run.read(MESSAGES, String(att.message_id));
+    const folder = msg && await run.read(FOLDERS, String(msg.folder_id));
+    const acct = msg && await run.read(ACCOUNTS, String(msg.account_id));
+    if (!msg || !folder)
+      throw new Error("The message is gone.");
+    if (!acct?.is_active)
+      throw new Error("The account is gone or inactive.");
+    if (!host.files)
+      throw new Error("This engine cannot hand a job its files; downloads need 3.0.0-beta.109 or later.");
+    imap = await imapOf(run, acct);
+    const sel = await imap.select(String(folder.path));
+    if (String(sel.uidValidity) !== String(folder.uid_validity))
+      throw new Error("The folder changed on the mail server: sync, then try again.");
+    const raw = (await imap.parts(Number(msg.uid), [String(att.section)])).get(String(att.section));
+    if (!raw)
+      throw new Error("The message is no longer on the mail server.");
+    const file = await host.files.put(decodeTransfer(raw, String(att.encoding ?? "")));
+    await run.update(ATTACHMENTS, att.id, { file_id: file.id, fetch_status: null, fetch_error: null });
+  } catch (err) {
+    await run.update(ATTACHMENTS, att.id, { fetch_status: "failed", fetch_error: message(err) });
+  } finally {
+    await imap?.logout();
+  }
+};
+var jobs_default = { sync, send, apply, fetchAttachment };
 export {
   jobs_default as default,
   folderType,

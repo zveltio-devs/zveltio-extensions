@@ -139,7 +139,10 @@ async function tcp(port: number): Promise<JobTcpStream> {
   };
 }
 
-/** An in-memory data API, an operator's binding of `mail`, and the tcp relay, as one job's host. */
+/** What the engine admitted from a request's `$files` for one job (ADR 0032); `id` is the job's id, which a put's file takes. */
+type Grant = { id: string; read?: string[]; write?: { name: string; maxBytes: number } };
+
+/** An in-memory data API, an operator's binding of `mail`, the tcp relay and the job's file grant, as one job's host. */
 function world(bound: string[]) {
   const store: Record<string, Map<string, Row>> = {};
   const table = (c: string) => (store[c] ??= new Map());
@@ -151,11 +154,14 @@ function world(bound: string[]) {
   const rows = (c: string, f: Row = {}) =>
     [...table(c).values()].filter((r) => Object.entries(f).every(([k, v]) => r[k] === (v && typeof v === 'object' ? v.eq : v)));
   const streams = new Map<string, JobTcpStream>();
-  /** The engine's stored files as the job's author sees them; a name the engine refuses is refused. */
+  /** The engine's stored files; a job reaches only those its grant names. */
   const files = new Map<string, { id: string; name: string; contentType: string; size: number; bytes: string }>();
   const connects: string[] = [];
-  async function run(job: string, input: unknown) {
+  const fileCalls: string[] = [];
+  async function run(job: string, input: unknown, grant?: Grant) {
     const def = manifest.jobs.find((j: Row) => j.name === job);
+    let putThisRun = false;
+    const refuse = (status: number, code: string) => Object.assign(new Error(`${status} ${code}`), { status, code });
     const call = async (name: string, a: Any[]) => {
       switch (name) {
         case 'collections.read':
@@ -212,14 +218,22 @@ function world(bound: string[]) {
         case 'tcp.write':
           return streams.get(a[0])!.write(new Uint8Array(Buffer.from(a[1], 'base64')));
         case 'files.put': {
+          fileCalls.push(`put`);
           expect(manifest.permissions).toContain('files');
-          if (!/\.(pdf|png|txt)$/.test(a[0])) throw Object.assign(new Error('file type not allowed'), { status: 415 });
-          const f = { id: crypto.randomUUID(), name: a[0], contentType: 'application/octet-stream', size: Buffer.from(a[1], 'base64').length, bytes: a[1] };
+          if (!grant?.write) throw refuse(403, 'file_not_granted');
+          if (putThisRun) throw refuse(409, 'file_already_put');
+          putThisRun = true;
+          const size = Buffer.from(a[0], 'base64').length;
+          if (size > grant.write.maxBytes) throw refuse(413, 'file_too_large');
+          // A retried job's put answers the file an earlier attempt stored.
+          const f = files.get(grant.id) ?? { id: grant.id, name: grant.write.name, contentType: 'application/octet-stream', size, bytes: a[0] };
           files.set(f.id, f);
           const { bytes: _, ...meta } = f;
           return meta;
         }
         case 'files.get':
+          fileCalls.push(`get ${a[0]}`);
+          if (!grant?.read?.includes(a[0])) throw refuse(403, 'file_not_granted');
           return files.get(a[0]) ?? null;
         case 'tcp.close':
           await streams.get(a[0])?.close();
@@ -230,7 +244,7 @@ function world(bound: string[]) {
     };
     await runInDeno({ extName: manifest.name, deno, code, job, input, timezone: 'UTC', memoryMb: 128, timeoutSeconds: 60, call });
   }
-  return { table, put, rows, run, connects, files };
+  return { table, put, rows, run, connects, files, fileCalls };
 }
 
 function account(w: ReturnType<typeof world>, imapPort: number, smtpPort = 1, extra: Row = {}) {
@@ -284,10 +298,13 @@ describe('sync', () => {
     expect(msgs[0]).toMatchObject({ subject: 'Invoice 7', from_address: 'ana@x.test', from_name: 'Ana Pop', is_read: false, is_starred: true, has_attachments: true });
     expect(msgs[0]!.body_html.trim()).toBe('<p>Pay</p>');
     expect(msgs[1]).toMatchObject({ subject: 'two', is_read: true, is_starred: false });
-    expect(w.rows('mail_attachments', { message_id: msgs[0]!.id })).toEqual([expect.objectContaining({ filename: 'a.pdf', mime_type: 'application/pdf', size: 14, file_id: expect.any(String) })]);
-
-    const stored = w.files.get(w.rows('mail_attachments')[0]!.file_id)!;
-    expect(Buffer.from(stored.bytes, 'base64').toString()).toBe('%PDF-1.4\n%%EOF');
+    // Where the attachment is, not its bytes: nothing is stored until its user asks.
+    expect(w.rows('mail_attachments', { message_id: msgs[0]!.id })).toEqual([
+      expect.objectContaining({ filename: 'a.pdf', mime_type: 'application/pdf', section: '2', encoding: 'base64', is_inline: false, file_id: null }),
+    ]);
+    expect(w.rows('mail_attachments')[0]!.size).toBeGreaterThanOrEqual(14);
+    expect(w.fileCalls).toEqual([]);
+    expect(w.files.size).toBe(0);
 
     // The filter's star reached the server too.
     const c = await Imap.open(await tcp(srv.port), 'none');
@@ -358,9 +375,10 @@ describe('send', () => {
         priority: 'normal',
         send_status: 'queued',
       });
-      await w.run('send', { draft_id: d.id });
+      await w.run('send', { draft_id: d.id }, { id: crypto.randomUUID(), read: [file.id] });
 
       expect(w.table('mail_drafts').has(d.id)).toBe(false);
+      expect(w.fileCalls).toEqual([`get ${file.id}`]);
       expect(smtp.got.lines).toEqual(expect.arrayContaining(['MAIL FROM:<me@x.test>', 'RCPT TO:<ana@x.test>', 'RCPT TO:<hidden@x.test>']));
       const p = await parseMessage(new TextEncoder().encode(smtp.got.data));
       expect(p).toMatchObject({ subject: 'Bună', text: 'Salut\n.punct', from: { address: 'me@x.test', name: 'Eu' } });
@@ -391,15 +409,18 @@ describe('send', () => {
     }
   });
 
-  it('fails a draft whose attachment the author cannot read, and sends nothing', async () => {
+  it('fails a draft whose attachment is gone, or was not handed to it, and sends nothing', async () => {
     const smtp = smtpServer();
     try {
-      const w = world([`127.0.0.1:${smtp.port}`]);
-      const acct = account(w, 1, smtp.port);
-      const d = w.put('mail_drafts', { account_id: acct.id, to_addresses: ['a@x.test'], attachments: [{ file_id: crypto.randomUUID(), filename: 'x.pdf' }], send_status: 'queued' });
-      await w.run('send', { draft_id: d.id });
-      expect(w.connects).toEqual([]);
-      expect(w.table('mail_drafts').get(d.id)).toMatchObject({ send_status: 'failed', send_error: expect.stringContaining('x.pdf') });
+      for (const [handed, why] of [[true, 'is gone'], [false, 'was not handed']] as const) {
+        const w = world([`127.0.0.1:${smtp.port}`]);
+        const acct = account(w, 1, smtp.port);
+        const id = crypto.randomUUID();
+        const d = w.put('mail_drafts', { account_id: acct.id, to_addresses: ['a@x.test'], attachments: [{ file_id: id, filename: 'x.pdf' }], send_status: 'queued' });
+        await w.run('send', { draft_id: d.id }, { id: crypto.randomUUID(), read: handed ? [id] : [] });
+        expect(w.connects).toEqual([]);
+        expect(w.table('mail_drafts').get(d.id)).toMatchObject({ send_status: 'failed', send_error: expect.stringContaining(`x.pdf ${why}`) });
+      }
     } finally {
       smtp.close();
     }
@@ -418,6 +439,61 @@ describe('send', () => {
       smtp.close();
     }
   });
+});
+
+describe('fetchAttachment', () => {
+  let srv: Awaited<ReturnType<typeof imapServer>>;
+  beforeAll(async () => {
+    srv = await imapServer({ INBOX: { messages: [{ raw: HTML_MAIL, flags: [] }] } });
+  });
+  afterAll(() => srv.close());
+
+  async function synced() {
+    const w = world([`127.0.0.1:${srv.port}`]);
+    const acct = account(w, srv.port);
+    await w.run('sync', { account_id: acct.id });
+    const att = w.rows('mail_attachments')[0]!;
+    w.table('mail_attachments').set(att.id, { ...att, fetch_status: 'queued' });
+    return { w, acct, att, grant: { id: crypto.randomUUID(), write: { name: 'a.pdf', maxBytes: Number(att.size) } } };
+  }
+
+  it('stores exactly the part, once, and records its id; a retry stores nothing twice', async () => {
+    const { w, att, grant } = await synced();
+    await w.run('fetchAttachment', { attachment_id: att.id }, grant);
+    expect(w.table('mail_attachments').get(att.id)).toMatchObject({ file_id: grant.id, fetch_status: null, fetch_error: null });
+    expect(w.files.size).toBe(1);
+    expect(Buffer.from(w.files.get(grant.id)!.bytes, 'base64').toString()).toBe('%PDF-1.4\n%%EOF');
+    expect(w.fileCalls).toEqual(['put']);
+
+    // A row that has its file: nothing to do, not even a connection.
+    const connected = w.connects.length;
+    await w.run('fetchAttachment', { attachment_id: att.id }, grant);
+    expect(w.connects.length).toBe(connected);
+    expect(w.fileCalls).toEqual(['put']);
+
+    // An attempt whose put committed but whose row write did not: the retry gets the same file back.
+    w.table('mail_attachments').set(att.id, { ...w.table('mail_attachments').get(att.id), file_id: null });
+    await w.run('fetchAttachment', { attachment_id: att.id }, grant);
+    expect(w.table('mail_attachments').get(att.id)!.file_id).toBe(grant.id);
+    expect(w.files.size).toBe(1);
+  }, 60_000);
+
+  it('records a refused put, or a folder whose UIDs changed, on the row', async () => {
+    const { w, att } = await synced();
+    await w.run('fetchAttachment', { attachment_id: att.id });
+    expect(w.table('mail_attachments').get(att.id)).toMatchObject({ file_id: null, fetch_status: 'failed', fetch_error: expect.stringContaining('file_not_granted') });
+
+    await w.run('fetchAttachment', { attachment_id: att.id }, { id: crypto.randomUUID(), write: { name: 'a.pdf', maxBytes: 3 } });
+    expect(w.table('mail_attachments').get(att.id)).toMatchObject({ fetch_status: 'failed', fetch_error: expect.stringContaining('file_too_large') });
+
+    const inbox = w.rows('mail_folders', { type: 'inbox' })[0]!;
+    w.table('mail_folders').set(inbox.id, { ...inbox, uid_validity: 'not-this-one' });
+    const before = w.fileCalls.length;
+    await w.run('fetchAttachment', { attachment_id: att.id }, { id: crypto.randomUUID(), write: { name: 'a.pdf', maxBytes: 100 } });
+    expect(w.table('mail_attachments').get(att.id)).toMatchObject({ file_id: null, fetch_status: 'failed', fetch_error: expect.stringContaining('folder changed') });
+    expect(w.fileCalls.length).toBe(before);
+    expect(w.files.size).toBe(0);
+  }, 60_000);
 });
 
 describe('apply', () => {

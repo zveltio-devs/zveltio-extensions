@@ -8,9 +8,10 @@ import { join } from 'node:path';
 const ext = (await import(join(import.meta.dir, 'index.js'))).default;
 type Row = Record<string, any>;
 
-function host(rows: Row[]) {
+/** `handed`: the request carried `$files`, which the engine hands one `files: true` enqueue (ADR 0032). */
+function host(rows: Row[], handed = false) {
   const updates: { id: string; data: Row; expect?: Row }[] = [];
-  const queued: { job: string; input: Row }[] = [];
+  const queued: { job: string; input: Row; options?: Row }[] = [];
   return {
     updates,
     queued,
@@ -21,8 +22,9 @@ function host(rows: Row[]) {
         return { id, ...data };
       },
     },
-    enqueue: async (job: string, input: Row) => {
-      queued.push({ job, input });
+    enqueue: async (job: string, input: Row, options?: Row) => {
+      if (options?.files && !handed) throw new Error(`action could not enqueue job "${job}": the request carried no $files`);
+      queued.push(options ? { job, input, options } : { job, input });
       return 'j1';
     },
   };
@@ -67,10 +69,41 @@ describe('send', () => {
     expect(h.updates).toEqual([{ id: 'd1', data: { send_status: 'queued', send_error: null }, expect: { send_status: ['draft'] } }]);
     expect(h.queued).toEqual([{ job: 'send', input: { draft_id: 'd1' } }]);
   });
+  it('hands the request\'s files to the job when the draft has attachments, and refuses when none were handed', async () => {
+    const withFiles = { ...draft, attachments: [{ file_id: 'f1', filename: 'a.pdf' }] };
+    const h = host([acct, withFiles], true);
+    await run('send', { draft_id: 'd1' }, h);
+    expect(h.queued).toEqual([{ job: 'send', input: { draft_id: 'd1' }, options: { files: true } }]);
+    await expect(run('send', { draft_id: 'd1' }, host([acct, withFiles]))).rejects.toMatchObject({ status: 400, code: 'files_required' });
+  });
   it('refuses a draft already sending, one without recipients, and one on an inactive account', async () => {
     await expect(run('send', { draft_id: 'd1' }, host([acct, { ...draft, send_status: 'sending' }]))).rejects.toMatchObject({ status: 409 });
     await expect(run('send', { draft_id: 'd1' }, host([acct, { ...draft, to_addresses: [] }]))).rejects.toMatchObject({ status: 422 });
     await expect(run('send', { draft_id: 'd1' }, host([{ ...acct, is_active: false }, draft]))).rejects.toMatchObject({ status: 409 });
+  });
+});
+
+describe('fetchAttachment', () => {
+  const att = { id: 't1', message_id: 'm1', file_id: null, fetch_status: null, updated_at: now };
+  it('queues the download with the request\'s files, under a precondition, and answers the id the file will have', async () => {
+    const h = host([acct, m1, att], true);
+    expect(await run('fetchAttachment', { attachment_id: 't1' }, h)).toEqual({ queued: true, file_id: 'j1' });
+    expect(h.updates).toEqual([{ id: 't1', data: { fetch_status: 'queued', fetch_error: null }, expect: { fetch_status: [null] } }]);
+    expect(h.queued).toEqual([{ job: 'fetchAttachment', input: { attachment_id: 't1' }, options: { files: true } }]);
+  });
+  it('answers a stored file without queueing, waits on a fresh download, and takes over a stale one', async () => {
+    const stored = host([acct, m1, { ...att, file_id: 'x1' }], true);
+    expect(await run('fetchAttachment', { attachment_id: 't1' }, stored)).toEqual({ queued: false, file_id: 'x1' });
+    const busy = host([acct, m1, { ...att, fetch_status: 'queued' }], true);
+    expect(await run('fetchAttachment', { attachment_id: 't1' }, busy)).toEqual({ queued: false, fetch_status: 'queued' });
+    expect([...stored.queued, ...busy.queued]).toEqual([]);
+    const stale = host([acct, m1, { ...att, fetch_status: 'queued', updated_at: '2020-01-01T00:00:00Z' }], true);
+    expect(await run('fetchAttachment', { attachment_id: 't1' }, stale)).toMatchObject({ queued: true });
+  });
+  it('refuses an unknown attachment, an inactive account, and a request that handed no $files.write', async () => {
+    await expect(run('fetchAttachment', { attachment_id: 'zz' }, host([acct, m1, att], true))).rejects.toMatchObject({ status: 404 });
+    await expect(run('fetchAttachment', { attachment_id: 't1' }, host([{ ...acct, is_active: false }, m1, att], true))).rejects.toMatchObject({ status: 409 });
+    await expect(run('fetchAttachment', { attachment_id: 't1' }, host([acct, m1, att]))).rejects.toMatchObject({ status: 400, code: 'files_required' });
   });
 });
 

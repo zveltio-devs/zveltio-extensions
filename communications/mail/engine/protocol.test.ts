@@ -7,7 +7,8 @@ import hoodiecrow from 'hoodiecrow-imap';
 import type { JobTcpStream } from '@zveltio/sdk/extension';
 import { Imap, decodeMailbox, encodeMailbox, parseTokens } from './lib/imap.js';
 import { sendMail, dotStuff } from './lib/smtp.js';
-import { buildMessage, parseMessage, cleanHtml, encodeWord } from './lib/mime.js';
+import { buildMessage, parseMessage, cleanHtml, encodeWord, decodeTransfer, partText, splitParts } from './lib/mime.js';
+import { leaves } from './lib/imap.js';
 
 const IMAP_PORT = 4031;
 const SMTP_PORT = 4032;
@@ -115,6 +116,20 @@ describe('IMAP client', () => {
     expect(parsed.html).toContain('cid:i1');
     expect(parsed.attachments).toHaveLength(1);
     expect(new TextDecoder().decode(parsed.attachments[0]!.content)).toBe('%PDF-1.4\n%%EOF');
+    // A sync lists a message from its header and BODYSTRUCTURE, and reads one part only when asked.
+    const listed = await c.structure(1);
+    expect(new TextDecoder().decode(listed!.header)).toContain('Message-ID: <m1@x.test>');
+    const split = splitParts(listed!.leaves);
+    expect(split.text).toBeNull();
+    expect(split.html).toMatchObject({ section: '1', type: 'text/html' });
+    expect(split.attachments).toEqual([
+      { section: '2', encoding: 'base64', filename: 'a.pdf', mimeType: 'application/pdf', size: expect.any(Number), contentId: null, inline: false },
+    ]);
+    expect(split.attachments[0]!.size).toBeGreaterThanOrEqual(14);
+    const got = await c.parts(1, ['2', '1']);
+    expect(new TextDecoder().decode(decodeTransfer(got.get('2')!, 'base64'))).toBe('%PDF-1.4\n%%EOF');
+    expect(partText(got.get('1')!, split.html!)).toContain('<p onclick');
+    await expect(c.parts(1, ['1 BODY[]'])).rejects.toThrow(/section/);
     // BODY.PEEK leaves \Seen alone.
     expect((await c.flags()).find((m) => m.uid === 1)!.flags).not.toContain('\\Seen');
 
@@ -156,6 +171,36 @@ describe('IMAP parsing', () => {
       '*', '1', 'FETCH', ['UID', '5', 'FLAGS', ['\\Seen'], 'BODY[]', lit, 'X', null, 'a "b"'],
     ]);
     expect(parseTokens('* OK [UIDVALIDITY 3] ok', [])).toEqual(['*', 'OK', '[UIDVALIDITY 3]', 'ok']);
+  });
+
+  it('lists BODYSTRUCTURE leaves with their sections, names and encodings', () => {
+    const [bs] = parseTokens(
+      '((("TEXT" "PLAIN" ("CHARSET" "iso-8859-2") NIL NIL "QUOTED-PRINTABLE" 12 1 NIL NIL NIL)("TEXT" "HTML" ("CHARSET" "utf-8") NIL NIL "7BIT" 20 1 NIL NIL NIL) "ALTERNATIVE" ("BOUNDARY" "a") NIL NIL)' +
+        '("APPLICATION" "PDF" ("NAME" "x.pdf") NIL NIL "BASE64" 400 NIL ("ATTACHMENT" ("FILENAME*" "utf-8\'\'Factur%C4%83.pdf")) NIL)' +
+        '("IMAGE" "PNG" NIL "<i1@x>" NIL "BASE64" 100 NIL ("INLINE" NIL) NIL)' +
+        '("APPLICATION" "OCTET-STREAM" ("NAME" "=?UTF-8?B?xIJsZcWfdGkudHh0?=") NIL NIL "BASE64" 8 NIL NIL NIL)' +
+        '("MESSAGE" "RFC822" NIL NIL NIL "7BIT" 300 (NIL "s" NIL NIL NIL NIL NIL NIL NIL NIL) ("TEXT" "PLAIN" NIL NIL NIL "7BIT" 3 1) 5 NIL NIL NIL) "MIXED" ("BOUNDARY" "b") NIL NIL)',
+      [],
+    );
+    const s = splitParts(leaves(bs!));
+    expect(s.text).toMatchObject({ section: '1.1', encoding: 'quoted-printable', params: { charset: 'iso-8859-2' } });
+    expect(s.html).toMatchObject({ section: '1.2', type: 'text/html' });
+    expect(s.attachments.map((a) => [a.section, a.filename, a.mimeType, a.size, a.inline, a.contentId])).toEqual([
+      ['2', 'Factură.pdf', 'application/pdf', 400, false, null],
+      ['3', 'attachment.png', 'image/png', 100, true, 'i1@x'],
+      ['4', 'Ăleşti.txt', 'application/octet-stream', 8, false, null],
+      ['5', 'attachment.eml', 'message/rfc822', 300, false, null],
+    ]);
+    // A single-part message is section 1.
+    expect(leaves(parseTokens('("TEXT" "PLAIN" NIL NIL NIL "7BIT" 3 1)', [])[0]!)[0]!.section).toBe('1');
+  });
+
+  it('decodes a part from its transfer encoding and charset', () => {
+    const enc = new TextEncoder();
+    expect(partText(enc.encode('a=BAb=\r\nc=3D'), { encoding: 'quoted-printable', params: { charset: 'iso-8859-2' } })).toBe('aşbc=');
+    expect(partText(enc.encode('xIJs\r\nZcWfdGk='), { encoding: 'base64', params: {} })).toBe('Ăleşti');
+    expect(partText(enc.encode('plain'), { encoding: '7bit', params: { charset: 'no-such-charset' } })).toBe('plain');
+    expect([...decodeTransfer(enc.encode('AAEC/w=='), 'base64')]).toEqual([0, 1, 2, 255]);
   });
 
   it('round-trips modified UTF-7 mailbox names', () => {
