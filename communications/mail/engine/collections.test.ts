@@ -58,8 +58,7 @@ d(`${NAME}: declared collections`, () => {
     // A secret is sealed in the database: no request role reads the column.
     const can = async (table: string, col: string) =>
       (await sql`SELECT has_column_privilege('zveltio_rls', ${table}, ${col}, 'SELECT') AS ok`.execute(db)).rows[0].ok;
-    for (const c of ['auth_secret', 'access_token', 'refresh_token']) expect(await can('zvd_connector_connections', c)).toBe(false);
-    expect(await can('zvd_connector_webhooks', 'secret')).toBe(false);
-    expect(await can('zvd_connector_connections', 'base_url')).toBe(true);
+    for (const c of ['imap_password', 'smtp_password']) expect(await can('zvd_mail_accounts', c)).toBe(false);
+    expect(await can('zvd_mail_accounts', 'imap_host')).toBe(true);
   }, 120_000);
 });

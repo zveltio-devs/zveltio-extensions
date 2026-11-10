@@ -197,7 +197,7 @@ describe('IMAP parsing', () => {
 
   it('decodes a part from its transfer encoding and charset', () => {
     const enc = new TextEncoder();
-    expect(partText(enc.encode('a=BAb=\r\nc=3D'), { encoding: 'quoted-printable', params: { charset: 'iso-8859-2' } })).toBe('aşbc=');
+    expect(partText(enc.encode('a=E9b=\r\nc=3D'), { encoding: 'quoted-printable', params: { charset: 'windows-1252' } })).toBe('aébc=');
     expect(partText(enc.encode('xIJs\r\nZcWfdGk='), { encoding: 'base64', params: {} })).toBe('Ăleşti');
     expect(partText(enc.encode('plain'), { encoding: '7bit', params: { charset: 'no-such-charset' } })).toBe('plain');
     expect([...decodeTransfer(enc.encode('AAEC/w=='), 'base64')]).toEqual([0, 1, 2, 255]);
