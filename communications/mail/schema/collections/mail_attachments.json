@@ -1,0 +1,76 @@
+{
+  "name": "mail_attachments",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "message_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "mail_messages"
+      }
+    },
+    {
+      "name": "filename",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "mime_type",
+      "type": "text"
+    },
+    {
+      "name": "size",
+      "type": "integer"
+    },
+    {
+      "name": "content_id",
+      "type": "text"
+    },
+    {
+      "name": "is_inline",
+      "type": "boolean",
+      "defaultValue": false
+    },
+    {
+      "name": "section",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "encoding",
+      "type": "text"
+    },
+    {
+      "name": "file_id",
+      "type": "uuid"
+    },
+    {
+      "name": "fetch_status",
+      "type": "enum",
+      "options": {
+        "values": [
+          "queued",
+          "failed"
+        ]
+      }
+    },
+    {
+      "name": "fetch_error",
+      "type": "text"
+    }
+  ],
+  "relations": [
+    {
+      "name": "mail_attachments_message_id",
+      "type": "m2o",
+      "field": "message_id",
+      "target": "mail_messages",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

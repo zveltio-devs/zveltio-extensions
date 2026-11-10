@@ -1,0 +1,82 @@
+{
+  "name": "mail_folders",
+  "writtenBy": "actions",
+  "fields": [
+    {
+      "name": "account_id",
+      "type": "m2o",
+      "required": true,
+      "indexed": true,
+      "options": {
+        "related_collection": "mail_accounts"
+      }
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "path",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "type",
+      "type": "enum",
+      "required": true,
+      "defaultValue": "other",
+      "options": {
+        "values": [
+          "inbox",
+          "sent",
+          "drafts",
+          "trash",
+          "spam",
+          "archive",
+          "other"
+        ]
+      }
+    },
+    {
+      "name": "unread_count",
+      "type": "integer",
+      "defaultValue": 0
+    },
+    {
+      "name": "total_count",
+      "type": "integer",
+      "defaultValue": 0
+    },
+    {
+      "name": "uid_validity",
+      "type": "text"
+    },
+    {
+      "name": "last_uid",
+      "type": "integer",
+      "defaultValue": 0
+    }
+  ],
+  "relations": [
+    {
+      "name": "mail_folders_account_id",
+      "type": "m2o",
+      "field": "account_id",
+      "target": "mail_accounts",
+      "targetField": "id",
+      "onDelete": "CASCADE",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ],
+  "indexes": [
+    {
+      "fields": [
+        "account_id",
+        "path"
+      ],
+      "unique": true
+    }
+  ]
+}

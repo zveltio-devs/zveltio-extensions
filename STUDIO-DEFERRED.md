@@ -20,7 +20,7 @@ Tier-3 pages appear only where the product calls for them (e.g.
 | Extension | Admin today (SDUI) | Deferred | Notes |
 |-----------|------------------|--------|------|
 | `ai` | providers, templates, history tabs | **Chat shipped** (`/admin/ai/chat`, Tier-3, non-streaming). Still deferred: query, schema gen, search UI; token streaming needs engine | `AiPromptBar` + `dashboard.hero` → chat |
-| `communications/mail` | accounts, signatures | **Inbox shipped** (`/admin/mail/inbox`, Tier-3). Settings remain SDUI | Folders, read/compose/reply, sync, flags |
+| `communications/mail` | accounts, identities, signatures, filters, contacts | **Inbox shipped** (`/admin/mail/inbox`, Tier-3, over the data API and the mail actions). Settings remain SDUI | Folders, read/compose/reply, attachments, sync, flags |
 | `content/pages` | sites + page metadata list | **Block builder shipped** (`/admin/pages/builder/:id`). Still optional: live resolved preview, templates/menus/insights shell | Canvas under `studio/src/components/builder/` |
 | `content/media` | metadata CRUD | File browser + upload UI | |
 | `developer/graphql` | schema/endpoints admin | **Playground shipped** (`/admin/developer/graphql/playground`) | POST `/ext/developer/graphql` |

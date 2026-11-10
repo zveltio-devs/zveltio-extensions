@@ -1,0 +1,19 @@
+{
+  "name": "mail_contacts",
+  "fields": [
+    {
+      "name": "email_address",
+      "type": "email",
+      "required": true,
+      "indexed": true
+    },
+    {
+      "name": "display_name",
+      "type": "text"
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    }
+  ]
+}

@@ -2,29 +2,18 @@
   "name": "communications/mail",
   "displayName": "Mail Client",
   "category": "communications",
-  "description": "IMAP/SMTP email client with AI features, filter rules, attachments and contacts. Password or OAuth2 (Gmail/Outlook). Background sync on a schedule. Filter actions and read/star/delete are pushed to the mail server.",
-  "version": "1.2.12",
-  "zveltioMinVersion": "1.0.0",
+  "description": "IMAP/SMTP mail client: accounts, folders, messages, drafts, identities, signatures, filters and contacts as collections; syncing and sending run as jobs that reach only the mail servers an operator binds to the \"mail\" slot.",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.109",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-mail",
   "permissions": [
-    "database",
-    "secrets",
-    "settings"
+    "data:system",
+    "files"
   ],
   "i18nPrefixes": [
     "communications"
   ],
-  "optionalDependencies": [
-    {
-      "name": "ai"
-    }
-  ],
-  "peerDependencies": {
-    "imapflow": "^1.0.0",
-    "mailparser": "^3.6.0",
-    "nodemailer": "^10.0.13"
-  },
   "studio": {
     "pages": [
       {
@@ -51,10 +40,514 @@
     "format": "esm",
     "target": "bun",
     "bundled": true,
-    "bundlePeers": true
+    "bundlePeers": false
   },
+  "collections": [
+    "mail_accounts",
+    "mail_folders",
+    "mail_messages",
+    "mail_attachments",
+    "mail_drafts",
+    "mail_identities",
+    "mail_signatures",
+    "mail_filters",
+    "mail_contacts"
+  ],
+  "actions": [
+    {
+      "name": "sync",
+      "permission": {
+        "resource": "mail_accounts",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "account_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "mail_accounts"
+      ],
+      "writes": [
+        "mail_accounts"
+      ],
+      "enqueues": [
+        "sync"
+      ]
+    },
+    {
+      "name": "send",
+      "permission": {
+        "resource": "mail_drafts",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "draft_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "draft_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "mail_drafts",
+        "mail_accounts"
+      ],
+      "writes": [
+        "mail_drafts"
+      ],
+      "enqueues": [
+        "send"
+      ]
+    },
+    {
+      "name": "fetchAttachment",
+      "permission": {
+        "resource": "mail_attachments",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "attachment_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "attachment_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "mail_attachments",
+        "mail_messages",
+        "mail_accounts"
+      ],
+      "writes": [
+        "mail_attachments"
+      ],
+      "enqueues": [
+        "fetchAttachment"
+      ]
+    },
+    {
+      "name": "setFlags",
+      "permission": {
+        "resource": "mail_messages",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "message_ids"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "message_ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 200,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "is_read": {
+            "type": "boolean"
+          },
+          "is_starred": {
+            "type": "boolean"
+          }
+        }
+      },
+      "reads": [
+        "mail_messages"
+      ],
+      "writes": [
+        "mail_messages"
+      ],
+      "enqueues": [
+        "apply"
+      ]
+    },
+    {
+      "name": "moveMessages",
+      "permission": {
+        "resource": "mail_messages",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "message_ids",
+          "folder_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "message_ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 200,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "folder_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "mail_messages",
+        "mail_folders",
+        "mail_accounts"
+      ],
+      "writes": [],
+      "enqueues": [
+        "apply"
+      ]
+    },
+    {
+      "name": "deleteMessages",
+      "permission": {
+        "resource": "mail_messages",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "message_ids"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "message_ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 200,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
+      "reads": [
+        "mail_messages",
+        "mail_accounts"
+      ],
+      "writes": [],
+      "enqueues": [
+        "apply"
+      ]
+    },
+    {
+      "name": "createFolder",
+      "permission": {
+        "resource": "mail_accounts",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "account_id",
+          "name"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+          }
+        }
+      },
+      "reads": [
+        "mail_accounts"
+      ],
+      "writes": [],
+      "enqueues": [
+        "apply"
+      ]
+    },
+    {
+      "name": "renameFolder",
+      "permission": {
+        "resource": "mail_folders",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "folder_id",
+          "name"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "folder_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+          }
+        }
+      },
+      "reads": [
+        "mail_folders",
+        "mail_accounts"
+      ],
+      "writes": [],
+      "enqueues": [
+        "apply"
+      ]
+    },
+    {
+      "name": "deleteFolder",
+      "permission": {
+        "resource": "mail_folders",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "folder_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "folder_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "mail_folders",
+        "mail_accounts"
+      ],
+      "writes": [],
+      "enqueues": [
+        "apply"
+      ]
+    }
+  ],
+  "jobs": [
+    {
+      "name": "sync",
+      "input": {
+        "type": "object",
+        "required": [
+          "account_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "mail_accounts",
+        "mail_folders",
+        "mail_messages",
+        "mail_filters"
+      ],
+      "writes": [
+        "mail_accounts",
+        "mail_folders",
+        "mail_messages",
+        "mail_attachments"
+      ],
+      "egressSlots": [
+        {
+          "name": "mail",
+          "kind": "tcp"
+        }
+      ],
+      "retry": {
+        "limit": 0,
+        "backoff": true
+      },
+      "timeoutSeconds": 600
+    },
+    {
+      "name": "send",
+      "input": {
+        "type": "object",
+        "required": [
+          "draft_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "draft_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "mail_drafts",
+        "mail_accounts",
+        "mail_identities",
+        "mail_folders",
+        "mail_contacts"
+      ],
+      "writes": [
+        "mail_drafts",
+        "mail_contacts"
+      ],
+      "egressSlots": [
+        {
+          "name": "mail",
+          "kind": "tcp"
+        }
+      ],
+      "retry": {
+        "limit": 0,
+        "backoff": true
+      },
+      "timeoutSeconds": 300
+    },
+    {
+      "name": "fetchAttachment",
+      "input": {
+        "type": "object",
+        "required": [
+          "attachment_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "attachment_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "mail_attachments",
+        "mail_messages",
+        "mail_folders",
+        "mail_accounts"
+      ],
+      "writes": [
+        "mail_attachments"
+      ],
+      "egressSlots": [
+        {
+          "name": "mail",
+          "kind": "tcp"
+        }
+      ],
+      "retry": {
+        "limit": 1,
+        "backoff": true
+      },
+      "timeoutSeconds": 300
+    },
+    {
+      "name": "apply",
+      "input": {
+        "type": "object",
+        "required": [
+          "account_id",
+          "op"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "op": {
+            "type": "string",
+            "enum": [
+              "flags",
+              "move",
+              "delete",
+              "createFolder",
+              "renameFolder",
+              "deleteFolder"
+            ]
+          },
+          "message_ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 200,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "is_read": {
+            "type": "boolean"
+          },
+          "is_starred": {
+            "type": "boolean"
+          },
+          "folder_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^[^\\u0000-\\u001f\\u007f]+$"
+          }
+        }
+      },
+      "reads": [
+        "mail_accounts",
+        "mail_folders",
+        "mail_messages"
+      ],
+      "writes": [
+        "mail_accounts",
+        "mail_folders",
+        "mail_messages",
+        "mail_attachments"
+      ],
+      "egressSlots": [
+        {
+          "name": "mail",
+          "kind": "tcp"
+        }
+      ],
+      "retry": {
+        "limit": 0,
+        "backoff": true
+      },
+      "timeoutSeconds": 300
+    }
+  ],
   "integrity": {
-    "engineSha256": "1f46295faf70a94685bd2374dfe8023d93739070b075c75eac5daf8c4d4ed76a",
-    "sourceSha256": "7b7dab70c869a5a9146d009fcb1f0a09be67b05400d4bbd07861824fc13ec804"
+    "engineSha256": "0bec0eafe46fc51bfe1b320335be21d340320fce6376f5cb422c30103d44a22b",
+    "sourceSha256": "976bb691a12290047bdf58bc31e0e9286789a2387e7c48a6d78bef8549cc16b9",
+    "schemaSha256": "c12f0b664bd925ba007df14456d2c60685194363034a4448a244f5b5d91238e6",
+    "jobsSha256": "9f0e274f796b63027712b1a60b7695239635b0e88049fac8e948688f5fc1c82c"
   }
 }
