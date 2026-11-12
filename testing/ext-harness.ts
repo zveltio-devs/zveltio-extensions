@@ -964,11 +964,32 @@ export async function mountForTest(
   // is what names it and where its manifest lives.
   const extDir = dirname(engineDir);
   const manifestPath = join(extDir, 'manifest.json');
-  if (existsSync(manifestPath)) {
-    await applyDeclared(relative(REPO, extDir), extDir, JSON.parse(readFileSync(manifestPath, 'utf8')));
-  }
+  const manifest = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, 'utf8')) : null;
+  if (manifest) await applyDeclared(relative(REPO, extDir), extDir, manifest);
   const wiring = await productionWiring(extDir, relative(REPO, extDir), mod.default);
   const ctx = await makeCtx(db, { authed, admin, user, grants }, publicRoutes, wiring);
+  // The manifest's declared routes (ADR 0039), mounted before `register` as the
+  // engine mounts them (`mountDeclaredRoutes`): the handler gets the request,
+  // the path parameters and the route host. Without this a test reached them
+  // only on a live engine (`onEngine`).
+  for (const r of manifest?.routes ?? []) {
+    const run = mod.default.routes?.[r.handler];
+    if (typeof run !== 'function') {
+      throw new Error(`manifest route ${r.method} ${r.path} names handler "${r.handler}", which routes does not export`);
+    }
+    app.on(r.method, r.path, (c: any) =>
+      run(c.req.raw, {
+        params: c.req.param(),
+        host: {
+          ...ctx.host(c),
+          enqueue: (job: string, input: unknown) => {
+            if (!ctx.internals?.enqueue) throw new Error('enqueue is not available to this extension');
+            return ctx.internals.enqueue(c, job, input);
+          },
+        },
+      }),
+    );
+  }
   await mod.default.register(app, ctx);
   // Mount collected root-level public routes on the same app so tests can hit
   // them at their absolute paths (mirrors the engine mounting them globally).

@@ -81,3 +81,15 @@ describe('POST /webhook/twilio', () => {
     expect((await post(setup([]), sign('tok'))).status).toBe(403);
   });
 });
+
+// The harness mounts the declared route as the engine does, so a contract test
+// reaches it by path; before, only a live engine (`webhook.test.ts`) did.
+const withDb = process.env.TEST_DATABASE_URL ? describe : describe.skip;
+withDb('sms — declared route through mountForTest', () => {
+  it('answers POST /webhook/twilio from the manifest handler', async () => {
+    const { mountForTest } = await import('../../testing/ext-harness');
+    const { app } = await mountForTest(import.meta.dir, { authed: false, admin: false });
+    const res = await app.request('/webhook/twilio', { method: 'POST' });
+    expect([res.status, await res.json()]).toEqual([400, { error: 'Missing X-Twilio-Signature' }]);
+  });
+});
