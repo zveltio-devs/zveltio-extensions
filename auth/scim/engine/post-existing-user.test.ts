@@ -28,23 +28,16 @@ d('auth/scim — POST of an existing account is a 409 that changes nothing', () 
   const tenantA = crypto.randomUUID();
   const tenantB = crypto.randomUUID();
   const userIds: string[] = [];
-  const tokenIds: string[] = [];
 
   afterAll(async () => {
-    for (const id of userIds) await sql`DELETE FROM zvd_scim_users WHERE user_id = ${id}`.execute(db);
-    for (const id of tokenIds) await sql`DELETE FROM zvd_scim_tokens WHERE id = ${id}::uuid`.execute(db);
     for (const id of userIds) await sql`DELETE FROM "user" WHERE id = ${id}`.execute(db);
     await sql`DELETE FROM zv_tenants WHERE id IN (${tenantA}::uuid, ${tenantB}::uuid)`.execute(db);
     await db.destroy();
   });
 
   type Idp = Awaited<ReturnType<typeof scimApp>>;
-  /** A tenant's identity provider: the app as that tenant, with its bearer token. */
-  const idpOf = async (tenant: string): Promise<Idp> => {
-    const idp = await scimApp(import.meta.dir, tenant);
-    tokenIds.push(idp.tokenId);
-    return idp;
-  };
+  /** A tenant's identity provider: the app as that tenant, with its API key. */
+  const idpOf = (tenant: string): Promise<Idp> => scimApp(import.meta.dir, tenant);
 
   const post = (idp: Idp, email: string, extra: object = {}) =>
     idp.app.request('/scim/v2/Users', {

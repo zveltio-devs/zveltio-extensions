@@ -60,10 +60,8 @@ d('auth/scim — PUT /Users/:id (RFC 7644 §3.5.1 replace)', () => {
       name?: { formatted?: string };
       displayName?: string;
       active?: boolean;
-      externalId?: string;
     };
     expect(body.active).toBe(true);
-    expect(body.externalId).toBe('okta-2');
     expect(`${body.name?.formatted ?? ''}${body.displayName ?? ''}`).toContain('After Rename');
   });
 

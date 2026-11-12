@@ -2,78 +2,74 @@
   "name": "auth/scim",
   "displayName": "SCIM Provisioning",
   "category": "auth",
-  "description": "SCIM 2.0 user provisioning for Azure AD / Entra, Okta and other identity providers — bearer tokens, Users CRUD, active-flag offboarding",
+  "description": "SCIM 2.0 user provisioning for Azure AD / Entra, Okta and other identity providers — engine API keys, Users CRUD, active-flag offboarding",
   "version": "3.0.0",
   "zveltioMinVersion": "3.0.0-beta.114",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-scim",
   "permissions": [
-    "identity:provision",
-    "data:system",
-    "data:write"
-  ],
-  "i18nPrefixes": [
-    "auth.scim"
+    "identity:provision"
   ],
   "routes": [
     {
-      "method": "POST",
-      "path": "/tokens",
-      "access": "caller",
-      "handler": "mintToken"
-    },
-    {
       "method": "GET",
       "path": "/v2/ServiceProviderConfig",
-      "access": "public",
+      "access": "caller",
       "handler": "serviceProviderConfig"
     },
     {
       "method": "GET",
       "path": "/v2/Users",
-      "access": "public",
+      "access": "caller",
       "handler": "listUsers"
     },
     {
       "method": "POST",
       "path": "/v2/Users",
-      "access": "public",
+      "access": "caller",
       "handler": "createUser"
     },
     {
       "method": "GET",
       "path": "/v2/Users/:id",
-      "access": "public",
+      "access": "caller",
       "handler": "getUser"
     },
     {
       "method": "PUT",
       "path": "/v2/Users/:id",
-      "access": "public",
+      "access": "caller",
       "handler": "replaceUser"
     },
     {
       "method": "PATCH",
       "path": "/v2/Users/:id",
-      "access": "public",
+      "access": "caller",
       "handler": "patchUser"
     },
     {
       "method": "DELETE",
       "path": "/v2/Users/:id",
-      "access": "public",
+      "access": "caller",
       "handler": "deleteUser"
     },
     {
       "method": "GET",
       "path": "/v2/Groups",
-      "access": "public",
+      "access": "caller",
       "handler": "listGroups"
     }
   ],
+  "apiKeyRoutes": [
+    "GET /v2/*",
+    "POST /v2/Users",
+    "PUT /v2/Users/*",
+    "PATCH /v2/Users/*",
+    "DELETE /v2/Users/*"
+  ],
   "contributes": {
     "engine": true,
-    "studio": true
+    "studio": false
   },
   "engine": {
     "entry": "engine/index.js",
@@ -83,23 +79,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "4a237dfd7bcb97599a75e5903c5b885547aa65b826c76a7a2e40291ad9661dd2",
-    "sourceSha256": "3163a7e98170e5bc2012976856e248a0c44ebabb5a78e105497391c92d5ffc2e",
-    "schemaSha256": "501c280ce551916a2b0f6baf195b8b7ff0e89673b9405543aaef0efc1b46264d"
-  },
-  "studio": {
-    "navGroup": "other",
-    "pages": [
-      {
-        "path": "/admin/auth/scim",
-        "label": "SCIM Provisioning",
-        "icon": "KeyRound",
-        "schema": "schemas/scim.json"
-      }
-    ]
-  },
-  "collections": [
-    "scim_tokens",
-    "scim_users"
-  ]
+    "engineSha256": "2138bb1bd5071f2c1780989d7163b01f55c2e1db7f64fac8bd03fffbf49dd2fc",
+    "sourceSha256": "f1f6364de60a0819af04c25840c9181db5521db6787a278b7ee003ea3f68c17c"
+  }
 }

@@ -15,9 +15,10 @@ https://YOUR-DOMAIN/ext/auth/scim/v2
 Every route of an extension is declared in its manifest and served under
 `/ext/<name>` (ADR 0039). **Upgrading from 2.x:** the address moved from
 `/scim/v2` to `/ext/auth/scim/v2`, with nothing left at the old address. Every
-identity provider must be reconfigured: change its Tenant URL and give it a new
-token (Step 2) — 3.0.0 stores a token as its SHA-256, so a 2.x token answers
-401. The users it provisioned stay its own.
+identity provider must be reconfigured: change its Tenant URL and give it an
+engine API key (Step 2) — 3.0.0 keeps no token of its own, so a `zvscim_`
+token answers 401 and cannot be converted. The users it provisioned stay its
+own.
 
 The full addresses the provider will call:
 
@@ -33,51 +34,55 @@ DELETE /ext/auth/scim/v2/Users/{id}
 
 ---
 
-## Step 1 — Approve the capabilities
+## Step 1 — Approve the capability
 
 **This is the step people forget**, and without it nothing works.
 
-The extension asks for `identity:provision`, `data:system` and `data:write`.
-They are **declared** in the manifest but not granted automatically — an administrator has to approve them explicitly. That is
-by design: an extension asking for more power has to ask visibly.
+The extension asks for `identity:provision`. It is **declared** in the manifest
+but not granted automatically — an administrator has to approve it explicitly.
+That is by design: an extension asking for more power has to ask visibly.
 
-Without `data:system` it cannot look the token up or record provisioning state,
-and every call answers 500: the provider has no user behind it, so the extension
-reads `scim_tokens` and writes `scim_users` as the system, inside the token's
-tenant (audited per call).
-
-Without `identity:provision` the engine refuses every provisioning call with
-`403 capability_required`: the directory is the engine's (`host.identity`, ADR
-0039 decision 9) and an extension reaches it only with the approved capability.
-The extension holds no broader user power (`auth:users` is no longer requested).
+Without it the engine refuses every provisioning call with `403
+capability_required`: the directory is the engine's (`host.identity`, ADR 0039
+decision 9) and an extension reaches it only with the approved capability.
+The extension holds no broader user power (`auth:users` is not requested) and
+no data access of its own.
 
 Approval happens from the **Marketplace**, on the extension's card, at
 installation or after an update that asks for a new capability.
 
 ---
 
-## Step 2 — Generate the token
+## Step 2 — Issue the API key
 
-**Studio → SCIM Provisioning → new token.**
+The provider's bearer token is an ordinary **engine API key** (ADR 0045). Issue
+one with a single scope:
 
-The token begins with `zvscim_` and is **shown only once**. Save it immediately;
-only its fingerprint is kept in the database, so it cannot be recovered, only
-replaced.
+| Collection / surface | Actions |
+|---|---|
+| `$ext:auth/scim` | `read`, `create`, `update`, `delete` |
 
-Who may mint, list and revoke tokens is the engine's rule on the collection
-`scim_tokens`. It has no default grants: tenant administrators manage it, other
-roles only when granted. Listing and revoking go through the data API
-(`/api/data/scim_tokens`); minting is `POST /ext/auth/scim/tokens`, because the
-raw token exists only there.
+**Studio → API keys → new key** (instance administrators), or `POST
+/api/me/api-keys` for a tenant administrator when the instance lets members
+issue their own keys. The key begins with `zvk_` and is **shown only once**;
+revoke it from the same page.
 
-Each token belongs to a single tenant. The users the provider provisions land in
-that token's tenant. The token is looked up **in the tenant the request names**:
-on a multi-tenant instance give the provider the tenant's own hostname (or have
-it send `x-tenant-slug`), or the request is the default tenant's and another
-tenant's token answers 401.
+**A key acts as the person who issued it.** The directory answers only a caller
+who administers the tenant, so the key works while its issuer is an
+administrator of that tenant and stops the moment they are not: a key a plain
+member issued gets `403 admin_required`. Revoking the key, letting it expire or
+demoting its issuer stops provisioning at once. Every provisioning act's audit
+entry names the key (`caller: apikey:<id>`).
 
-**Upgrading from 1.x:** see the 2.0.0 entry in `CHANGELOG.md` — tokens are
-minted again, and 1.x provisioning state is not carried over.
+The key acts in **the tenant the request names**: on a multi-tenant instance
+give the provider the tenant's own hostname (or have it send `x-tenant-slug`).
+A key issued in one tenant answers 401 in another; a key issued in the root
+tenant acts in a tenant only where its issuer is a member in force (an
+instance owner, everywhere). The users the provider provisions land in the
+request's tenant.
+
+**Upgrading from 1.x:** see the 2.0.0 entry in `CHANGELOG.md` — 1.x
+provisioning state is not carried over.
 
 Provisioning creates **new** accounts. If the email already has an account on
 the instance — for example, the person also works for another tenant — the
@@ -100,10 +105,10 @@ In Azure AD / Okta, under provisioning:
 | Field | Value |
 |---|---|
 | Tenant URL | `https://YOUR-DOMAIN/ext/auth/scim/v2` |
-| Secret Token | the `zvscim_…` token from Step 2 |
+| Secret Token | the `zvk_…` API key from Step 2 |
 
-Then **Test Connection**. The provider calls `ServiceProviderConfig`; if that
-answers, the rest will work.
+Then **Test Connection**. The provider calls `ServiceProviderConfig`, which
+answers only a key that may provision; if that answers, the rest will work.
 
 ---
 
@@ -185,12 +190,17 @@ still get in on Monday with a browser left open.
 
 ## If something does not work
 
-**500 on every call, with a valid token** — almost certainly the capabilities are
-not approved (`data:system`). Check Step 1. **403
-`capability_required`** on provisioning: `identity:provision` is not approved.
+**403 `capability_required`** — `identity:provision` is not approved. Check
+Step 1.
 
-**401 on `ServiceProviderConfig` too** — wrong token, or (multi-tenant) the
-request does not name the token's tenant: use the tenant's hostname.
+**403 `admin_required`** — the key's issuer does not administer this tenant
+(any more). Issue a key as one who does.
+
+**403 "API key lacks the $ext:auth/scim scope"** — the key was issued without
+the scope of Step 2.
+
+**401** — wrong, revoked or expired key, or (multi-tenant) the request does not
+name a tenant the key acts in: use the tenant's hostname.
 
 **404 on the old address `/scim/v2`** — 3.0.0 serves SCIM at
 `/ext/auth/scim/v2`; change the provider's Tenant URL.

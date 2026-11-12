@@ -23,7 +23,7 @@ d('auth/scim — DELETE /Users/:id', () => {
   });
 
   it('revokes the sessions, drops the grants and audits the removal with the provider as actor', async () => {
-    const { app, json, tokenId, userIdOf } = await scimApp(import.meta.dir);
+    const { app, json, keyId, userIdOf } = await scimApp(import.meta.dir);
     const tenantId = DEFAULT_TENANT_ID;
 
     const create = await app.request('/scim/v2/Users', {
@@ -71,11 +71,11 @@ d('auth/scim — DELETE /Users/:id', () => {
          AND metadata->>'actor' = 'ext:auth/scim' AND metadata->>'subject' = ${subject}
     `.execute(db);
     expect(removed.rows[0]!.n).toBe(1);
-    // The token lookup runs as the system; its audit row names the token too.
-    const asSystem = await sql<{ n: number }>`
-      SELECT COUNT(*)::int AS n FROM zv_audit_log
-       WHERE event_type = 'extension.as_system' AND metadata->>'claimed_actor' = ${`scim:${tokenId}`}
+    // The act names the API key that called (ADR 0045).
+    const caller = await sql<{ caller: string }>`
+      SELECT metadata->>'caller' AS caller FROM zv_audit_log
+       WHERE event_type = 'identity.removed' AND resource_id = ${id}
     `.execute(db);
-    expect(asSystem.rows[0]!.n).toBeGreaterThan(0);
+    expect(caller.rows).toEqual([{ caller: `apikey:${keyId}` }]);
   });
 });

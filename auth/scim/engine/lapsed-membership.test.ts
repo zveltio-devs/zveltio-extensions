@@ -29,22 +29,15 @@ d('auth/scim — a lapsed membership reads as active: false and is not writable'
   const db = new Kysely<Record<string, never>>({ dialect: new PostgresDialect({ pool }) });
   const tenantId = crypto.randomUUID();
   const userIds: string[] = [];
-  const tokenIds: string[] = [];
 
   afterAll(async () => {
-    for (const id of userIds) await sql`DELETE FROM zvd_scim_users WHERE user_id = ${id}`.execute(db);
-    for (const id of tokenIds) await sql`DELETE FROM zvd_scim_tokens WHERE id = ${id}::uuid`.execute(db);
     for (const id of userIds) await sql`DELETE FROM "user" WHERE id = ${id}`.execute(db);
     await sql`DELETE FROM zv_tenants WHERE id = ${tenantId}::uuid`.execute(db);
     await db.destroy();
   });
 
-  /** A tenant's identity provider: the app as that tenant, with its bearer token. */
-  const idpOf = async (tenant: string) => {
-    const idp = await scimApp(import.meta.dir, tenant);
-    tokenIds.push(idp.tokenId);
-    return idp;
-  };
+  /** A tenant's identity provider: the app as that tenant, with its API key. */
+  const idpOf = (tenant: string) => scimApp(import.meta.dir, tenant);
 
   type Idp = Awaited<ReturnType<typeof scimApp>>;
   /** `id`: the engine user; `sid`: the SCIM id (the provider's subject). */

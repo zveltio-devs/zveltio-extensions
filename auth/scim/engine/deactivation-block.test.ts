@@ -9,6 +9,7 @@
 import { afterAll, describe, expect, it } from 'bun:test';
 import { Kysely, PostgresDialect, sql } from 'kysely';
 import { Pool } from 'pg';
+import { seatHarnessGod } from '../../../testing/ext-harness';
 import { scimApp } from '../testing/scim-app';
 
 const d =
@@ -129,7 +130,9 @@ d('auth/scim — active=false blocks sign-in, active=true restores it', () => {
   // reach it at all (ADR 0039 decision 9), as if it did not exist.
   it('cannot reach the instance owner: 404, and nothing changes', async () => {
     const { app, json } = await scimApp(import.meta.dir);
-    // The harness seeds its session user as the instance's one god.
+    // The harness seats its session user as the instance's one god; whether an
+    // earlier file did depends on the order files run in.
+    await seatHarnessGod();
     const god = '00000000-0000-4000-8000-00000000e001';
     const snapshot = () =>
       sql<{ name: string; banned: boolean | null }>`

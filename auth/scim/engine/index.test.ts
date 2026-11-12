@@ -1,31 +1,25 @@
 // Auto-generated per-extension contract test — shared logic in testing/ext-harness.ts.
 // Runs against the packed engine/index.js + real Postgres (TEST_DATABASE_URL; skips without it).
 import { describe, expect, it } from 'bun:test';
-import { createHash } from 'node:crypto';
 import { sql } from 'kysely';
-import { extensionContract, onEngine } from '../../../testing/ext-harness';
+import { extensionContract } from '../../../testing/ext-harness';
 import { scimApp } from '../testing/scim-app';
 
 await extensionContract(import.meta.dir);
 
-// Full SCIM lifecycle against the real DB: with a bearer token the tenant
-// issued, the "IdP" (us) drives /scim/v2 — ServiceProviderConfig, provision, filter
-// probe, PatchOp deactivation (sessions killed = enforced), deprovision.
+// Full SCIM lifecycle against the real DB: with an engine API key the tenant's
+// administrator issued (ADR 0045), the "IdP" (us) drives /scim/v2 —
+// ServiceProviderConfig, provision, filter probe, PatchOp deactivation
+// (sessions killed = enforced), deprovision.
 const d =
   process.env.TEST_DATABASE_URL && process.env.BETTER_AUTH_SECRET ? describe : describe.skip;
 
+const SCIM_USER = 'urn:ietf:params:scim:schemas:core:2.0:User';
+
 d('auth/scim bespoke (SCIM 2.0 lifecycle)', () => {
-  it('token → provision → filter → deactivate → delete', async () => {
+  it('key → provision → filter → deactivate → delete', async () => {
     const { app, bearer } = await scimApp(import.meta.dir);
     const email = `scim-${Date.now()}@test.local`;
-
-    // Unauthenticated SCIM calls are refused with a SCIM error envelope.
-    const noAuth = await app.request('/scim/v2/Users');
-    expect(noAuth.status).toBe(401);
-    expect(((await noAuth.json()) as { schemas: string[] }).schemas[0]).toContain(':Error');
-    // A token this tenant never issued.
-    const forged = await app.request('/scim/v2/Users', { headers: { Authorization: 'Bearer zvscim_forged' } });
-    expect(forged.status).toBe(401);
 
     // ServiceProviderConfig — the first thing Azure probes.
     const spc = await app.request('/scim/v2/ServiceProviderConfig', { headers: bearer });
@@ -37,7 +31,7 @@ d('auth/scim bespoke (SCIM 2.0 lifecycle)', () => {
       method: 'POST',
       headers: { ...bearer, 'content-type': 'application/json' },
       body: JSON.stringify({
-        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        schemas: [SCIM_USER],
         userName: email,
         externalId: 'ext-123',
         name: { formatted: 'Scim Probe' },
@@ -55,10 +49,9 @@ d('auth/scim bespoke (SCIM 2.0 lifecycle)', () => {
       `/scim/v2/Users?filter=${encodeURIComponent(`userName eq "${email}"`)}`,
       { headers: bearer },
     );
-    const probeBody = (await probe.json()) as { totalResults: number; Resources: Array<{ id: string; externalId?: string }> };
+    const probeBody = (await probe.json()) as { totalResults: number; Resources: Array<{ id: string }> };
     expect(probeBody.totalResults).toBe(1);
     expect(probeBody.Resources[0]!.id).toBe(created.id);
-    expect(probeBody.Resources[0]!.externalId).toBe('ext-123');
 
     // Offboarding: PatchOp active=false → flag recorded, sessions killed.
     const patch = await app.request(`/scim/v2/Users/${created.id}`, {
@@ -83,35 +76,52 @@ d('auth/scim bespoke (SCIM 2.0 lifecycle)', () => {
     expect(((await groups.json()) as { totalResults: number }).totalResults).toBe(0);
   });
 
-  // Minting is a data API write as the caller: who may mint is the engine's
-  // rule on `scim_tokens` (no default grants), and only the hash is stored.
-  it('POST /tokens: refused without a grant, and for an administrator stores the hash only', async () => {
-    const { app: ext, engineApp, db, harness } = await onEngine(import.meta.dir);
-    const { app } = await scimApp(import.meta.dir);
-    const mint = (cookie: string) =>
-      ext.request('/ext/auth/scim/tokens', {
+  // Who may provision is the engine's: the key is checked by the engine's
+  // `/ext/*` gate (401 nobody / unknown / another tenant's key, 403 a key
+  // without `$ext:auth/scim`, in the engine's error shape), and the directory
+  // answers only a caller whose author administers the tenant (403
+  // `admin_required`, answered as a SCIM error). Nothing is provisioned.
+  it("refuses nobody, a forged key, another tenant's key, a key without the scope, a member and a member's key", async () => {
+    const idp = await scimApp(import.meta.dir);
+    const { app, db, engineApp, harness, keyFor, person, issuer } = idp;
+    const email = `scim-refused-${Date.now()}@test.local`;
+    const post = (headers: Record<string, string>) =>
+      app.request('/scim/v2/Users', {
         method: 'POST',
-        headers: { 'content-type': 'application/json', cookie },
-        body: JSON.stringify({ name: `Entra ${crypto.randomUUID()}` }),
+        headers: { ...headers, 'content-type': 'application/json' },
+        body: JSON.stringify({ schemas: [SCIM_USER], userName: email }),
       });
-    const member = await harness.createMemberSession(engineApp, db);
-    const refused = await mint(member.cookie);
-    expect(refused.status).toBe(403);
-    expect(JSON.stringify(await refused.json())).not.toContain('zvscim_');
-
-    const res = await mint(await harness.createGodSession(engineApp, db));
-    expect(res.status, await res.clone().text()).toBe(201);
-    const { token, id, base_url } = (await res.json()) as { token: string; id: string; base_url: string };
-    expect([token.startsWith('zvscim_'), base_url]).toEqual([true, '/ext/auth/scim/v2']);
-    const hash = createHash('sha256').update(token).digest('hex');
-    const stored = await sql<{ token_hash: string }>`
-      SELECT token_hash FROM zvd_scim_tokens WHERE id = ${id}::uuid`.execute(db);
-    expect(stored.rows).toEqual([{ token_hash: hash }]);
-
-    const spc = await app.request('/scim/v2/ServiceProviderConfig', { headers: { Authorization: `Bearer ${token}` } });
-    expect(spc.status).toBe(200);
-    const used = await sql<{ last_used_at: Date | null }>`
-      DELETE FROM zvd_scim_tokens WHERE id = ${id}::uuid RETURNING last_used_at`.execute(db);
-    expect(used.rows[0]!.last_used_at).not.toBeNull();
+    const other = crypto.randomUUID();
+    await sql`INSERT INTO zv_tenants (id, slug, name) VALUES (${other}::uuid, ${`scim-o-${Date.now()}`}, 'other')`.execute(
+      db,
+    );
+    try {
+      const bearer = (key: string) => ({ Authorization: `Bearer ${key}` });
+      const member = await harness.createMemberSession(engineApp, db);
+      const statuses = {
+        nobody: (await post({})).status,
+        forged: (await post(bearer('zvk_forged'))).status,
+        foreign: (await post(bearer(await keyFor(issuer, other)))).status,
+        noScope: (await post(bearer(await keyFor(issuer, undefined, [{ collection: '*', actions: ['*'] }])))).status,
+      };
+      expect(statuses).toEqual({ nobody: 401, forged: 401, foreign: 401, noScope: 403 });
+      for (const res of [
+        await post({ cookie: member.cookie }),
+        await post(bearer(await keyFor(await person(idp.tenant, false)))),
+      ]) {
+        expect(res.status).toBe(403);
+        const body = (await res.json()) as { schemas: string[]; detail: string };
+        expect(body.schemas[0]).toContain(':Error');
+        expect(body.detail).toContain('does not administer this tenant');
+      }
+      // ServiceProviderConfig ("Test Connection") fails the same way for a member's key.
+      const spc = await app.request('/scim/v2/ServiceProviderConfig', {
+        headers: bearer(await keyFor(await person(idp.tenant, false))),
+      });
+      expect(spc.status).toBe(403);
+      expect((await sql`SELECT 1 FROM "user" WHERE email = ${email}`.execute(db)).rows).toHaveLength(0);
+    } finally {
+      await sql`DELETE FROM zv_tenants WHERE id = ${other}::uuid`.execute(db);
+    }
   });
 });
