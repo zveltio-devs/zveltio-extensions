@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.3.0 (2026-11-12)
+
+- feat: the Studio page is a `zveltio.view/2` view (ADR 0042): it names its collections and actions instead of URLs, and Studio draws it from the specification
+- change: the reports status filter is gone; the list shows every report
+- requires engine 3.0.0-beta.111
+
 ## 2.2.0 (2026-10-31)
 
 - feat: a report and its expenses, mileage and per diem entries are written only by this extension's actions (`writtenBy: "actions"`): the data API, sync and every other path answer 409 `written_by_actions`, so a submitted report cannot be edited, nor its entries changed under its frozen totals

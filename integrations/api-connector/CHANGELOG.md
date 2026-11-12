@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.0 (2026-11-12)
+
+- feat: the Studio page is a `zveltio.view/2` view (ADR 0042): it names its collections and actions instead of URLs, and Studio draws it from the specification
+- change: the call column shows the call id, not the composed label
+- requires engine 3.0.0-beta.111
+
 ## 2.0.3 (2026-11-09)
 
 - build: repacked with hono 4.13.17 and kysely 0.29.8, in lockstep with the engine; no behaviour change

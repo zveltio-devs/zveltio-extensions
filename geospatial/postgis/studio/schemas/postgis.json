@@ -1,23 +1,30 @@
 {
-  "sduiSchema": 1,
+  "spec": "zveltio.view/2",
   "title": "geospatial.postgis.title",
-  "subtitle": "geospatial.postgis.subtitle",
-  "resources": [
+  "type": "list",
+  "collection": "geo_location_history",
+  "fields": [
     {
-      "id": "history",
-      "label": "geospatial.postgis.tab.history",
-      "icon": "MapPin",
-      "dataSource": "/api/data/geo_location_history?sort=created_at&order=desc&limit=500",
-      "dataPath": "records",
-      "search": { "fields": ["entity_type", "entity_id"], "placeholder": "common.search" },
-      "columns": [
-        { "key": "entity_type", "label": "geospatial.postgis.col.entityType" },
-        { "key": "entity_id", "label": "geospatial.postgis.col.entityId" },
-        { "key": "location.lat", "label": "geospatial.postgis.ui.latitude" },
-        { "key": "location.lng", "label": "geospatial.postgis.ui.longitude" },
-        { "key": "source", "label": "geospatial.postgis.col.source" },
-        { "key": "recorded_at", "label": "geospatial.postgis.col.recordedAt", "type": "date" }
-      ]
+      "field": "entity_type",
+      "label": "geospatial.postgis.col.entityType"
+    },
+    {
+      "field": "entity_id",
+      "label": "geospatial.postgis.col.entityId"
+    },
+    {
+      "field": "location",
+      "label": "geospatial.postgis.ui.latitude"
+    },
+    {
+      "field": "source",
+      "label": "geospatial.postgis.col.source"
+    },
+    {
+      "field": "recorded_at",
+      "label": "geospatial.postgis.col.recordedAt"
     }
-  ]
+  ],
+  "sort": "-created_at",
+  "search": true
 }

@@ -1,318 +1,114 @@
 {
-  "sduiSchema": 1,
+  "spec": "zveltio.view/2",
   "title": "sms.title",
-  "subtitle": "sms.subtitle",
-  "newLabel": "common.new",
-  "resources": [
+  "type": "tabs",
+  "items": [
     {
-      "id": "messages",
-      "label": "sms.tab.messages",
-      "icon": "Send",
-      "dataSource": "/api/data/sms_messages?sort=created_at&order=desc&limit=500",
-      "dataPath": "records",
-      "filters": [
+      "type": "list",
+      "collection": "sms_messages",
+      "title": "sms.tab.messages",
+      "fields": [
         {
-          "param": "status",
-          "options": [
-            {
-              "value": "all",
-              "label": "common.filter.all"
-            },
-            {
-              "value": "pending",
-              "label": "sms.status.pending"
-            },
-            {
-              "value": "sending",
-              "label": "sms.status.sending"
-            },
-            {
-              "value": "sent",
-              "label": "sms.status.sent"
-            },
-            {
-              "value": "delivered",
-              "label": "sms.status.delivered"
-            },
-            {
-              "value": "failed",
-              "label": "sms.status.failed"
-            }
-          ]
-        }
-      ],
-      "columns": [
-        {
-          "key": "to_number",
+          "field": "to_number",
           "label": "common.col.to",
-          "type": "mono"
+          "display": "mono"
         },
         {
-          "key": "body",
+          "field": "body",
           "label": "sms.col.body"
         },
         {
-          "key": "provider",
+          "field": "provider",
           "label": "sms.col.provider"
         },
         {
-          "key": "status",
+          "field": "status",
           "label": "common.col.status",
-          "type": "badge",
-          "badge": {
-            "colors": {
-              "pending": "badge-warning",
-              "sending": "badge-ghost",
-              "sent": "badge-info",
-              "delivered": "badge-success",
-              "failed": "badge-error"
-            },
-            "labels": {
-              "pending": "sms.status.pending",
-              "sending": "sms.status.sending",
-              "sent": "sms.status.sent",
-              "delivered": "sms.status.delivered",
-              "failed": "sms.status.failed"
-            }
+          "display": "badge",
+          "tones": {
+            "pending": "warning",
+            "sending": "muted",
+            "sent": "info",
+            "delivered": "success",
+            "failed": "danger"
           }
         },
         {
-          "key": "sent_at",
-          "label": "sms.col.sentAt",
-          "type": "date"
+          "field": "sent_at",
+          "label": "sms.col.sentAt"
         },
         {
-          "key": "error",
+          "field": "error",
           "label": "sms.col.error"
         }
       ],
-      "form": {
-        "endpoint": "/ext/sms/actions/send",
-        "fields": [
-          {
-            "name": "provider",
-            "label": "sms.ui.provider",
-            "type": "select",
-            "colSpan": 1,
-            "default": "twilio",
-            "options": [
-              {
-                "value": "twilio",
-                "label": "sms.ui.twilio"
-              },
-              {
-                "value": "vonage",
-                "label": "sms.ui.vonage"
-              }
-            ]
-          },
-          {
-            "name": "to",
-            "label": "sms.ui.to_number",
-            "type": "tel",
-            "required": true,
-            "colSpan": 1,
-            "placeholder": "sms.ui.1234567890"
-          },
-          {
-            "name": "template_id",
-            "label": "sms.ui.template_optional",
-            "type": "relation",
-            "colSpan": 2,
-            "relation": {
-              "dataSource": "/api/data/sms_templates?limit=500",
-              "dataPath": "records",
-              "valueKey": "id",
-              "labelKey": "name"
-            }
-          },
-          {
-            "name": "body",
-            "label": "sms.ui.message_body",
-            "type": "textarea",
-            "rows": 3,
-            "colSpan": 2
-          },
-          {
-            "name": "variables",
-            "label": "sms.ui.variables_json",
-            "type": "json",
-            "mono": true,
-            "rows": 3,
-            "colSpan": 2,
-            "default": "{}"
-          }
-        ]
-      }
+      "sort": "-created_at",
+      "actions": [
+        {
+          "action": "send",
+          "tone": "info",
+          "label": "common.new",
+          "prompt": [
+            "provider",
+            "to",
+            "template_id",
+            "body",
+            "variables"
+          ]
+        }
+      ]
     },
     {
-      "id": "templates",
-      "label": "sms.tab.templates",
-      "icon": "FileText",
-      "dataSource": "/api/data/sms_templates?sort=name&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "sms_templates",
+      "title": "sms.tab.templates",
+      "fields": [
         {
-          "key": "name",
+          "field": "name",
           "label": "common.col.name"
         },
         {
-          "key": "body",
+          "field": "body",
           "label": "sms.col.body"
         },
         {
-          "key": "provider",
+          "field": "provider",
           "label": "sms.col.provider"
         }
       ],
-      "rowActions": [
-        {
-          "id": "edit",
-          "kind": "edit",
-          "label": "common.edit"
-        },
-        {
-          "id": "delete",
-          "icon": "Trash2",
-          "variant": "text-error",
-          "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/api/data/sms_templates/{id}",
-          "confirm": "sms.confirmDeleteTemplate"
-        }
-      ],
-      "form": {
-        "endpoint": "/api/data/sms_templates",
-        "fields": [
-          {
-            "name": "name",
-            "label": "common.col.name",
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "provider",
-            "label": "sms.col.provider",
-            "type": "select",
-            "colSpan": 1,
-            "default": "twilio",
-            "options": [
-              {
-                "value": "twilio",
-                "label": "sms.ui.twilio"
-              },
-              {
-                "value": "vonage",
-                "label": "sms.ui.vonage"
-              }
-            ]
-          },
-          {
-            "name": "body",
-            "label": "sms.placeholder.body",
-            "type": "textarea",
-            "required": true,
-            "rows": 3,
-            "colSpan": 2
-          }
-        ]
-      }
+      "sort": "name",
+      "edit": true,
+      "delete": true,
+      "create": true
     },
     {
-      "id": "settings",
-      "label": "sms.tab.settings",
-      "icon": "Settings",
-      "dataSource": "/api/data/sms_settings?limit=1",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "sms_settings",
+      "title": "sms.tab.settings",
+      "fields": [
         {
-          "key": "twilio_account_sid",
+          "field": "twilio_account_sid",
           "label": "sms.settings.accountSid",
-          "type": "mono"
+          "display": "mono"
         },
         {
-          "key": "twilio_from_number",
+          "field": "twilio_from_number",
           "label": "sms.settings.twilioFrom",
-          "type": "mono"
+          "display": "mono"
         },
         {
-          "key": "vonage_api_key",
+          "field": "vonage_api_key",
           "label": "sms.settings.apiKey",
-          "type": "mono"
+          "display": "mono"
         },
         {
-          "key": "vonage_from_number",
+          "field": "vonage_from_number",
           "label": "sms.settings.vonageFrom",
-          "type": "mono"
+          "display": "mono"
         }
       ],
-      "rowActions": [
-        {
-          "id": "edit",
-          "kind": "edit",
-          "label": "common.edit"
-        }
-      ],
-      "form": {
-        "endpoint": "/api/data/sms_settings",
-        "sections": [
-          {
-            "title": "sms.ui.twilio",
-            "fields": [
-              {
-                "name": "twilio_account_sid",
-                "label": "sms.settings.accountSid",
-                "mono": true,
-                "colSpan": 1
-              },
-              {
-                "name": "twilio_from_number",
-                "label": "sms.settings.twilioFrom",
-                "mono": true,
-                "colSpan": 1
-              },
-              {
-                "name": "twilio_auth_token",
-                "label": "sms.settings.authToken",
-                "type": "password",
-                "colSpan": 2,
-                "placeholder": "sms.settings.leaveBlank"
-              },
-              {
-                "name": "twilio_webhook_url",
-                "label": "sms.settings.webhookUrl",
-                "mono": true,
-                "colSpan": 2,
-                "placeholder": "sms.settings.webhookHint"
-              }
-            ]
-          },
-          {
-            "title": "sms.ui.vonage",
-            "fields": [
-              {
-                "name": "vonage_api_key",
-                "label": "sms.settings.apiKey",
-                "mono": true,
-                "colSpan": 1
-              },
-              {
-                "name": "vonage_from_number",
-                "label": "sms.settings.vonageFrom",
-                "mono": true,
-                "colSpan": 1
-              },
-              {
-                "name": "vonage_api_secret",
-                "label": "sms.settings.apiSecret",
-                "type": "password",
-                "colSpan": 2,
-                "placeholder": "sms.settings.leaveBlank"
-              }
-            ]
-          }
-        ]
-      }
+      "edit": true,
+      "create": true
     }
   ]
 }

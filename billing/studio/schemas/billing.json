@@ -1,213 +1,113 @@
 {
-  "sduiSchema": 1,
+  "spec": "zveltio.view/2",
   "title": "billing.title",
-  "subtitle": "billing.subtitle",
-  "newLabel": "billing.btn.newPlan",
-  "resources": [
+  "type": "tabs",
+  "items": [
     {
-      "id": "plans",
-      "label": "billing.ui.available_plans",
-      "icon": "CreditCard",
-      "dataSource": "/api/data/billing_plans?sort=price_cents&order=asc&limit=500",
-      "dataPath": "records",
-      "layout": "cards",
-      "card": {
-        "title": "name",
-        "badge": "interval",
-        "subtitle": "price_cents"
-      },
-      "columns": [
+      "type": "list",
+      "collection": "billing_plans",
+      "title": "billing.ui.available_plans",
+      "fields": [
         {
-          "key": "name",
+          "field": "name",
           "label": "common.col.name"
         },
         {
-          "key": "price_cents",
+          "field": "price_cents",
           "label": "common.col.price"
         },
         {
-          "key": "interval",
+          "field": "interval",
           "label": "billing.col.interval"
         },
         {
-          "key": "stripe_price_id",
+          "field": "stripe_price_id",
           "label": "billing.col.stripePrice",
-          "type": "mono"
+          "display": "mono"
         }
       ],
-      "form": {
-        "endpoint": "/api/data/billing_plans",
-        "fields": [
-          {
-            "name": "name",
-            "label": "common.col.name",
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "interval",
-            "label": "billing.col.interval",
-            "type": "select",
-            "colSpan": 1,
-            "default": "month",
-            "options": [
-              {
-                "value": "month",
-                "label": "billing.interval.month"
-              },
-              {
-                "value": "year",
-                "label": "billing.interval.year"
-              }
-            ]
-          },
-          {
-            "name": "price_cents",
-            "label": "billing.form.priceCents",
-            "type": "number",
-            "required": true,
-            "colSpan": 1,
-            "default": 0
-          },
-          {
-            "name": "stripe_price_id",
-            "label": "billing.col.stripePrice",
-            "mono": true,
-            "colSpan": 1
-          },
-          {
-            "name": "limits",
-            "label": "billing.form.limits",
-            "type": "json",
-            "mono": true,
-            "rows": 4,
-            "colSpan": 2
-          }
-        ]
-      },
-      "rowActions": [
-        {
-          "id": "delete",
-          "variant": "text-error",
-          "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/api/data/billing_plans/{id}",
-          "confirm": "ext.confirmDelete"
-        }
-      ]
+      "sort": "price_cents",
+      "present": "cards",
+      "delete": true,
+      "create": true
     },
     {
-      "id": "subscriptions",
-      "label": "billing.tab.subscription",
-      "icon": "Receipt",
-      "dataSource": "/api/data/billing_subscriptions?expand=plan_id&sort=created_at&order=desc&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "billing_subscriptions",
+      "title": "billing.tab.subscription",
+      "fields": [
         {
-          "key": "plan_id_expanded.name",
+          "field": "plan_id",
           "label": "billing.col.plan"
         },
         {
-          "key": "stripe_subscription_id",
+          "field": "stripe_subscription_id",
           "label": "billing.col.stripeSubscription",
-          "type": "mono"
+          "display": "mono"
         },
         {
-          "key": "status",
+          "field": "status",
           "label": "common.col.status",
-          "type": "badge",
-          "badge": {
-            "colors": {
-              "active": "badge-success",
-              "past_due": "badge-warning",
-              "canceled": "badge-error",
-              "trialing": "badge-info",
-              "unpaid": "badge-error",
-              "incomplete": "badge-ghost",
-              "incomplete_expired": "badge-ghost",
-              "paused": "badge-ghost"
-            }
+          "display": "badge",
+          "tones": {
+            "active": "success",
+            "past_due": "warning",
+            "canceled": "danger",
+            "trialing": "info",
+            "unpaid": "danger",
+            "incomplete": "muted",
+            "incomplete_expired": "muted",
+            "paused": "muted"
           }
         },
         {
-          "key": "plan_id_expanded.price_cents",
-          "label": "common.col.price"
+          "field": "current_period_start",
+          "label": "billing.col.periodStart"
         },
         {
-          "key": "current_period_start",
-          "label": "billing.col.periodStart",
-          "type": "date"
-        },
-        {
-          "key": "current_period_end",
-          "label": "billing.col.periodEnd",
-          "type": "date"
+          "field": "current_period_end",
+          "label": "billing.col.periodEnd"
         }
-      ]
+      ],
+      "sort": "-created_at"
     },
     {
-      "id": "usage",
-      "label": "billing.tab.usage",
-      "icon": "BarChart2",
-      "dataSource": "/api/data/billing_usage_events?sort=created_at&order=desc&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "billing_usage_events",
+      "title": "billing.tab.usage",
+      "fields": [
         {
-          "key": "event_type",
+          "field": "event_type",
           "label": "billing.col.metric",
-          "type": "mono"
+          "display": "mono"
         },
         {
-          "key": "collection",
+          "field": "collection",
           "label": "billing.col.collection"
         },
         {
-          "key": "quantity",
+          "field": "quantity",
           "label": "billing.col.quantity"
         },
         {
-          "key": "created_at",
-          "label": "common.col.date",
-          "type": "date"
+          "field": "created_at",
+          "label": "common.col.date"
         }
-      ]
+      ],
+      "sort": "-created_at"
     },
     {
-      "id": "settings",
-      "label": "billing.tab.settings",
-      "icon": "Settings",
-      "dataSource": "/api/data/billing_settings?limit=1",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "billing_settings",
+      "title": "billing.tab.settings",
+      "fields": [
         {
-          "key": "updated_at",
-          "label": "common.col.date",
-          "type": "date"
+          "field": "updated_at",
+          "label": "common.col.date"
         }
       ],
-      "rowActions": [
-        {
-          "id": "delete",
-          "variant": "text-error",
-          "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/api/data/billing_settings/{id}",
-          "confirm": "ext.confirmDelete"
-        }
-      ],
-      "form": {
-        "endpoint": "/api/data/billing_settings",
-        "fields": [
-          {
-            "name": "stripe_webhook_secret",
-            "label": "billing.form.webhookSecret",
-            "type": "password",
-            "required": true,
-            "mono": true,
-            "colSpan": 2
-          }
-        ]
-      }
+      "delete": true,
+      "create": true
     }
   ]
 }

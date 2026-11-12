@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.0 (2026-11-12)
+
+- feat: the Studio page is a `zveltio.view/2` view (ADR 0042): it names its collections and actions instead of URLs, and Studio draws it from the specification
+- change: an employee shows the first name only, and the status filter is gone (search stays)
+- requires engine 3.0.0-beta.111
+
 ## 2.0.0 (2026-10-30)
 
 - feat!: employees, departments, job positions, employment contracts with their amendments and suspensions, salary history, documents, benefits, emergency contacts, onboarding tasks, review cycles and reviews are collections declared in `schema/collections/`, created and owned by the engine; no SQL migrations

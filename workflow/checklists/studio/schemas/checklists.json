@@ -1,398 +1,209 @@
 {
-  "sduiSchema": 1,
+  "spec": "zveltio.view/2",
   "title": "workflow.checklists.title",
-  "subtitle": "workflow.checklists.pageSubtitle",
-  "newLabel": "workflow.checklists.btn.new",
-  "resources": [
+  "type": "tabs",
+  "items": [
     {
-      "id": "templates",
-      "label": "workflow.checklists.tab.templates",
-      "icon": "ClipboardList",
-      "dataSource": "/api/data/checklist_templates?sort=name&order=asc&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "checklist_templates",
+      "title": "workflow.checklists.tab.templates",
+      "fields": [
         {
-          "key": "name",
+          "field": "name",
           "label": "common.col.name"
         },
         {
-          "key": "description",
+          "field": "description",
           "label": "common.col.description"
         },
         {
-          "key": "collection",
+          "field": "collection",
           "label": "common.col.collection",
-          "type": "mono"
+          "display": "mono"
         },
         {
-          "key": "is_active",
-          "label": "common.col.active",
-          "type": "boolean"
+          "field": "is_active",
+          "label": "common.col.active"
         }
       ],
-      "rowActions": [
-        {
-          "id": "edit",
-          "kind": "edit",
-          "label": "common.edit"
-        }
-      ],
-      "form": {
-        "endpoint": "/api/data/checklist_templates",
-        "fields": [
-          {
-            "name": "name",
-            "label": "common.col.name",
-            "required": true,
-            "colSpan": 2
-          },
-          {
-            "name": "description",
-            "label": "common.col.description",
-            "type": "textarea",
-            "colSpan": 2
-          },
-          {
-            "name": "collection",
-            "label": "common.col.collection",
-            "mono": true,
-            "colSpan": 1
-          },
-          {
-            "name": "is_active",
-            "label": "common.col.active",
-            "type": "boolean",
-            "default": true,
-            "colSpan": 1
-          }
-        ]
-      }
+      "sort": "name",
+      "edit": true,
+      "create": true
     },
     {
-      "id": "templateItems",
-      "label": "workflow.checklists.tab.templateItems",
-      "icon": "ListChecks",
-      "dataSource": "/api/data/checklist_template_items?sort=order_idx&order=asc&limit=500&expand=template_id",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "checklist_template_items",
+      "title": "workflow.checklists.tab.templateItems",
+      "fields": [
         {
-          "key": "template_id_expanded.name",
+          "field": "template_id",
           "label": "workflow.checklists.col.template"
         },
         {
-          "key": "label",
+          "field": "label",
           "label": "common.col.label"
         },
         {
-          "key": "required",
-          "label": "common.required",
-          "type": "boolean"
+          "field": "required",
+          "label": "common.required"
         },
         {
-          "key": "order_idx",
+          "field": "order_idx",
           "label": "common.col.index",
-          "type": "mono"
+          "display": "mono"
         }
       ],
-      "rowActions": [
-        {
-          "id": "edit",
-          "kind": "edit",
-          "label": "common.edit"
-        }
-      ],
-      "form": {
-        "endpoint": "/api/data/checklist_template_items",
-        "fields": [
-          {
-            "name": "template_id",
-            "label": "workflow.checklists.col.template",
-            "type": "relation",
-            "required": true,
-            "colSpan": 2,
-            "relation": {
-              "dataSource": "/api/data/checklist_templates?sort=name&order=asc&limit=500",
-              "dataPath": "records",
-              "valueKey": "id",
-              "labelKey": "name"
-            }
-          },
-          {
-            "name": "label",
-            "label": "common.col.label",
-            "required": true,
-            "colSpan": 2
-          },
-          {
-            "name": "description",
-            "label": "common.col.description",
-            "type": "textarea",
-            "colSpan": 2
-          },
-          {
-            "name": "required",
-            "label": "common.required",
-            "type": "boolean",
-            "default": false,
-            "colSpan": 1
-          },
-          {
-            "name": "order_idx",
-            "label": "common.col.index",
-            "type": "number",
-            "default": 0,
-            "colSpan": 1
-          }
-        ]
-      }
+      "sort": "order_idx",
+      "edit": true,
+      "create": true
     },
     {
-      "id": "checklists",
-      "label": "workflow.checklists.tab.instances",
-      "icon": "BarChart2",
-      "dataSource": "/api/data/checklists?sort=updated_at&order=desc&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "checklists",
+      "title": "workflow.checklists.tab.instances",
+      "fields": [
         {
-          "key": "name",
+          "field": "name",
           "label": "common.col.name"
         },
         {
-          "key": "collection",
+          "field": "collection",
           "label": "common.col.collection",
-          "type": "mono"
+          "display": "mono"
         },
         {
-          "key": "record_id",
+          "field": "record_id",
           "label": "workflow.checklists.col.record",
-          "type": "mono"
+          "display": "mono"
         },
         {
-          "key": "completed_at",
-          "label": "workflow.checklists.col.completed",
-          "type": "date"
+          "field": "completed_at",
+          "label": "workflow.checklists.col.completed"
         },
         {
-          "key": "created_at",
-          "label": "common.col.created",
-          "type": "date"
+          "field": "created_at",
+          "label": "common.col.created"
         }
       ],
+      "sort": "-updated_at",
       "rowActions": [
         {
-          "id": "delete",
-          "icon": "Trash2",
-          "variant": "text-error",
-          "method": "POST",
-          "endpoint": "/ext/workflow/checklists/actions/deleteChecklist",
-          "body": {
-            "id": "{id}"
+          "action": "deleteChecklist",
+          "tone": "danger",
+          "input": {
+            "id": {
+              "$record": "id"
+            }
           },
           "confirm": "workflow.checklists.confirmDelete"
         }
       ],
-      "form": {
-        "endpoint": "/ext/workflow/checklists/actions/attachChecklist",
-        "fields": [
-          {
-            "name": "name",
-            "label": "common.col.name",
-            "required": true,
-            "colSpan": 2
-          },
-          {
-            "name": "template_id",
-            "label": "workflow.checklists.col.template",
-            "type": "relation",
-            "required": true,
-            "colSpan": 2,
-            "relation": {
-              "dataSource": "/api/data/checklist_templates?is_active[eq]=true&sort=name&order=asc&limit=500",
-              "dataPath": "records",
-              "valueKey": "id",
-              "labelKey": "name"
-            }
-          },
-          {
-            "name": "collection",
-            "label": "common.col.collection",
-            "mono": true,
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "record_id",
-            "label": "workflow.checklists.col.record",
-            "mono": true,
-            "required": true,
-            "colSpan": 1
-          }
-        ]
-      }
+      "actions": [
+        {
+          "action": "attachChecklist",
+          "tone": "info",
+          "label": "workflow.checklists.btn.new",
+          "prompt": [
+            "name",
+            "template_id",
+            "collection",
+            "record_id"
+          ]
+        }
+      ]
     },
     {
-      "id": "items",
-      "label": "workflow.checklists.tab.items",
-      "icon": "CheckSquare",
-      "dataSource": "/api/data/checklist_items?sort=order_idx&order=asc&limit=500&expand=checklist_id",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "checklist_items",
+      "title": "workflow.checklists.tab.items",
+      "fields": [
         {
-          "key": "checklist_id_expanded.name",
+          "field": "checklist_id",
           "label": "workflow.checklists.col.checklist"
         },
         {
-          "key": "label",
+          "field": "label",
           "label": "common.col.label"
         },
         {
-          "key": "required",
-          "label": "common.required",
-          "type": "boolean"
+          "field": "required",
+          "label": "common.required"
         },
         {
-          "key": "checked",
-          "label": "workflow.checklists.col.checked",
-          "type": "boolean"
+          "field": "checked",
+          "label": "workflow.checklists.col.checked"
         },
         {
-          "key": "due_at",
-          "label": "workflow.checklists.col.due",
-          "type": "date"
+          "field": "due_at",
+          "label": "workflow.checklists.col.due"
         }
       ],
+      "sort": "order_idx",
       "rowActions": [
         {
-          "id": "check",
-          "icon": "Check",
+          "action": "updateItem",
           "label": "workflow.checklists.action.check",
-          "method": "POST",
-          "endpoint": "/ext/workflow/checklists/actions/updateItem",
-          "body": {
-            "id": "{id}",
+          "input": {
+            "id": {
+              "$record": "id"
+            },
             "checked": true
           }
         },
         {
-          "id": "uncheck",
-          "icon": "Undo2",
+          "action": "updateItem",
           "label": "workflow.checklists.action.uncheck",
-          "method": "POST",
-          "endpoint": "/ext/workflow/checklists/actions/updateItem",
-          "body": {
-            "id": "{id}",
+          "input": {
+            "id": {
+              "$record": "id"
+            },
             "checked": false
           }
         }
       ]
     },
     {
-      "id": "recurrences",
-      "label": "workflow.checklists.tab.recurrences",
-      "icon": "Repeat",
-      "dataSource": "/api/data/checklist_recurrences?is_active[eq]=true&sort=next_run_at&order=asc&limit=500&expand=template_id",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "checklist_recurrences",
+      "title": "workflow.checklists.tab.recurrences",
+      "fields": [
         {
-          "key": "template_id_expanded.name",
+          "field": "template_id",
           "label": "workflow.checklists.col.template"
         },
         {
-          "key": "collection",
+          "field": "collection",
           "label": "common.col.collection",
-          "type": "mono"
+          "display": "mono"
         },
         {
-          "key": "record_id",
+          "field": "record_id",
           "label": "workflow.checklists.col.record",
-          "type": "mono"
+          "display": "mono"
         },
         {
-          "key": "frequency",
+          "field": "frequency",
           "label": "workflow.checklists.col.frequency"
         },
         {
-          "key": "next_run_at",
-          "label": "workflow.checklists.col.nextRun",
-          "type": "date"
+          "field": "next_run_at",
+          "label": "workflow.checklists.col.nextRun"
         },
         {
-          "key": "is_active",
-          "label": "common.col.active",
-          "type": "boolean"
+          "field": "is_active",
+          "label": "common.col.active"
         }
       ],
-      "rowActions": [
+      "filter": [
         {
-          "id": "edit",
-          "kind": "edit",
-          "label": "common.edit"
+          "field": "is_active",
+          "op": "eq",
+          "value": true
         }
       ],
-      "form": {
-        "endpoint": "/api/data/checklist_recurrences",
-        "fields": [
-          {
-            "name": "template_id",
-            "label": "workflow.checklists.col.template",
-            "type": "relation",
-            "required": true,
-            "colSpan": 2,
-            "relation": {
-              "dataSource": "/api/data/checklist_templates?is_active[eq]=true&sort=name&order=asc&limit=500",
-              "dataPath": "records",
-              "valueKey": "id",
-              "labelKey": "name"
-            }
-          },
-          {
-            "name": "collection",
-            "label": "common.col.collection",
-            "mono": true,
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "record_id",
-            "label": "workflow.checklists.col.record",
-            "mono": true,
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "frequency",
-            "label": "workflow.checklists.col.frequency",
-            "type": "select",
-            "default": "weekly",
-            "colSpan": 1,
-            "options": [
-              {
-                "value": "daily",
-                "label": "workflow.checklists.ui.daily"
-              },
-              {
-                "value": "weekly",
-                "label": "workflow.checklists.ui.weekly"
-              },
-              {
-                "value": "monthly",
-                "label": "workflow.checklists.ui.monthly"
-              },
-              {
-                "value": "quarterly",
-                "label": "workflow.checklists.ui.quarterly"
-              }
-            ]
-          },
-          {
-            "name": "next_run_at",
-            "label": "workflow.checklists.col.nextRun",
-            "type": "datetime",
-            "required": true,
-            "colSpan": 1
-          }
-        ]
-      }
+      "sort": "next_run_at",
+      "edit": true,
+      "create": true
     }
   ]
 }

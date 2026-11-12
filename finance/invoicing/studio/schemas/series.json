@@ -1,132 +1,56 @@
 {
-  "sduiSchema": 1,
+  "spec": "zveltio.view/2",
   "title": "invoicing.series.title",
-  "subtitle": "invoicing.series.subtitle",
-  "newLabel": "invoicing.series.new",
-  "resources": [
+  "type": "list",
+  "collection": "document_series",
+  "fields": [
     {
-      "id": "series",
-      "dataSource": "/api/data/document_series?sort=doc_type&limit=500",
-      "dataPath": "records",
-      "columns": [
-        {
-          "key": "doc_type",
-          "label": "invoicing.form.docType",
-          "type": "badge",
-          "badge": {
-            "colors": {
-              "invoice": "badge-primary",
-              "proforma": "badge-ghost",
-              "delivery_note": "badge-info",
-              "quote": "badge-accent"
-            },
-            "labels": {
-              "invoice": "invoicing.doc.invoice",
-              "proforma": "invoicing.doc.proforma",
-              "delivery_note": "invoicing.doc.deliveryNote",
-              "quote": "invoicing.doc.quote"
-            }
-          }
-        },
-        {
-          "key": "series",
-          "label": "invoicing.form.series"
-        },
-        {
-          "key": "next_number",
-          "label": "invoicing.series.next"
-        },
-        {
-          "key": "padding",
-          "label": "invoicing.series.padding"
-        },
-        {
-          "key": "is_default",
-          "label": "invoicing.series.isDefault",
-          "type": "badge",
-          "badge": {
-            "colors": {
-              "true": "badge-success",
-              "false": "badge-ghost"
-            },
-            "labels": {
-              "true": "invoicing.series.yes",
-              "false": "invoicing.series.no"
-            }
-          }
-        }
-      ],
-      "rowActions": [
-        {
-          "id": "delete",
-          "icon": "Trash2",
-          "label": "common.delete",
-          "variant": "text-error",
-          "method": "DELETE",
-          "endpoint": "/api/data/document_series/{id}",
-          "confirm": "invoicing.series.confirmDelete"
-        }
-      ],
-      "form": {
-        "endpoint": "/ext/finance/invoicing/actions/createSeries",
-        "fields": [
-          {
-            "name": "doc_type",
-            "label": "invoicing.form.docType",
-            "type": "select",
-            "colSpan": 1,
-            "default": "invoice",
-            "options": [
-              {
-                "value": "invoice",
-                "label": "invoicing.doc.invoice"
-              },
-              {
-                "value": "proforma",
-                "label": "invoicing.doc.proforma"
-              },
-              {
-                "value": "delivery_note",
-                "label": "invoicing.doc.deliveryNote"
-              },
-              {
-                "value": "quote",
-                "label": "invoicing.doc.quote"
-              },
-              {
-                "value": "credit_note",
-                "label": "invoicing.doc.creditNote"
-              }
-            ]
-          },
-          {
-            "name": "series",
-            "label": "invoicing.form.series",
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "next_number",
-            "label": "invoicing.series.next",
-            "type": "number",
-            "default": 1,
-            "colSpan": 1
-          },
-          {
-            "name": "padding",
-            "label": "invoicing.series.padding",
-            "type": "number",
-            "default": 4,
-            "colSpan": 1
-          },
-          {
-            "name": "is_default",
-            "label": "invoicing.series.isDefault",
-            "type": "boolean",
-            "colSpan": 2
-          }
-        ]
+      "field": "doc_type",
+      "label": "invoicing.form.docType",
+      "display": "badge",
+      "tones": {
+        "invoice": "info",
+        "proforma": "muted",
+        "delivery_note": "info",
+        "quote": "info"
       }
+    },
+    {
+      "field": "series",
+      "label": "invoicing.form.series"
+    },
+    {
+      "field": "next_number",
+      "label": "invoicing.series.next"
+    },
+    {
+      "field": "padding",
+      "label": "invoicing.series.padding"
+    },
+    {
+      "field": "is_default",
+      "label": "invoicing.series.isDefault",
+      "display": "badge",
+      "tones": {
+        "true": "success",
+        "false": "muted"
+      }
+    }
+  ],
+  "sort": "doc_type",
+  "delete": true,
+  "actions": [
+    {
+      "action": "createSeries",
+      "tone": "info",
+      "label": "invoicing.series.new",
+      "prompt": [
+        "doc_type",
+        "series",
+        "next_number",
+        "padding",
+        "is_default"
+      ]
     }
   ]
 }

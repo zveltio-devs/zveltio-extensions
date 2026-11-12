@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.2.0 (2026-11-12)
+
+- feat: the Studio page is a `zveltio.view/2` view (ADR 0042): it names its collections and actions instead of URLs, and Studio draws it from the specification
+- requires engine 3.0.0-beta.111
+
 ## 2.1.0 (2026-10-31)
 
 - feat: disposing of an asset that has an asset account closes it in the ledger through accounting's `createEntry` and `postEntry`, in the same transaction: accumulated depreciation and the disposal loss account (the part not yet depreciated) debited, the asset account credited at cost. The entry is linked on `disposal_entry_id`. Proceeds of a sale are invoiced, not posted here. An asset without an asset account is disposed in the register only, as before

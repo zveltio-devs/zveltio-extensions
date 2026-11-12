@@ -1,338 +1,181 @@
 {
-  "sduiSchema": 1,
+  "spec": "zveltio.view/2",
   "title": "workflow.approvals.title",
-  "subtitle": "workflow.approvals.subtitle",
-  "resources": [
+  "type": "tabs",
+  "items": [
     {
-      "id": "requests",
-      "dataSource": "/api/data/approval_requests?expand=workflow_id,current_step_id&sort=created_at&order=desc&limit=500",
-      "dataPath": "records",
-      "filters": [
+      "type": "list",
+      "collection": "approval_requests",
+      "title": "workflow.approvals.tab.requests",
+      "fields": [
         {
-          "param": "status",
-          "options": [
-            {
-              "value": "",
-              "label": "common.filter.all"
+          "field": "workflow_id",
+          "label": "workflow.approvals.col.workflow"
+        },
+        {
+          "field": "collection",
+          "label": "common.col.collection",
+          "display": "mono"
+        },
+        {
+          "field": "record_id",
+          "label": "workflow.approvals.col.record",
+          "display": "mono"
+        },
+        {
+          "field": "current_step_id",
+          "label": "workflow.approvals.col.step"
+        },
+        {
+          "field": "status",
+          "label": "common.col.status",
+          "display": "badge",
+          "tones": {
+            "pending": "warning",
+            "approved": "success",
+            "rejected": "danger",
+            "cancelled": "muted"
+          }
+        },
+        {
+          "field": "created_at",
+          "label": "common.col.date"
+        },
+        {
+          "field": "priority",
+          "label": "common.col.priority"
+        }
+      ],
+      "sort": "-created_at",
+      "rowActions": [
+        {
+          "action": "decide",
+          "label": "common.approve",
+          "tone": "success",
+          "input": {
+            "id": {
+              "$record": "id"
             },
+            "decision": "approved"
+          },
+          "prompt": [
+            "comment"
+          ],
+          "when": [
             {
-              "value": "pending",
-              "label": "common.status.pending"
+              "field": "status",
+              "op": "eq",
+              "value": "pending"
+            }
+          ]
+        },
+        {
+          "action": "decide",
+          "label": "common.reject",
+          "tone": "danger",
+          "input": {
+            "id": {
+              "$record": "id"
             },
+            "decision": "rejected"
+          },
+          "prompt": [
+            "comment"
+          ],
+          "when": [
             {
-              "value": "approved",
-              "label": "common.status.approved"
-            },
+              "field": "status",
+              "op": "eq",
+              "value": "pending"
+            }
+          ]
+        },
+        {
+          "action": "cancel",
+          "label": "workflow.approvals.cancelRequest",
+          "input": {
+            "id": {
+              "$record": "id"
+            }
+          },
+          "confirm": "workflow.approvals.confirmCancel",
+          "when": [
             {
-              "value": "rejected",
-              "label": "common.status.rejected"
-            },
-            {
-              "value": "cancelled",
-              "label": "common.status.cancelled"
+              "field": "status",
+              "op": "eq",
+              "value": "pending"
             }
           ]
         }
       ],
-      "columns": [
+      "actions": [
         {
-          "key": "workflow_id_expanded.name",
-          "label": "workflow.approvals.col.workflow"
-        },
-        {
-          "key": "collection",
-          "label": "common.col.collection",
-          "type": "mono"
-        },
-        {
-          "key": "record_id",
-          "label": "workflow.approvals.col.record",
-          "type": "mono"
-        },
-        {
-          "key": "current_step_id_expanded.name",
-          "label": "workflow.approvals.col.step"
-        },
-        {
-          "key": "status",
-          "label": "common.col.status",
-          "type": "badge",
-          "badge": {
-            "colors": {
-              "pending": "badge-warning",
-              "approved": "badge-success",
-              "rejected": "badge-error",
-              "cancelled": "badge-ghost"
-            }
-          }
-        },
-        {
-          "key": "created_at",
-          "label": "common.col.date",
-          "type": "date"
-        },
-        {
-          "key": "priority",
-          "label": "common.col.priority"
+          "action": "requestApproval",
+          "tone": "info",
+          "label": "workflow.approvals.btn.newRequest",
+          "prompt": [
+            "workflow_id",
+            "collection",
+            "record_id"
+          ]
         }
-      ],
-      "rowActions": [
-        {
-          "id": "approve",
-          "icon": "CheckCircle",
-          "variant": "text-success",
-          "label": "common.approve",
-          "method": "POST",
-          "endpoint": "/ext/workflow/approvals/actions/decide",
-          "body": {
-            "id": "{id}",
-            "decision": "approved"
-          },
-          "visibleWhen": {
-            "field": "status",
-            "equals": "pending"
-          },
-          "prompt": {
-            "title": "common.approve",
-            "submitLabel": "common.approve",
-            "fields": [
-              {
-                "name": "comment",
-                "label": "workflow.approvals.comment",
-                "type": "textarea",
-                "rows": 3
-              }
-            ]
-          }
-        },
-        {
-          "id": "reject",
-          "icon": "XCircle",
-          "variant": "text-error",
-          "label": "common.reject",
-          "method": "POST",
-          "endpoint": "/ext/workflow/approvals/actions/decide",
-          "body": {
-            "id": "{id}",
-            "decision": "rejected"
-          },
-          "visibleWhen": {
-            "field": "status",
-            "equals": "pending"
-          },
-          "prompt": {
-            "title": "common.reject",
-            "submitLabel": "common.reject",
-            "fields": [
-              {
-                "name": "comment",
-                "label": "workflow.approvals.comment",
-                "type": "textarea",
-                "rows": 3,
-                "required": true
-              }
-            ]
-          }
-        },
-        {
-          "id": "cancel",
-          "icon": "Ban",
-          "label": "workflow.approvals.cancelRequest",
-          "method": "POST",
-          "endpoint": "/ext/workflow/approvals/actions/cancel",
-          "confirm": "workflow.approvals.confirmCancel",
-          "visibleWhen": {
-            "field": "status",
-            "equals": "pending"
-          },
-          "body": {
-            "id": "{id}"
-          }
-        }
-      ],
-      "label": "workflow.approvals.tab.requests",
-      "form": {
-        "endpoint": "/ext/workflow/approvals/actions/requestApproval",
-        "fields": [
-          {
-            "name": "workflow_id",
-            "label": "workflow.approvals.col.workflow",
-            "type": "relation",
-            "required": true,
-            "colSpan": 2,
-            "relation": {
-              "dataSource": "/api/data/approval_workflows?is_active[eq]=true&sort=name&order=asc&limit=500",
-              "dataPath": "records",
-              "valueKey": "id",
-              "labelKey": "name"
-            }
-          },
-          {
-            "name": "collection",
-            "label": "common.col.collection",
-            "mono": true,
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "record_id",
-            "label": "workflow.approvals.col.record",
-            "mono": true,
-            "required": true,
-            "colSpan": 1
-          }
-        ]
-      }
+      ]
     },
     {
-      "id": "workflows",
-      "label": "workflow.approvals.tab.workflows",
-      "icon": "GitBranch",
-      "dataSource": "/api/data/approval_workflows?sort=name&order=asc&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "approval_workflows",
+      "title": "workflow.approvals.tab.workflows",
+      "fields": [
         {
-          "key": "name",
+          "field": "name",
           "label": "common.col.name"
         },
         {
-          "key": "collection",
+          "field": "collection",
           "label": "common.col.collection",
-          "type": "mono"
+          "display": "mono"
         },
         {
-          "key": "is_active",
-          "label": "common.col.active",
-          "type": "boolean"
+          "field": "is_active",
+          "label": "common.col.active"
         }
       ],
-      "rowActions": [
-        {
-          "id": "edit",
-          "kind": "edit",
-          "label": "common.edit"
-        }
-      ],
-      "form": {
-        "endpoint": "/api/data/approval_workflows",
-        "fields": [
-          {
-            "name": "name",
-            "label": "common.col.name",
-            "required": true,
-            "colSpan": 2
-          },
-          {
-            "name": "description",
-            "label": "common.col.description",
-            "type": "textarea",
-            "colSpan": 2
-          },
-          {
-            "name": "collection",
-            "label": "common.col.collection",
-            "mono": true,
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "is_active",
-            "label": "common.col.active",
-            "type": "boolean",
-            "default": true,
-            "colSpan": 1
-          }
-        ]
-      }
+      "sort": "name",
+      "edit": true,
+      "create": true
     },
     {
-      "id": "steps",
-      "label": "workflow.approvals.tab.steps",
-      "icon": "ListOrdered",
-      "dataSource": "/api/data/approval_steps?expand=workflow_id&sort=step_order&order=asc&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "approval_steps",
+      "title": "workflow.approvals.tab.steps",
+      "fields": [
         {
-          "key": "workflow_id_expanded.name",
+          "field": "workflow_id",
           "label": "workflow.approvals.col.workflow"
         },
         {
-          "key": "step_order",
+          "field": "step_order",
           "label": "common.col.index",
-          "type": "mono"
+          "display": "mono"
         },
         {
-          "key": "name",
+          "field": "name",
           "label": "common.col.name"
         },
         {
-          "key": "approver_role",
+          "field": "approver_role",
           "label": "workflow.approvals.col.approverRole",
-          "type": "mono"
+          "display": "mono"
         },
         {
-          "key": "deadline_hours",
+          "field": "deadline_hours",
           "label": "workflow.approvals.col.deadlineHours",
-          "type": "mono"
+          "display": "mono"
         }
       ],
-      "rowActions": [
-        {
-          "id": "edit",
-          "kind": "edit",
-          "label": "common.edit"
-        }
-      ],
-      "form": {
-        "endpoint": "/api/data/approval_steps",
-        "fields": [
-          {
-            "name": "workflow_id",
-            "label": "workflow.approvals.col.workflow",
-            "type": "relation",
-            "required": true,
-            "colSpan": 2,
-            "relation": {
-              "dataSource": "/api/data/approval_workflows?sort=name&order=asc&limit=500",
-              "dataPath": "records",
-              "valueKey": "id",
-              "labelKey": "name"
-            }
-          },
-          {
-            "name": "step_order",
-            "label": "common.col.index",
-            "type": "number",
-            "default": 0,
-            "colSpan": 1
-          },
-          {
-            "name": "name",
-            "label": "common.col.name",
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "approver_role",
-            "label": "workflow.approvals.col.approverRole",
-            "mono": true,
-            "colSpan": 1
-          },
-          {
-            "name": "approver_user_id",
-            "label": "workflow.approvals.col.approverUser",
-            "mono": true,
-            "colSpan": 1
-          },
-          {
-            "name": "deadline_hours",
-            "label": "workflow.approvals.col.deadlineHours",
-            "type": "number",
-            "colSpan": 1
-          }
-        ]
-      }
+      "sort": "step_order",
+      "edit": true,
+      "create": true
     }
-  ],
-  "newLabel": "workflow.approvals.btn.newRequest"
+  ]
 }

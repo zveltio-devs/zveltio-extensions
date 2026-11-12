@@ -1,384 +1,230 @@
 {
-  "sduiSchema": 1,
+  "spec": "zveltio.view/2",
   "title": "finance.subscriptions.title",
-  "subtitle": "finance.subscriptions.subtitle",
-  "newLabel": "finance.subscriptions.btn.newSubscriber",
-  "resources": [
+  "type": "tabs",
+  "items": [
     {
-      "id": "subscribers",
-      "label": "finance.subscriptions.tab.subscribers",
-      "dataSource": "/api/data/subscribers?sort=created_at&order=desc&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "subscribers",
+      "title": "finance.subscriptions.tab.subscribers",
+      "fields": [
         {
-          "key": "name",
-          "label": "finance.subscriptions.col.subscriber",
-          "secondary": "email"
+          "field": "name",
+          "label": "finance.subscriptions.col.subscriber"
         },
         {
-          "key": "current_period_start",
-          "label": "finance.subscriptions.col.periodStart",
-          "type": "date"
+          "field": "current_period_start",
+          "label": "finance.subscriptions.col.periodStart"
         },
         {
-          "key": "current_period_end",
-          "label": "finance.subscriptions.col.nextBill",
-          "type": "date"
+          "field": "current_period_end",
+          "label": "finance.subscriptions.col.nextBill"
         },
         {
-          "key": "status",
+          "field": "status",
           "label": "common.col.status",
-          "type": "badge",
-          "badge": {
-            "colors": {
-              "active": "badge-success",
-              "trialing": "badge-info",
-              "past_due": "badge-warning",
-              "cancelled": "badge-error",
-              "open": "badge-warning",
-              "paid": "badge-success"
-            }
+          "display": "badge",
+          "tones": {
+            "active": "success",
+            "trialing": "info",
+            "past_due": "warning",
+            "cancelled": "danger",
+            "open": "warning",
+            "paid": "success"
           }
         },
         {
-          "key": "cancel_at_period_end",
-          "label": "finance.subscriptions.col.cancelling",
-          "type": "boolean"
+          "field": "cancel_at_period_end",
+          "label": "finance.subscriptions.col.cancelling"
         }
       ],
+      "sort": "-created_at",
+      "edit": true,
       "rowActions": [
         {
-          "id": "edit",
-          "kind": "edit",
-          "label": "common.edit"
-        },
-        {
-          "id": "invoice",
-          "icon": "FileText",
+          "action": "issueInvoice",
           "label": "finance.subscriptions.action.invoice",
-          "method": "POST",
-          "endpoint": "/ext/finance/subscriptions/actions/issueInvoice",
-          "body": {
-            "id": "{id}"
+          "input": {
+            "id": {
+              "$record": "id"
+            }
           }
         },
         {
-          "id": "changePlan",
-          "icon": "ArrowLeftRight",
+          "action": "changePlan",
           "label": "finance.subscriptions.action.changePlan",
-          "method": "POST",
-          "endpoint": "/ext/finance/subscriptions/actions/changePlan",
-          "prompt": {
-            "title": "finance.subscriptions.action.changePlan",
-            "submitLabel": "finance.subscriptions.action.changePlan",
-            "fields": [
-              {
-                "name": "plan_id",
-                "label": "finance.subscriptions.col.plan",
-                "type": "relation",
-                "required": true,
-                "relation": {
-                  "dataSource": "/api/data/subscription_plans?is_active[eq]=true&sort=name&order=asc&limit=500",
-                  "dataPath": "records",
-                  "valueKey": "id",
-                  "labelKey": "name"
-                }
-              },
-              {
-                "name": "reason",
-                "label": "finance.subscriptions.col.reason",
-                "type": "text"
-              }
-            ]
+          "input": {
+            "id": {
+              "$record": "id"
+            }
           },
-          "body": {
-            "id": "{id}"
-          }
+          "prompt": [
+            "plan_id",
+            "reason"
+          ]
         },
         {
-          "id": "usage",
-          "icon": "Gauge",
+          "action": "recordUsage",
           "label": "finance.subscriptions.action.usage",
-          "method": "POST",
-          "endpoint": "/ext/finance/subscriptions/actions/recordUsage",
-          "prompt": {
-            "title": "finance.subscriptions.action.usage",
-            "submitLabel": "finance.subscriptions.action.usage",
-            "fields": [
-              {
-                "name": "metric_name",
-                "label": "finance.subscriptions.col.metric",
-                "type": "text",
-                "required": true
-              },
-              {
-                "name": "quantity",
-                "label": "finance.subscriptions.col.quantity",
-                "type": "number",
-                "required": true
-              }
-            ]
+          "input": {
+            "id": {
+              "$record": "id"
+            }
           },
-          "body": {
-            "id": "{id}"
-          }
+          "prompt": [
+            "metric_name",
+            "quantity"
+          ]
         },
         {
-          "id": "cancelAtPeriodEnd",
-          "icon": "CalendarX",
+          "action": "cancel",
           "label": "finance.subscriptions.action.cancelAtPeriodEnd",
-          "method": "POST",
-          "endpoint": "/ext/finance/subscriptions/actions/cancel",
-          "visibleWhen": {
-            "field": "cancel_at_period_end",
-            "equals": false
-          },
-          "body": {
-            "id": "{id}",
+          "input": {
+            "id": {
+              "$record": "id"
+            },
             "at_period_end": true
-          }
+          },
+          "when": [
+            {
+              "field": "cancel_at_period_end",
+              "op": "eq",
+              "value": false
+            }
+          ]
         },
         {
-          "id": "cancel",
-          "icon": "X",
+          "action": "cancel",
           "label": "finance.subscriptions.action.cancel",
-          "method": "POST",
-          "endpoint": "/ext/finance/subscriptions/actions/cancel",
-          "confirm": "finance.subscriptions.cancelConfirm",
-          "body": {
-            "id": "{id}"
-          }
+          "input": {
+            "id": {
+              "$record": "id"
+            }
+          },
+          "confirm": "finance.subscriptions.cancelConfirm"
         },
         {
-          "id": "reactivate",
-          "icon": "RotateCcw",
+          "action": "reactivate",
           "label": "finance.subscriptions.action.reactivate",
-          "method": "POST",
-          "endpoint": "/ext/finance/subscriptions/actions/reactivate",
-          "body": {
-            "id": "{id}"
+          "input": {
+            "id": {
+              "$record": "id"
+            }
           }
         }
       ],
-      "form": {
-        "endpoint": "/ext/finance/subscriptions/actions/subscribe",
-        "fields": [
-          {
-            "name": "name",
-            "label": "finance.subscriptions.col.subscriber",
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "email",
-            "label": "common.col.email",
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "plan_id",
-            "label": "finance.subscriptions.col.plan",
-            "type": "relation",
-            "required": true,
-            "colSpan": 1,
-            "relation": {
-              "dataSource": "/api/data/subscription_plans?is_active[eq]=true&sort=name&order=asc&limit=500",
-              "dataPath": "records",
-              "valueKey": "id",
-              "labelKey": "name"
-            }
-          },
-          {
-            "name": "start_date",
-            "label": "finance.subscriptions.col.started",
-            "type": "date",
-            "colSpan": 1
-          }
-        ]
-      }
+      "actions": [
+        {
+          "action": "subscribe",
+          "tone": "info",
+          "label": "finance.subscriptions.btn.newSubscriber",
+          "prompt": [
+            "name",
+            "email",
+            "plan_id",
+            "start_date"
+          ]
+        }
+      ]
     },
     {
-      "id": "plans",
-      "label": "finance.subscriptions.tab.plans",
-      "dataSource": "/api/data/subscription_plans?sort=price&order=asc&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "subscription_plans",
+      "title": "finance.subscriptions.tab.plans",
+      "fields": [
         {
-          "key": "name",
+          "field": "name",
           "label": "common.col.name"
         },
         {
-          "key": "interval",
+          "field": "interval",
           "label": "finance.subscriptions.ui.interval"
         },
         {
-          "key": "price",
-          "label": "common.col.price",
-          "type": "currency",
-          "currency": {
-            "codeKey": "currency"
-          }
+          "field": "price",
+          "label": "common.col.price"
         },
         {
-          "key": "trial_days",
+          "field": "trial_days",
           "label": "finance.subscriptions.ui.trial_days"
         },
         {
-          "key": "is_active",
-          "label": "common.col.active",
-          "type": "boolean"
+          "field": "is_active",
+          "label": "common.col.active"
         }
       ],
-      "rowActions": [
-        {
-          "id": "edit",
-          "kind": "edit",
-          "label": "common.edit"
-        }
-      ],
-      "form": {
-        "endpoint": "/api/data/subscription_plans",
-        "fields": [
-          {
-            "name": "name",
-            "label": "finance.subscriptions.col.name",
-            "colSpan": 2,
-            "required": true
-          },
-          {
-            "name": "price",
-            "label": "common.col.price",
-            "type": "number",
-            "colSpan": 1
-          },
-          {
-            "name": "currency",
-            "label": "common.col.currency",
-            "colSpan": 1,
-            "default": "RON"
-          },
-          {
-            "name": "interval",
-            "label": "finance.subscriptions.ui.interval",
-            "type": "select",
-            "colSpan": 1,
-            "default": "monthly",
-            "options": [
-              {
-                "value": "monthly",
-                "label": "finance.subscriptions.ui.monthly"
-              },
-              {
-                "value": "quarterly",
-                "label": "finance.subscriptions.ui.quarterly"
-              },
-              {
-                "value": "yearly",
-                "label": "finance.subscriptions.ui.yearly"
-              }
-            ]
-          },
-          {
-            "name": "trial_days",
-            "label": "finance.subscriptions.ui.trial_days",
-            "type": "number",
-            "colSpan": 1
-          },
-          {
-            "name": "usage_billing",
-            "label": "finance.subscriptions.ui.usage_billing",
-            "type": "boolean",
-            "colSpan": 1
-          },
-          {
-            "name": "usage_unit_price",
-            "label": "finance.subscriptions.ui.usage_unit_price",
-            "type": "number",
-            "colSpan": 1
-          },
-          {
-            "name": "is_active",
-            "label": "common.col.active",
-            "type": "boolean",
-            "colSpan": 1,
-            "default": true
-          }
-        ]
-      }
+      "sort": "price",
+      "edit": true,
+      "create": true
     },
     {
-      "id": "invoices",
-      "label": "finance.subscriptions.tab.invoices",
-      "dataSource": "/api/data/subscription_invoices?sort=created_at&order=desc&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "subscription_invoices",
+      "title": "finance.subscriptions.tab.invoices",
+      "fields": [
         {
-          "key": "period_start",
-          "label": "finance.subscriptions.col.periodStart",
-          "type": "date"
+          "field": "period_start",
+          "label": "finance.subscriptions.col.periodStart"
         },
         {
-          "key": "period_end",
-          "label": "finance.subscriptions.col.periodEnd",
-          "type": "date"
+          "field": "period_end",
+          "label": "finance.subscriptions.col.periodEnd"
         },
         {
-          "key": "total_amount",
-          "label": "common.col.amount",
-          "type": "currency",
-          "currency": {
-            "codeKey": "currency"
-          }
+          "field": "total_amount",
+          "label": "common.col.amount"
         },
         {
-          "key": "due_date",
-          "label": "finance.subscriptions.col.due",
-          "type": "date"
+          "field": "due_date",
+          "label": "finance.subscriptions.col.due"
         },
         {
-          "key": "status",
+          "field": "status",
           "label": "common.col.status",
-          "type": "badge",
-          "badge": {
-            "colors": {
-              "active": "badge-success",
-              "trialing": "badge-info",
-              "past_due": "badge-warning",
-              "cancelled": "badge-error",
-              "open": "badge-warning",
-              "paid": "badge-success"
-            }
+          "display": "badge",
+          "tones": {
+            "active": "success",
+            "trialing": "info",
+            "past_due": "warning",
+            "cancelled": "danger",
+            "open": "warning",
+            "paid": "success"
           }
         }
       ],
+      "sort": "-created_at",
       "rowActions": [
         {
-          "id": "pay",
-          "icon": "Check",
+          "action": "markInvoicePaid",
           "label": "finance.subscriptions.action.pay",
-          "method": "POST",
-          "endpoint": "/ext/finance/subscriptions/actions/markInvoicePaid",
-          "visibleWhen": {
-            "field": "status",
-            "equals": "open"
+          "input": {
+            "id": {
+              "$record": "id"
+            }
           },
-          "body": {
-            "id": "{id}"
-          }
+          "when": [
+            {
+              "field": "status",
+              "op": "eq",
+              "value": "open"
+            }
+          ]
         },
         {
-          "id": "fail",
-          "icon": "AlertTriangle",
+          "action": "recordPaymentFailure",
           "label": "finance.subscriptions.action.fail",
-          "method": "POST",
-          "endpoint": "/ext/finance/subscriptions/actions/recordPaymentFailure",
-          "visibleWhen": {
-            "field": "status",
-            "equals": "open"
+          "input": {
+            "id": {
+              "$record": "id"
+            }
           },
-          "body": {
-            "id": "{id}"
-          }
+          "when": [
+            {
+              "field": "status",
+              "op": "eq",
+              "value": "open"
+            }
+          ]
         }
       ]
     }

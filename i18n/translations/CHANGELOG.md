@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.1.0 (2026-11-12)
+
+- feat: the Studio page is a `zveltio.view/2` view (ADR 0042): it names its collections and actions instead of URLs, and Studio draws it from the specification
+- requires engine 3.0.0-beta.111
+
 ## 2.0.0 (2026-11-02)
 
 - feat!: the register is the `i18n_locales`, `i18n_settings`, `i18n_keys`, `i18n_translations`, `i18n_approvals` and `i18n_glossary` collections, declared in `schema/collections/` and created and owned by the engine; no SQL migrations

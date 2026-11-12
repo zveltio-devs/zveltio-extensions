@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.2.0 (2026-11-12)
+
+- feat: the Studio page is a `zveltio.view/2` view (ADR 0042): it names its collections and actions instead of URLs, and Studio draws it from the specification
+- requires engine 3.0.0-beta.111
+
 ## 2.1.1 (2026-10-31)
 
 - fix: a journal line's `cost_center_id` refuses (`RESTRICT`) instead of clearing: a cost center that no line names deletes again through the data API, and one still named answers the foreign key refusal instead of 409 `written_by_actions`

@@ -1,260 +1,100 @@
 {
-  "sduiSchema": 1,
+  "spec": "zveltio.view/2",
   "title": "ai.title",
-  "subtitle": "ai.subtitle",
-  "newLabel": "common.new",
-  "resources": [
+  "type": "tabs",
+  "items": [
     {
-      "id": "providers",
-      "label": "ai.tab.providers",
-      "icon": "Server",
-      "dataSource": "/api/data/ai_providers?sort=name&limit=200",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "ai_providers",
+      "title": "ai.tab.providers",
+      "fields": [
         {
-          "key": "name",
+          "field": "name",
           "label": "common.col.name"
         },
         {
-          "key": "kind",
+          "field": "kind",
           "label": "ai.provider.kind"
         },
         {
-          "key": "default_model",
+          "field": "default_model",
           "label": "ai.provider.defaultModel",
-          "type": "mono"
+          "display": "mono"
         },
         {
-          "key": "is_default",
-          "label": "ai.provider.isDefault",
-          "type": "boolean"
+          "field": "is_default",
+          "label": "ai.provider.isDefault"
         },
         {
-          "key": "is_active",
-          "label": "ai.provider.active",
-          "type": "boolean"
+          "field": "is_active",
+          "label": "ai.provider.active"
         }
       ],
-      "rowActions": [
-        {
-          "id": "edit",
-          "kind": "edit",
-          "label": "common.edit"
-        },
-        {
-          "id": "delete",
-          "icon": "Trash2",
-          "variant": "text-error",
-          "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/api/data/ai_providers/{id}",
-          "confirm": "ext.confirmDelete"
-        }
-      ],
-      "form": {
-        "endpoint": "/api/data/ai_providers",
-        "fields": [
-          {
-            "name": "name",
-            "label": "common.col.name",
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "kind",
-            "label": "ai.provider.kind",
-            "type": "select",
-            "default": "openai",
-            "colSpan": 1,
-            "options": [
-              {
-                "value": "openai",
-                "label": "ai.provider.openai"
-              },
-              {
-                "value": "anthropic",
-                "label": "ai.provider.anthropic"
-              },
-              {
-                "value": "ollama",
-                "label": "ai.provider.ollama"
-              },
-              {
-                "value": "openai_compatible",
-                "label": "ai.provider.custom"
-              }
-            ]
-          },
-          {
-            "name": "base_url",
-            "label": "ai.provider.baseUrl",
-            "mono": true,
-            "colSpan": 2,
-            "placeholder": "ai.provider.baseUrlHint"
-          },
-          {
-            "name": "api_key",
-            "label": "ai.provider.apiKey",
-            "type": "password",
-            "colSpan": 2,
-            "placeholder": "ai.provider.leaveBlank"
-          },
-          {
-            "name": "default_model",
-            "label": "ai.provider.defaultModel",
-            "mono": true,
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "is_default",
-            "label": "ai.provider.isDefault",
-            "type": "boolean",
-            "default": false,
-            "colSpan": 1
-          },
-          {
-            "name": "is_active",
-            "label": "ai.provider.active",
-            "type": "boolean",
-            "default": true,
-            "colSpan": 1
-          }
-        ]
-      }
+      "sort": "name",
+      "edit": true,
+      "delete": true,
+      "create": true
     },
     {
-      "id": "templates",
-      "label": "ai.tab.templates",
-      "icon": "FileText",
-      "dataSource": "/api/data/ai_prompt_templates?sort=name&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "ai_prompt_templates",
+      "title": "ai.tab.templates",
+      "fields": [
         {
-          "key": "name",
+          "field": "name",
           "label": "common.col.name"
         },
         {
-          "key": "category",
+          "field": "category",
           "label": "common.col.category"
         },
         {
-          "key": "model",
+          "field": "model",
           "label": "ai.provider.defaultModel"
         },
         {
-          "key": "is_active",
-          "label": "ai.provider.active",
-          "type": "boolean"
+          "field": "is_active",
+          "label": "ai.provider.active"
         }
       ],
-      "rowActions": [
-        {
-          "id": "edit",
-          "kind": "edit",
-          "label": "common.edit"
-        },
-        {
-          "id": "delete",
-          "icon": "Trash2",
-          "variant": "text-error",
-          "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/api/data/ai_prompt_templates/{id}",
-          "confirm": "ext.confirmDelete"
-        }
-      ],
-      "form": {
-        "endpoint": "/api/data/ai_prompt_templates",
-        "fields": [
-          {
-            "name": "name",
-            "label": "common.col.name",
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "category",
-            "label": "common.col.category",
-            "default": "general",
-            "colSpan": 1
-          },
-          {
-            "name": "description",
-            "label": "common.col.description",
-            "colSpan": 2
-          },
-          {
-            "name": "system_prompt",
-            "label": "ai.templates.systemPrompt",
-            "type": "textarea",
-            "required": true,
-            "rows": 6,
-            "colSpan": 2
-          },
-          {
-            "name": "model",
-            "label": "ai.provider.defaultModel",
-            "colSpan": 1
-          },
-          {
-            "name": "temperature",
-            "label": "ai.templates.temperature",
-            "type": "number",
-            "colSpan": 1
-          },
-          {
-            "name": "max_tokens",
-            "label": "ai.templates.maxTokens",
-            "type": "number",
-            "colSpan": 1
-          },
-          {
-            "name": "is_active",
-            "label": "ai.provider.active",
-            "type": "boolean",
-            "default": true,
-            "colSpan": 1
-          }
-        ]
-      }
+      "sort": "name",
+      "edit": true,
+      "delete": true,
+      "create": true
     },
     {
-      "id": "usage",
-      "label": "ai.tab.usage",
-      "icon": "History",
-      "dataSource": "/api/data/ai_usage?sort=created_at&order=desc&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "ai_usage",
+      "title": "ai.tab.usage",
+      "fields": [
         {
-          "key": "created_at",
-          "label": "common.col.created",
-          "type": "date"
+          "field": "created_at",
+          "label": "common.col.created"
         },
         {
-          "key": "model",
+          "field": "model",
           "label": "ai.provider.defaultModel",
-          "type": "mono"
+          "display": "mono"
         },
         {
-          "key": "created_by",
+          "field": "created_by",
           "label": "ai.usage.requestedBy",
-          "type": "mono"
+          "display": "mono"
         },
         {
-          "key": "prompt_tokens",
+          "field": "prompt_tokens",
           "label": "ai.usage.promptTokens"
         },
         {
-          "key": "response_tokens",
+          "field": "response_tokens",
           "label": "ai.usage.responseTokens"
         },
         {
-          "key": "latency_ms",
+          "field": "latency_ms",
           "label": "ai.usage.latency"
         }
       ],
-      "readOnlyReason": "usage rows are written by the chat job, one per answer; nobody types them in."
+      "sort": "-created_at"
     }
   ]
 }

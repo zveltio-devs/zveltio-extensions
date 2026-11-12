@@ -1,68 +1,24 @@
 {
-  "sduiSchema": 1,
+  "spec": "zveltio.view/2",
   "title": "developer.graphql.title",
-  "subtitle": "developer.graphql.subtitle",
-  "newLabel": "common.new",
-  "resources": [
+  "type": "list",
+  "collection": "graphql_queries",
+  "fields": [
     {
-      "id": "persisted",
-      "label": "developer.graphql.tab.persisted",
-      "icon": "Save",
-      "dataSource": "/api/data/graphql_queries?sort=name&order=asc&limit=500",
-      "dataPath": "records",
-      "columns": [
-        {
-          "key": "name",
-          "label": "common.col.name",
-          "type": "mono"
-        },
-        {
-          "key": "description",
-          "label": "common.col.description"
-        },
-        {
-          "key": "created_at",
-          "label": "common.col.created",
-          "type": "date"
-        }
-      ],
-      "rowActions": [
-        {
-          "id": "delete",
-          "icon": "Trash2",
-          "variant": "text-error",
-          "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/api/data/graphql_queries/{id}",
-          "confirm": "developer.graphql.confirmDelete"
-        }
-      ],
-      "form": {
-        "endpoint": "/api/data/graphql_queries",
-        "fields": [
-          {
-            "name": "name",
-            "label": "common.col.name",
-            "required": true,
-            "mono": true,
-            "colSpan": 1
-          },
-          {
-            "name": "description",
-            "label": "common.col.description",
-            "colSpan": 2
-          },
-          {
-            "name": "query",
-            "label": "developer.graphql.panel.query",
-            "type": "textarea",
-            "mono": true,
-            "required": true,
-            "rows": 8,
-            "colSpan": 2
-          }
-        ]
-      }
+      "field": "name",
+      "label": "common.col.name",
+      "display": "mono"
+    },
+    {
+      "field": "description",
+      "label": "common.col.description"
+    },
+    {
+      "field": "created_at",
+      "label": "common.col.created"
     }
-  ]
+  ],
+  "sort": "name",
+  "delete": true,
+  "create": true
 }

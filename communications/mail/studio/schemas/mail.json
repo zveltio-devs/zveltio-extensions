@@ -1,523 +1,139 @@
 {
-  "sduiSchema": 1,
+  "spec": "zveltio.view/2",
   "title": "communications.mail.title",
-  "subtitle": "communications.mail.subtitle",
-  "newLabel": "common.new",
-  "resources": [
+  "type": "tabs",
+  "items": [
     {
-      "id": "accounts",
-      "label": "communications.mail.tab.accounts",
-      "icon": "Mail",
-      "dataSource": "/api/data/mail_accounts?sort=name&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "mail_accounts",
+      "title": "communications.mail.tab.accounts",
+      "fields": [
         {
-          "key": "name",
+          "field": "name",
           "label": "common.col.name"
         },
         {
-          "key": "email_address",
+          "field": "email_address",
           "label": "common.col.email"
         },
         {
-          "key": "imap_host",
+          "field": "imap_host",
           "label": "communications.mail.col.host",
-          "type": "mono"
+          "display": "mono"
         },
         {
-          "key": "sync_status",
+          "field": "sync_status",
           "label": "communications.mail.col.syncStatus",
-          "type": "badge"
+          "display": "badge"
         },
         {
-          "key": "last_sync_at",
-          "label": "communications.mail.col.lastSync",
-          "type": "date"
+          "field": "last_sync_at",
+          "label": "communications.mail.col.lastSync"
         },
         {
-          "key": "is_default",
-          "label": "communications.mail.col.default",
-          "type": "boolean"
+          "field": "is_default",
+          "label": "communications.mail.col.default"
         }
       ],
+      "sort": "name",
+      "edit": true,
+      "delete": true,
       "rowActions": [
         {
-          "id": "sync",
-          "icon": "RefreshCw",
+          "action": "sync",
           "label": "common.sync",
-          "method": "POST",
-          "endpoint": "/ext/communications/mail/actions/sync",
-          "body": {
-            "account_id": "{id}"
+          "input": {
+            "account_id": {
+              "$record": "id"
+            }
           }
-        },
-        {
-          "id": "edit",
-          "kind": "edit",
-          "label": "common.edit"
-        },
-        {
-          "id": "delete",
-          "icon": "Trash2",
-          "variant": "text-error",
-          "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/api/data/mail_accounts/{id}",
-          "confirm": "ext.confirmDelete"
         }
       ],
-      "form": {
-        "endpoint": "/api/data/mail_accounts",
-        "sections": [
-          {
-            "title": "communications.mail.tab.accounts",
-            "fields": [
-              {
-                "name": "name",
-                "label": "communications.mail.label.accountName",
-                "required": true,
-                "colSpan": 1
-              },
-              {
-                "name": "email_address",
-                "label": "common.col.email",
-                "type": "email",
-                "required": true,
-                "colSpan": 1
-              },
-              {
-                "name": "display_name",
-                "label": "communications.mail.form.displayName",
-                "colSpan": 1
-              },
-              {
-                "name": "is_active",
-                "label": "communications.mail.col.active",
-                "type": "boolean",
-                "default": true,
-                "colSpan": 1
-              },
-              {
-                "name": "is_default",
-                "label": "communications.mail.label.setDefaultAccount",
-                "type": "boolean",
-                "default": false,
-                "colSpan": 2
-              }
-            ]
-          },
-          {
-            "title": "communications.mail.ui.imapIncoming",
-            "fields": [
-              {
-                "name": "imap_host",
-                "label": "communications.mail.form.imapHost",
-                "mono": true,
-                "required": true,
-                "colSpan": 1,
-                "placeholder": "communications.mail.ui.imap_gmail_com"
-              },
-              {
-                "name": "imap_port",
-                "label": "communications.mail.form.imapPort",
-                "type": "number",
-                "default": 993,
-                "colSpan": 1
-              },
-              {
-                "name": "imap_tls",
-                "label": "communications.mail.form.tls",
-                "type": "select",
-                "default": "implicit",
-                "options": [
-                  {
-                    "value": "implicit",
-                    "label": "communications.mail.tls.implicit"
-                  },
-                  {
-                    "value": "starttls",
-                    "label": "communications.mail.tls.starttls"
-                  },
-                  {
-                    "value": "none",
-                    "label": "communications.mail.tls.none"
-                  }
-                ],
-                "colSpan": 2
-              },
-              {
-                "name": "imap_user",
-                "label": "communications.mail.form.imapUser",
-                "required": true,
-                "colSpan": 1
-              },
-              {
-                "name": "imap_password",
-                "label": "communications.mail.form.imapPassword",
-                "type": "password",
-                "colSpan": 1
-              }
-            ]
-          },
-          {
-            "title": "communications.mail.ui.smtpOutgoing",
-            "fields": [
-              {
-                "name": "smtp_host",
-                "label": "communications.mail.form.smtpHost",
-                "mono": true,
-                "required": true,
-                "colSpan": 1,
-                "placeholder": "communications.mail.ui.smtp_gmail_com"
-              },
-              {
-                "name": "smtp_port",
-                "label": "communications.mail.form.smtpPort",
-                "type": "number",
-                "default": 465,
-                "colSpan": 1
-              },
-              {
-                "name": "smtp_tls",
-                "label": "communications.mail.form.tls",
-                "type": "select",
-                "default": "implicit",
-                "options": [
-                  {
-                    "value": "implicit",
-                    "label": "communications.mail.tls.implicit"
-                  },
-                  {
-                    "value": "starttls",
-                    "label": "communications.mail.tls.starttls"
-                  },
-                  {
-                    "value": "none",
-                    "label": "communications.mail.tls.none"
-                  }
-                ],
-                "colSpan": 2
-              },
-              {
-                "name": "smtp_user",
-                "label": "communications.mail.form.smtpUser",
-                "colSpan": 1,
-                "placeholder": "communications.mail.ui.optional"
-              },
-              {
-                "name": "smtp_password",
-                "label": "communications.mail.form.smtpPassword",
-                "type": "password",
-                "colSpan": 1,
-                "placeholder": "communications.mail.ui.optional"
-              }
-            ]
-          }
-        ]
-      }
+      "create": true
     },
     {
-      "id": "identities",
-      "label": "communications.mail.tab.identities",
-      "icon": "AtSign",
-      "dataSource": "/api/data/mail_identities?sort=email_address&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "mail_identities",
+      "title": "communications.mail.tab.identities",
+      "fields": [
         {
-          "key": "email_address",
+          "field": "email_address",
           "label": "common.col.email"
         },
         {
-          "key": "display_name",
+          "field": "display_name",
           "label": "communications.mail.form.displayName"
         },
         {
-          "key": "is_default",
-          "label": "communications.mail.col.default",
-          "type": "boolean"
+          "field": "is_default",
+          "label": "communications.mail.col.default"
         }
       ],
-      "rowActions": [
-        {
-          "id": "edit",
-          "kind": "edit",
-          "label": "common.edit"
-        },
-        {
-          "id": "delete",
-          "icon": "Trash2",
-          "variant": "text-error",
-          "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/api/data/mail_identities/{id}",
-          "confirm": "ext.confirmDelete"
-        }
-      ],
-      "form": {
-        "endpoint": "/api/data/mail_identities",
-        "fields": [
-          {
-            "name": "account_id",
-            "label": "communications.mail.tab.accounts",
-            "type": "relation",
-            "required": true,
-            "colSpan": 2,
-            "relation": {
-              "dataSource": "/api/data/mail_accounts?sort=name&limit=500",
-              "dataPath": "records",
-              "valueKey": "id",
-              "labelKey": "name"
-            }
-          },
-          {
-            "name": "email_address",
-            "label": "common.col.email",
-            "type": "email",
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "display_name",
-            "label": "communications.mail.form.displayName",
-            "colSpan": 1
-          },
-          {
-            "name": "reply_to",
-            "label": "communications.mail.form.replyTo",
-            "type": "email",
-            "colSpan": 1
-          },
-          {
-            "name": "signature_id",
-            "label": "communications.mail.tab.signatures",
-            "type": "relation",
-            "colSpan": 1,
-            "relation": {
-              "dataSource": "/api/data/mail_signatures?sort=name&limit=500",
-              "dataPath": "records",
-              "valueKey": "id",
-              "labelKey": "name"
-            }
-          },
-          {
-            "name": "is_default",
-            "label": "communications.mail.col.default",
-            "type": "boolean",
-            "default": false,
-            "colSpan": 2
-          }
-        ]
-      }
+      "sort": "email_address",
+      "edit": true,
+      "delete": true,
+      "create": true
     },
     {
-      "id": "signatures",
-      "label": "communications.mail.tab.signatures",
-      "icon": "PenLine",
-      "dataSource": "/api/data/mail_signatures?sort=name&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "mail_signatures",
+      "title": "communications.mail.tab.signatures",
+      "fields": [
         {
-          "key": "name",
+          "field": "name",
           "label": "common.col.name"
         },
         {
-          "key": "is_default",
-          "label": "communications.mail.col.default",
-          "type": "boolean"
+          "field": "is_default",
+          "label": "communications.mail.col.default"
         }
       ],
-      "rowActions": [
-        {
-          "id": "edit",
-          "kind": "edit",
-          "label": "common.edit"
-        },
-        {
-          "id": "delete",
-          "icon": "Trash2",
-          "variant": "text-error",
-          "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/api/data/mail_signatures/{id}",
-          "confirm": "ext.confirmDelete"
-        }
-      ],
-      "form": {
-        "endpoint": "/api/data/mail_signatures",
-        "fields": [
-          {
-            "name": "name",
-            "label": "common.col.name",
-            "required": true,
-            "colSpan": 2
-          },
-          {
-            "name": "body_text",
-            "label": "communications.mail.ui.body",
-            "type": "textarea",
-            "rows": 6,
-            "colSpan": 2
-          },
-          {
-            "name": "is_default",
-            "label": "communications.mail.col.default",
-            "type": "boolean",
-            "default": false,
-            "colSpan": 2
-          }
-        ]
-      }
+      "sort": "name",
+      "edit": true,
+      "delete": true,
+      "create": true
     },
     {
-      "id": "filters",
-      "label": "communications.mail.tab.filters",
-      "icon": "Filter",
-      "dataSource": "/api/data/mail_filters?sort=sort_order&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "mail_filters",
+      "title": "communications.mail.tab.filters",
+      "fields": [
         {
-          "key": "name",
+          "field": "name",
           "label": "common.col.name"
         },
         {
-          "key": "sort_order",
+          "field": "sort_order",
           "label": "communications.mail.form.sortOrder"
         },
         {
-          "key": "is_active",
-          "label": "communications.mail.col.active",
-          "type": "boolean"
+          "field": "is_active",
+          "label": "communications.mail.col.active"
         }
       ],
-      "rowActions": [
-        {
-          "id": "edit",
-          "kind": "edit",
-          "label": "common.edit"
-        },
-        {
-          "id": "delete",
-          "icon": "Trash2",
-          "variant": "text-error",
-          "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/api/data/mail_filters/{id}",
-          "confirm": "ext.confirmDelete"
-        }
-      ],
-      "form": {
-        "endpoint": "/api/data/mail_filters",
-        "fields": [
-          {
-            "name": "account_id",
-            "label": "communications.mail.tab.accounts",
-            "type": "relation",
-            "required": true,
-            "colSpan": 2,
-            "relation": {
-              "dataSource": "/api/data/mail_accounts?sort=name&limit=500",
-              "dataPath": "records",
-              "valueKey": "id",
-              "labelKey": "name"
-            }
-          },
-          {
-            "name": "name",
-            "label": "communications.mail.label.filterName",
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "sort_order",
-            "label": "communications.mail.form.sortOrder",
-            "type": "number",
-            "default": 0,
-            "colSpan": 1
-          },
-          {
-            "name": "is_active",
-            "label": "communications.mail.col.active",
-            "type": "boolean",
-            "default": true,
-            "colSpan": 2
-          },
-          {
-            "name": "conditions",
-            "label": "communications.mail.ui.conditionsAll",
-            "type": "json",
-            "mono": true,
-            "rows": 4,
-            "colSpan": 2,
-            "default": "[{\"field\":\"from\",\"operator\":\"contains\",\"value\":\"newsletter@\"}]"
-          },
-          {
-            "name": "actions",
-            "label": "communications.mail.form.actions",
-            "type": "json",
-            "mono": true,
-            "rows": 3,
-            "colSpan": 2,
-            "default": "[{\"type\":\"move\",\"folder\":\"Newsletters\"}]"
-          }
-        ]
-      }
+      "sort": "sort_order",
+      "edit": true,
+      "delete": true,
+      "create": true
     },
     {
-      "id": "contacts",
-      "label": "communications.mail.tab.contacts",
-      "icon": "BookUser",
-      "dataSource": "/api/data/mail_contacts?sort=email_address&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "mail_contacts",
+      "title": "communications.mail.tab.contacts",
+      "fields": [
         {
-          "key": "email_address",
+          "field": "email_address",
           "label": "common.col.email"
         },
         {
-          "key": "display_name",
+          "field": "display_name",
           "label": "communications.mail.form.displayName"
         }
       ],
-      "rowActions": [
-        {
-          "id": "edit",
-          "kind": "edit",
-          "label": "common.edit"
-        },
-        {
-          "id": "delete",
-          "icon": "Trash2",
-          "variant": "text-error",
-          "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/api/data/mail_contacts/{id}",
-          "confirm": "ext.confirmDelete"
-        }
-      ],
-      "form": {
-        "endpoint": "/api/data/mail_contacts",
-        "fields": [
-          {
-            "name": "email_address",
-            "label": "common.col.email",
-            "type": "email",
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "display_name",
-            "label": "communications.mail.form.displayName",
-            "colSpan": 1
-          },
-          {
-            "name": "notes",
-            "label": "communications.mail.form.notes",
-            "type": "textarea",
-            "rows": 3,
-            "colSpan": 2
-          }
-        ]
-      }
+      "sort": "email_address",
+      "edit": true,
+      "delete": true,
+      "create": true
     }
   ]
 }

@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.2.0 (2026-11-12)
+
+- feat: the Studio page is a `zveltio.view/2` view (ADR 0042): it names its collections and actions instead of URLs, and Studio draws it from the specification
+- requires engine 3.0.0-beta.111
+
 ## 2.1.2 (2026-11-02)
 
 - fix: a first purchase order that loses the race to create the number series answers 409 `series_busy` (retry) instead of 500; it used to read the winner's row on a transaction Postgres had already aborted

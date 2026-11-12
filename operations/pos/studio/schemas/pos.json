@@ -1,102 +1,83 @@
 {
-  "sduiSchema": 1,
+  "spec": "zveltio.view/2",
   "title": "operations.pos.title",
-  "subtitle": "operations.pos.subtitle",
-  "newLabel": "operations.pos.openSession",
-  "resources": [
+  "type": "split",
+  "panes": [
     {
-      "id": "sessions",
-      "dataSource": "/api/data/pos_orders?session_id[eq]={masterId}&sort=created_at&order=desc&limit=500",
-      "dataPath": "records",
-      "master": {
-        "dataSource": "/api/data/pos_sessions?sort=created_at&order=desc&limit=500",
-        "dataPath": "records",
-        "idKey": "id",
-        "titleKey": "status",
-        "subtitle": {
-          "keys": [
-            "created_at"
-          ],
-          "sep": " "
-        },
-        "badgeKey": "status"
-      },
-      "detailActions": [
+      "type": "list",
+      "id": "master",
+      "collection": "pos_sessions",
+      "fields": [
+        "status",
+        "created_at"
+      ],
+      "sort": "-created_at",
+      "rowActions": [
         {
-          "id": "close",
-          "icon": "Square",
+          "action": "closeSession",
           "label": "operations.pos.closeSession",
-          "method": "POST",
-          "endpoint": "/ext/operations/pos/actions/closeSession",
-          "visibleWhen": {
-            "field": "status",
-            "equals": "open"
+          "input": {
+            "id": {
+              "$record": "id"
+            }
           },
-          "prompt": {
-            "title": "operations.pos.closeSession",
-            "submitLabel": "operations.pos.closeSession",
-            "fields": [
-              {
-                "name": "closing_float",
-                "label": "operations.pos.ui.closing_float",
-                "type": "number",
-                "required": true,
-                "default": 0
-              }
-            ]
-          },
-          "body": {
-            "id": "{id}"
-          }
+          "prompt": [
+            "closing_float"
+          ],
+          "when": [
+            {
+              "field": "status",
+              "op": "eq",
+              "value": "open"
+            }
+          ]
         }
-      ],
-      "columns": [
+      ]
+    },
+    {
+      "type": "list",
+      "collection": "pos_orders",
+      "fields": [
         {
-          "key": "number",
+          "field": "number",
           "label": "common.col.number",
-          "type": "mono"
+          "display": "mono"
         },
         {
-          "key": "created_at",
-          "label": "operations.pos.col.time",
-          "type": "date"
+          "field": "created_at",
+          "label": "operations.pos.col.time"
         },
         {
-          "key": "total",
-          "label": "common.col.total",
-          "type": "currency",
-          "currency": {
-            "code": "RON"
-          }
+          "field": "total",
+          "label": "common.col.total"
         },
         {
-          "key": "status",
+          "field": "status",
           "label": "common.col.status",
-          "type": "badge",
-          "badge": {
-            "colors": {}
+          "display": "badge"
+        }
+      ],
+      "filter": [
+        {
+          "field": "session_id",
+          "op": "eq",
+          "value": {
+            "$selected": "master"
           }
         }
       ],
-      "form": {
-        "endpoint": "/ext/operations/pos/actions/openSession",
-        "fields": [
-          {
-            "name": "opening_float",
-            "label": "operations.pos.ui.opening_float",
-            "type": "number",
-            "required": true,
-            "colSpan": 2,
-            "default": 0
-          },
-          {
-            "name": "notes",
-            "label": "common.col.notes",
-            "type": "textarea",
-            "colSpan": 2
-          }
-        ]
-      }
+      "sort": "-created_at",
+      "actions": [
+        {
+          "action": "openSession",
+          "tone": "info",
+          "label": "operations.pos.openSession",
+          "prompt": [
+            "opening_float",
+            "notes"
+          ]
+        }
+      ]
     }
   ]
 }

@@ -1,263 +1,118 @@
 {
-  "sduiSchema": 1,
+  "spec": "zveltio.view/2",
   "title": "hr.time-tracking.title",
-  "subtitle": "hr.time-tracking.subtitle",
-  "newLabel": "hr.time-tracking.ui.newProjectBtn",
-  "resources": [
+  "type": "tabs",
+  "items": [
     {
-      "id": "projects",
-      "label": "hr.time-tracking.tab.projects",
-      "icon": "FolderOpen",
-      "dataSource": "/api/data/time_projects?sort=name&order=asc&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "time_projects",
+      "title": "hr.time-tracking.tab.projects",
+      "fields": [
         {
-          "key": "name",
+          "field": "name",
           "label": "common.col.name"
         },
         {
-          "key": "client_name",
+          "field": "client_name",
           "label": "hr.time-tracking.col.client"
         },
         {
-          "key": "hourly_rate",
+          "field": "hourly_rate",
           "label": "hr.time-tracking.col.rate"
         },
         {
-          "key": "currency",
+          "field": "currency",
           "label": "common.col.currency"
         },
         {
-          "key": "is_billable",
-          "label": "hr.time-tracking.col.billable",
-          "type": "boolean"
+          "field": "is_billable",
+          "label": "hr.time-tracking.col.billable"
         },
         {
-          "key": "status",
+          "field": "status",
           "label": "common.col.status",
-          "type": "badge",
-          "badge": {
-            "colors": {
-              "active": "badge-success",
-              "archived": "badge-ghost"
-            }
+          "display": "badge",
+          "tones": {
+            "active": "success",
+            "archived": "muted"
           }
         }
       ],
+      "sort": "name",
       "rowActions": [
         {
-          "id": "startTimer",
-          "icon": "Play",
+          "action": "startTimer",
           "label": "hr.time-tracking.btn.startTimer",
-          "method": "POST",
-          "endpoint": "/ext/hr/time-tracking/actions/startTimer",
-          "body": {
-            "project_id": "{id}"
+          "input": {
+            "project_id": {
+              "$record": "id"
+            }
           },
-          "visibleWhen": {
-            "field": "status",
-            "equals": "active"
-          },
-          "prompt": {
-            "title": "hr.time-tracking.btn.startTimer",
-            "submitLabel": "hr.time-tracking.btn.startTimer",
-            "fields": [
-              {
-                "name": "employee_id",
-                "label": "common.col.employee",
-                "type": "relation",
-                "required": true,
-                "colSpan": 2,
-                "relation": {
-                  "dataSource": "/api/data/employees?status[eq]=active&sort=last_name&order=asc&limit=500",
-                  "dataPath": "records",
-                  "valueKey": "id",
-                  "labelKey": [
-                    "first_name",
-                    "last_name"
-                  ]
-                }
-              },
-              {
-                "name": "task_description",
-                "label": "hr.time-tracking.ui.description",
-                "type": "textarea",
-                "rows": 2
-              }
-            ]
-          }
+          "prompt": [
+            "employee_id",
+            "task_description"
+          ],
+          "when": [
+            {
+              "field": "status",
+              "op": "eq",
+              "value": "active"
+            }
+          ]
         },
         {
-          "id": "stopTimer",
-          "icon": "Square",
+          "action": "stopTimer",
           "label": "hr.time-tracking.btn.stopTimer",
-          "method": "POST",
-          "endpoint": "/ext/hr/time-tracking/actions/stopTimer",
-          "prompt": {
-            "title": "hr.time-tracking.btn.stopTimer",
-            "submitLabel": "hr.time-tracking.btn.stopTimer",
-            "fields": [
-              {
-                "name": "employee_id",
-                "label": "common.col.employee",
-                "type": "relation",
-                "required": true,
-                "colSpan": 2,
-                "relation": {
-                  "dataSource": "/api/data/employees?status[eq]=active&sort=last_name&order=asc&limit=500",
-                  "dataPath": "records",
-                  "valueKey": "id",
-                  "labelKey": [
-                    "first_name",
-                    "last_name"
-                  ]
-                }
-              }
-            ]
-          }
+          "prompt": [
+            "employee_id"
+          ]
         }
       ],
-      "form": {
-        "endpoint": "/api/data/time_projects",
-        "fields": [
-          {
-            "name": "name",
-            "label": "common.col.name",
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "client_name",
-            "label": "hr.time-tracking.col.client",
-            "colSpan": 1
-          },
-          {
-            "name": "hourly_rate",
-            "label": "hr.time-tracking.ui.hourly_rate",
-            "type": "number",
-            "colSpan": 1,
-            "default": 0
-          },
-          {
-            "name": "currency",
-            "label": "hr.time-tracking.form.currency",
-            "colSpan": 1,
-            "default": "RON"
-          },
-          {
-            "name": "is_billable",
-            "label": "hr.time-tracking.form.billableProject",
-            "type": "boolean",
-            "colSpan": 2,
-            "default": true
-          }
-        ]
-      }
+      "create": true
     },
     {
-      "id": "entries",
-      "label": "hr.time-tracking.tab.entries",
-      "icon": "Clock",
-      "dataSource": "/api/data/time_entries?expand=project_id&sort=date&order=desc&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "time_entries",
+      "title": "hr.time-tracking.tab.entries",
+      "fields": [
         {
-          "key": "project_id_expanded.name",
+          "field": "project_id",
           "label": "common.col.project"
         },
         {
-          "key": "task_description",
+          "field": "task_description",
           "label": "hr.time-tracking.ui.description"
         },
         {
-          "key": "date",
-          "label": "common.col.date",
-          "type": "date"
+          "field": "date",
+          "label": "common.col.date"
         },
         {
-          "key": "duration_minutes",
+          "field": "duration_minutes",
           "label": "hr.time-tracking.col.hours"
         },
         {
-          "key": "is_billable",
-          "label": "hr.time-tracking.col.billable",
-          "type": "boolean"
+          "field": "is_billable",
+          "label": "hr.time-tracking.col.billable"
         }
       ],
-      "rowActions": [
+      "sort": "-date",
+      "delete": true,
+      "actions": [
         {
-          "id": "delete",
-          "icon": "Trash2",
-          "variant": "text-error",
-          "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/api/data/time_entries/{id}",
-          "confirm": "hr.timeTracking.confirmDelete"
+          "action": "logTime",
+          "tone": "info",
+          "label": "hr.time-tracking.ui.newProjectBtn",
+          "prompt": [
+            "employee_id",
+            "project_id",
+            "date",
+            "duration_minutes",
+            "is_billable",
+            "task_description"
+          ]
         }
-      ],
-      "form": {
-        "endpoint": "/ext/hr/time-tracking/actions/logTime",
-        "fields": [
-          {
-            "name": "employee_id",
-            "label": "common.col.employee",
-            "type": "relation",
-            "required": true,
-            "colSpan": 2,
-            "relation": {
-              "dataSource": "/api/data/employees?status[eq]=active&sort=last_name&order=asc&limit=500",
-              "dataPath": "records",
-              "valueKey": "id",
-              "labelKey": [
-                "first_name",
-                "last_name"
-              ]
-            }
-          },
-          {
-            "name": "project_id",
-            "label": "common.col.project",
-            "type": "relation",
-            "required": true,
-            "colSpan": 1,
-            "relation": {
-              "dataSource": "/api/data/time_projects?status[eq]=active&sort=name&order=asc&limit=500",
-              "dataPath": "records",
-              "valueKey": "id",
-              "labelKey": "name"
-            }
-          },
-          {
-            "name": "date",
-            "label": "common.col.date",
-            "type": "date",
-            "required": true,
-            "colSpan": 1,
-            "default": "today"
-          },
-          {
-            "name": "duration_minutes",
-            "label": "hr.time-tracking.col.hours",
-            "type": "number",
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "is_billable",
-            "label": "hr.time-tracking.col.billable",
-            "type": "boolean",
-            "colSpan": 1,
-            "default": true
-          },
-          {
-            "name": "task_description",
-            "label": "hr.time-tracking.ui.description",
-            "type": "textarea",
-            "rows": 2,
-            "colSpan": 2
-          }
-        ]
-      }
+      ]
     }
   ]
 }

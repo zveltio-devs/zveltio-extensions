@@ -1,116 +1,49 @@
 {
-  "sduiSchema": 1,
+  "spec": "zveltio.view/2",
   "title": "content.media.title",
-  "subtitle": "content.media.subtitle",
-  "newLabel": "common.new",
-  "resources": [
+  "type": "tabs",
+  "items": [
     {
-      "id": "tags",
-      "label": "content.media.ui.tags",
-      "icon": "Tag",
-      "dataSource": "/api/data/media_tags?sort=name&order=asc&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "media_tags",
+      "title": "content.media.ui.tags",
+      "fields": [
         {
-          "key": "name",
+          "field": "name",
           "label": "content.media.ui.new_tag"
         },
         {
-          "key": "color",
+          "field": "color",
           "label": "content.media.ui.color",
-          "type": "mono"
+          "display": "mono"
         }
       ],
-      "rowActions": [
-        {
-          "id": "delete",
-          "icon": "Trash2",
-          "variant": "text-error",
-          "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/api/data/media_tags/{id}",
-          "confirm": "ext.confirmDelete"
-        }
-      ],
-      "form": {
-        "endpoint": "/api/data/media_tags",
-        "fields": [
-          {
-            "name": "name",
-            "label": "content.media.ui.new_tag",
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "color",
-            "label": "content.media.ui.color",
-            "colSpan": 1,
-            "default": "#6366f1"
-          }
-        ]
-      }
+      "sort": "name",
+      "delete": true,
+      "create": true
     },
     {
-      "id": "collections",
-      "label": "content.media.tab.collections",
-      "icon": "Images",
-      "dataSource": "/api/data/media_collections?sort=name&order=asc&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "media_collections",
+      "title": "content.media.tab.collections",
+      "fields": [
         {
-          "key": "name",
+          "field": "name",
           "label": "common.col.name"
         },
         {
-          "key": "is_public",
-          "label": "content.media.col.public",
-          "type": "boolean"
+          "field": "is_public",
+          "label": "content.media.col.public"
         },
         {
-          "key": "description",
+          "field": "description",
           "label": "common.col.description"
         }
       ],
-      "rowActions": [
-        {
-          "id": "edit",
-          "kind": "edit",
-          "label": "common.edit"
-        },
-        {
-          "id": "delete",
-          "icon": "Trash2",
-          "variant": "text-error",
-          "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/api/data/media_collections/{id}",
-          "confirm": "ext.confirmDelete"
-        }
-      ],
-      "form": {
-        "endpoint": "/api/data/media_collections",
-        "fields": [
-          {
-            "name": "name",
-            "label": "common.col.name",
-            "required": true,
-            "colSpan": 2
-          },
-          {
-            "name": "description",
-            "label": "common.col.description",
-            "type": "textarea",
-            "colSpan": 2
-          },
-          {
-            "name": "is_public",
-            "label": "content.media.col.public",
-            "type": "boolean",
-            "default": false,
-            "colSpan": 2
-          }
-        ]
-      }
+      "sort": "name",
+      "edit": true,
+      "delete": true,
+      "create": true
     }
   ]
 }

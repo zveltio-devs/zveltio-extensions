@@ -3,8 +3,8 @@
   "displayName": "Time Tracking",
   "category": "hr",
   "description": "Timesheets, project-based time logging and billable hours",
-  "version": "2.2.0",
-  "zveltioMinVersion": "3.0.0-beta.94",
+  "version": "2.3.0",
+  "zveltioMinVersion": "3.0.0-beta.111",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-time-tracking",
   "permissions": [

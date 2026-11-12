@@ -1,246 +1,126 @@
 {
-  "sduiSchema": 1,
+  "spec": "zveltio.view/2",
   "title": "operations.assets.title",
-  "subtitle": "operations.assets.subtitle",
-  "newLabel": "operations.assets.btn.new",
-  "resources": [
+  "type": "list",
+  "collection": "assets",
+  "fields": [
     {
-      "id": "assets",
-      "dataSource": "/api/data/assets?sort=created_at&order=desc&limit=500",
-      "dataPath": "records",
-      "columns": [
-        {
-          "key": "name",
-          "label": "common.col.name"
-        },
-        {
-          "key": "code",
-          "label": "common.col.code",
-          "type": "mono"
-        },
-        {
-          "key": "category",
-          "label": "common.col.category"
-        },
-        {
-          "key": "location",
-          "label": "operations.assets.col.location"
-        },
-        {
-          "key": "purchase_cost",
-          "label": "operations.assets.col.cost",
-          "type": "currency",
-          "currency": {
-            "code": "RON"
-          }
-        },
-        {
-          "key": "status",
-          "label": "common.col.status",
-          "type": "badge",
-          "badge": {
-            "colors": {
-              "active": "badge-success",
-              "disposed": "badge-error"
-            }
-          }
-        }
-      ],
-      "rowActions": [
-        {
-          "id": "transfer",
-          "icon": "MoveRight",
-          "label": "operations.assets.action.transfer",
-          "method": "POST",
-          "endpoint": "/ext/operations/assets/actions/transferAsset",
-          "visibleWhen": {
-            "field": "status",
-            "equals": "active"
-          },
-          "prompt": {
-            "title": "operations.assets.action.transfer",
-            "submitLabel": "operations.assets.action.transfer",
-            "fields": [
-              {
-                "name": "to_location",
-                "label": "operations.assets.form.toLocation",
-                "required": true
-              },
-              {
-                "name": "transfer_date",
-                "label": "operations.assets.form.date",
-                "type": "date",
-                "required": true,
-                "default": "today"
-              },
-              {
-                "name": "reason",
-                "label": "operations.assets.form.reason",
-                "type": "textarea"
-              }
-            ]
-          },
-          "body": {
-            "id": "{id}"
-          }
-        },
-        {
-          "id": "revalue",
-          "icon": "TrendingUp",
-          "label": "operations.assets.action.revalue",
-          "method": "POST",
-          "endpoint": "/ext/operations/assets/actions/revalueAsset",
-          "visibleWhen": {
-            "field": "status",
-            "equals": "active"
-          },
-          "prompt": {
-            "title": "operations.assets.action.revalue",
-            "submitLabel": "operations.assets.action.revalue",
-            "fields": [
-              {
-                "name": "new_value",
-                "label": "operations.assets.form.newValue",
-                "type": "number",
-                "required": true,
-                "default": "{current_value}"
-              },
-              {
-                "name": "revaluation_date",
-                "label": "operations.assets.form.date",
-                "type": "date",
-                "required": true,
-                "default": "today"
-              },
-              {
-                "name": "notes",
-                "label": "operations.assets.form.reason",
-                "type": "textarea"
-              }
-            ]
-          },
-          "body": {
-            "id": "{id}"
-          }
-        },
-        {
-          "id": "dispose",
-          "icon": "Archive",
-          "label": "operations.assets.action.dispose",
-          "method": "POST",
-          "endpoint": "/ext/operations/assets/actions/disposeAsset",
-          "visibleWhen": {
-            "field": "status",
-            "equals": "active"
-          },
-          "prompt": {
-            "title": "operations.assets.action.dispose",
-            "submitLabel": "operations.assets.action.dispose",
-            "fields": [
-              {
-                "name": "disposal_date",
-                "label": "operations.assets.form.date",
-                "type": "date",
-                "required": true,
-                "default": "today"
-              },
-              {
-                "name": "disposal_value",
-                "label": "operations.assets.form.disposalValue",
-                "type": "number",
-                "default": 0
-              },
-              {
-                "name": "reason",
-                "label": "operations.assets.form.reason",
-                "type": "textarea"
-              }
-            ]
-          },
-          "body": {
-            "id": "{id}"
-          }
-        }
-      ],
-      "form": {
-        "endpoint": "/ext/operations/assets/actions/createAsset",
-        "fields": [
-          {
-            "name": "name",
-            "label": "assets.form.name",
-            "required": true,
-            "colSpan": 2
-          },
-          {
-            "name": "code",
-            "label": "assets.form.assetCode",
-            "colSpan": 1,
-            "required": true
-          },
-          {
-            "name": "serial_number",
-            "label": "assets.form.serialNumber",
-            "colSpan": 1
-          },
-          {
-            "name": "category",
-            "label": "assets.form.category",
-            "colSpan": 1
-          },
-          {
-            "name": "location",
-            "label": "assets.form.location",
-            "colSpan": 1
-          },
-          {
-            "name": "purchase_date",
-            "label": "assets.form.purchaseDate",
-            "type": "date",
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "purchase_cost",
-            "label": "assets.form.purchaseCost",
-            "type": "number",
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "useful_life_years",
-            "label": "assets.form.usefulLife",
-            "type": "number",
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "residual_value",
-            "label": "assets.form.residualValue",
-            "type": "number",
-            "colSpan": 1
-          },
-          {
-            "name": "depreciation_account_id",
-            "label": "operations.assets.form.depreciationAccount",
-            "colSpan": 1
-          },
-          {
-            "name": "accumulated_dep_account_id",
-            "label": "operations.assets.form.accumulatedAccount",
-            "colSpan": 1
-          },
-          {
-            "name": "asset_account_id",
-            "label": "operations.assets.form.assetAccount",
-            "colSpan": 1
-          },
-          {
-            "name": "disposal_loss_account_id",
-            "label": "operations.assets.form.disposalLossAccount",
-            "colSpan": 1
-          }
-        ]
+      "field": "name",
+      "label": "common.col.name"
+    },
+    {
+      "field": "code",
+      "label": "common.col.code",
+      "display": "mono"
+    },
+    {
+      "field": "category",
+      "label": "common.col.category"
+    },
+    {
+      "field": "location",
+      "label": "operations.assets.col.location"
+    },
+    {
+      "field": "purchase_cost",
+      "label": "operations.assets.col.cost"
+    },
+    {
+      "field": "status",
+      "label": "common.col.status",
+      "display": "badge",
+      "tones": {
+        "active": "success",
+        "disposed": "danger"
       }
+    }
+  ],
+  "sort": "-created_at",
+  "rowActions": [
+    {
+      "action": "transferAsset",
+      "label": "operations.assets.action.transfer",
+      "input": {
+        "id": {
+          "$record": "id"
+        }
+      },
+      "prompt": [
+        "to_location",
+        "transfer_date",
+        "reason"
+      ],
+      "when": [
+        {
+          "field": "status",
+          "op": "eq",
+          "value": "active"
+        }
+      ]
+    },
+    {
+      "action": "revalueAsset",
+      "label": "operations.assets.action.revalue",
+      "input": {
+        "id": {
+          "$record": "id"
+        }
+      },
+      "prompt": [
+        "new_value",
+        "revaluation_date",
+        "notes"
+      ],
+      "when": [
+        {
+          "field": "status",
+          "op": "eq",
+          "value": "active"
+        }
+      ]
+    },
+    {
+      "action": "disposeAsset",
+      "label": "operations.assets.action.dispose",
+      "input": {
+        "id": {
+          "$record": "id"
+        }
+      },
+      "prompt": [
+        "disposal_date",
+        "disposal_value",
+        "reason"
+      ],
+      "when": [
+        {
+          "field": "status",
+          "op": "eq",
+          "value": "active"
+        }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "action": "createAsset",
+      "tone": "info",
+      "label": "operations.assets.btn.new",
+      "prompt": [
+        "name",
+        "code",
+        "serial_number",
+        "category",
+        "location",
+        "purchase_date",
+        "purchase_cost",
+        "useful_life_years",
+        "residual_value",
+        "depreciation_account_id",
+        "accumulated_dep_account_id",
+        "asset_account_id",
+        "disposal_loss_account_id"
+      ]
     }
   ]
 }

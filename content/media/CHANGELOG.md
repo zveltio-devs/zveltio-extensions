@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.1.0 (2026-11-12)
+
+- feat: the Studio page is a `zveltio.view/2` view (ADR 0042): it names its collections and actions instead of URLs, and Studio draws it from the specification
+- requires engine 3.0.0-beta.111
+
 ## 2.0.0 (2026-11-03)
 
 - feat!: files, folders and uploads are the engine's own `/api/storage` (upload with the engine's storage quota, list, folders, signed URLs, transforms, delete). The extension's duplicate routes for them are dropped: `/files`, `/files/:id`, `/upload`, `/folders`, `DELETE /folders/:id` (the engine has no folder delete yet), `PATCH` of a file's title/description/alt text, `/stats` and `/admin/quotas`

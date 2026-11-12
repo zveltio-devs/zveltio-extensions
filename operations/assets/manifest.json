@@ -3,8 +3,8 @@
   "displayName": "Fixed Assets",
   "category": "operations",
   "description": "Fixed asset register, straight-line and declining balance depreciation posted to the ledger, maintenance, insurance, revaluations and transfers",
-  "version": "2.1.0",
-  "zveltioMinVersion": "3.0.0-beta.94",
+  "version": "2.2.0",
+  "zveltioMinVersion": "3.0.0-beta.111",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-assets",
   "permissions": [
