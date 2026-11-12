@@ -22,24 +22,25 @@ d('auth/scim — DELETE /Users/:id', () => {
     await db.destroy();
   });
 
-  it('revokes the sessions, drops the grants and audits user.deleted with the token', async () => {
-    const { app, json, tokenId } = await scimApp(import.meta.dir);
+  it('revokes the sessions, drops the grants and audits the removal with the provider as actor', async () => {
+    const { app, json, tokenId, userIdOf } = await scimApp(import.meta.dir);
     const tenantId = DEFAULT_TENANT_ID;
 
     const create = await app.request('/scim/v2/Users', {
       method: 'POST',
       headers: json,
-      body: JSON.stringify({ schemas: [SCIM_USER], userName: `scim-del-${Date.now()}@test.local` }),
+      body: JSON.stringify({ schemas: [SCIM_USER], userName: `scim-del-${crypto.randomUUID()}@test.local` }),
     });
     expect(create.status).toBe(201);
-    const { id } = (await create.json()) as { id: string };
+    const { id: subject } = (await create.json()) as { id: string };
+    const id = await userIdOf(subject);
     await sql`
       INSERT INTO session (id, token, "userId", "expiresAt", "createdAt", "updatedAt")
       VALUES (${crypto.randomUUID()}, ${crypto.randomUUID()}, ${id}, NOW() + INTERVAL '1 day', NOW(), NOW())
     `.execute(db);
     await sql`INSERT INTO zvd_permissions (ptype, v0, v1, v2) VALUES ('g', ${id}, 'admin', '*')`.execute(db);
 
-    const res = await app.request(`/scim/v2/Users/${id}`, { method: 'DELETE', headers: json });
+    const res = await app.request(`/scim/v2/Users/${subject}`, { method: 'DELETE', headers: json });
     expect(res.status).toBe(204);
 
     const count = async (q: ReturnType<typeof sql<{ n: number }>>) =>
@@ -51,12 +52,25 @@ d('auth/scim — DELETE /Users/:id', () => {
       SELECT user_id, metadata FROM zv_audit_log
        WHERE event_type = 'user.deleted' AND resource_id = ${id}
     `.execute(db);
+    // The engine audits the act, with the provider as the actor (ADR 0039 decision 9).
     expect(audit.rows).toEqual([
       {
         user_id: null,
-        metadata: { actor: `scim:${tokenId}`, reason: 'scim.deprovision', tenant_id: tenantId },
+        metadata: {
+          actor: 'ext:auth/scim',
+          reason: 'identity.remove',
+          tenant_id: tenantId,
+          provider: 'auth/scim',
+          subject,
+        },
       },
     ]);
+    const removed = await sql<{ n: number }>`
+      SELECT COUNT(*)::int AS n FROM zv_audit_log
+       WHERE event_type = 'identity.removed' AND resource_id = ${id}
+         AND metadata->>'actor' = 'ext:auth/scim' AND metadata->>'subject' = ${subject}
+    `.execute(db);
+    expect(removed.rows[0]!.n).toBe(1);
     // The token lookup runs as the system; its audit row names the token too.
     const asSystem = await sql<{ n: number }>`
       SELECT COUNT(*)::int AS n FROM zv_audit_log

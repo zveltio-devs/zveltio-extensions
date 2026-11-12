@@ -31,7 +31,7 @@ d('auth/scim — deactivation is all-or-nothing', () => {
   it('a failed enforcement statement does not leave the user marked inactive', async () => {
     const { app, json } = await scimApp(import.meta.dir);
 
-    const email = `scim-atomic-${Date.now()}@test.local`;
+    const email = `scim-atomic-${crypto.randomUUID()}@test.local`;
     const create = await app.request('/scim/v2/Users', {
       method: 'POST',
       headers: json,
@@ -65,10 +65,12 @@ d('auth/scim — deactivation is all-or-nothing', () => {
     // Whatever the surface answer, it must not be a success.
     expect(status).toBeGreaterThanOrEqual(400);
 
-    // And the flag must not claim the deactivation happened.
+    // And the flag must not claim the deactivation happened: the engine keeps
+    // it on the account's link to this provider (ADR 0039 decision 9).
     const flag = await sql<{ active: boolean }>`
-      SELECT active FROM zvd_scim_users WHERE user_id = ${id}
+      SELECT active FROM zv_identity_links WHERE provider = 'auth/scim' AND subject = ${id}
     `.execute(db);
+    expect(flag.rows).toHaveLength(1);
     expect(flag.rows[0]?.active ?? true).toBe(true);
   });
 });
