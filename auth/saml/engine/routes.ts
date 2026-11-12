@@ -1,6 +1,7 @@
 import { readMultipart, MULTIPART_REQUIRED } from '@zveltio/sdk/extension';
 /**
- * SAML 2.0 SSO routes
+ * SAML 2.0 SSO routes, declared public in the manifest and answered by plain
+ * functions (ADR 0039):
  *
  * GET  /ext/auth/saml/login          — Redirect to IdP login page
  * POST /ext/auth/saml/callback       — ACS endpoint; processes SAMLResponse
@@ -11,24 +12,21 @@ import { readMultipart, MULTIPART_REQUIRED } from '@zveltio/sdk/extension';
  * served to no one, read back decrypted by this extension only.
  */
 
-import { Hono } from 'hono';
 import { sql } from 'kysely';
 import { createSamlInstance, validateSamlResponse, extractAssertionId, type SamlIdpConfig } from './saml-provider.js';
-import type { ExtensionContext, HostCollections } from '@zveltio/sdk/extension';
+import type { ExtensionContext, HostCollections, RouteHandler } from '@zveltio/sdk/extension';
 type SamlConfig = SamlIdpConfig & { enabled: boolean; mapEmail: string; mapName: string };
 
 /**
  * The OWN tenant's `saml_settings` row, or `null` when none is saved, through
  * the data API (`host.collections`, ADR 0025), as the system: every route here
- * is public. `private_key` is a `secret` field, which only this extension reads
- * back, decrypted (ADR 0024); one the instance's key cannot decrypt comes back
- * `null`, as an unset one does. The tenant match keeps the row the request's
- * own whatever the principal reaches.
+ * is public, and the system's reach is the request's tenant. `private_key` is a
+ * `secret` field, which only this extension reads back, decrypted (ADR 0024);
+ * one the instance's key cannot decrypt comes back `null`, as an unset one does.
  */
-async function getSamlConfig(c: any, collections: HostCollections): Promise<SamlConfig | null> {
-  const tenant = (c.get('tenant') as { id?: string } | null | undefined)?.id;
-  const { records } = await collections.list('saml_settings', { limit: 100 });
-  const row = (records as Record<string, any>[]).find((r) => r.tenant_id === tenant);
+async function getSamlConfig(collections: HostCollections): Promise<SamlConfig | null> {
+  const { records } = await collections.list('saml_settings', { limit: 1 });
+  const row = (records as Record<string, any>[])[0];
   if (!row) return null;
   return {
     enabled: row.enabled === true,
@@ -45,134 +43,131 @@ async function getSamlConfig(c: any, collections: HostCollections): Promise<Saml
   };
 }
 
-export function samlRoutes(ctx: ExtensionContext): Hono {
-  const { db, internals, host } = ctx;
+/**
+ * What the routes keep from `register`: a declared handler is handed the request
+ * and its `host` only. Reading the settings and claiming an assertion are more
+ * than the anonymous caller may (`asSystem`, `data:system`).
+ */
+let kept: Pick<ExtensionContext, 'db' | 'internals'> | undefined;
 
-  // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
-  // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
-  // a handler is therefore already RLS-scoped — there is one spelling, so there
-  // is none to forget.
+export function keepContext(ctx: ExtensionContext): void {
+  kept = ctx;
+}
 
-  // ctx.internals.createBetterAuthSession is the only way to produce a session
-  // the engine's `auth.api.getSession` will accept: better-auth writes it where
-  // it reads sessions (its pool, or its Valkey cache) and names the cookie.
-  if (!internals?.createBetterAuthSession) {
-    throw new Error('[saml] engine internals missing createBetterAuthSession — Zveltio version mismatch');
-  }
-  if (!host) throw new Error('[saml] engine has no route host (needs 3.0.0-beta.103) — Zveltio version mismatch');
-  const crossDomain = ctx.config?.crossDomainAuth ?? false;
+function context(): Pick<ExtensionContext, 'db' | 'internals'> {
+  if (!kept) throw new Error('[saml] the routes answer once the extension is registered');
+  return kept;
+}
 
-  // Every route here is public (the IdP and the browser call them before anyone
-  // is signed in): the settings are read as the system (`data:system`, audited),
-  // in the request's tenant only.
-  const readConfig = (c: any) => internals.asSystem(['saml_settings'], () => getSamlConfig(c, host(c).collections));
+const answer = (body: unknown, status: number) => Response.json(body, { status });
 
-  const router = new Hono();
+const readConfig = (collections: HostCollections) =>
+  context().internals.asSystem(['saml_settings'], () => getSamlConfig(collections));
 
-  // GET /login — redirect user to IdP
-  router.get('/login', async (c) => {
-    const config = await readConfig(c);
-    if (!config?.enabled) return c.json({ error: 'SAML SSO is not configured or disabled' }, 503);
+/** A relative path to land on, else `/admin`: the open-redirect guard. */
+const landing = (raw: unknown) =>
+  typeof raw === 'string' && raw.startsWith('/') && !raw.startsWith('//') ? raw : '/admin';
 
-    const saml = await createSamlInstance(config);
-    const rawRelayState = c.req.query('redirect') ?? '/admin';
-    const relayState = rawRelayState.startsWith('/') && !rawRelayState.startsWith('//')
-      ? rawRelayState
-      : '/admin';
-    // `getAuthorizeUrlAsync`, not `getAuthorizeUrl`.
-    //
-    // The promise-returning methods carry the `*Async` suffix on
-    // @node-saml/node-saml 5.x (saml.d.ts). This is the one endpoint that begins
-    // SSO, so the wrong name would be `undefined` and throw a TypeError here.
-    const loginUrl = await saml.getAuthorizeUrlAsync('', c.req.raw.headers.get('host') ?? '', { RelayState: relayState });
-    return c.redirect(loginUrl);
+/** GET /login — redirect the browser to the IdP; the `saml` sign-in provider starts here. */
+export const login: RouteHandler = async (request, { host }) => {
+  const config = await readConfig(host.collections);
+  if (!config?.enabled) return answer({ error: 'SAML SSO is not configured or disabled' }, 503);
+
+  const saml = await createSamlInstance(config);
+  const relayState = landing(new URL(request.url).searchParams.get('redirect') ?? '/admin');
+  // `getAuthorizeUrlAsync`, not `getAuthorizeUrl`.
+  //
+  // The promise-returning methods carry the `*Async` suffix on
+  // @node-saml/node-saml 5.x (saml.d.ts). This is the one endpoint that begins
+  // SSO, so the wrong name would be `undefined` and throw a TypeError here.
+  const loginUrl = await saml.getAuthorizeUrlAsync('', request.headers.get('host') ?? '', {
+    RelayState: relayState,
   });
+  return new Response(null, { status: 302, headers: { location: loginUrl } });
+};
 
-  // POST /callback — ACS endpoint (IdP posts here)
-  router.post('/callback', async (c) => {
-    const config = await readConfig(c);
-    if (!config?.enabled) return c.json({ error: 'SAML SSO is not configured or disabled' }, 503);
+/**
+ * POST /callback — the ACS endpoint the IdP posts to. The IdP says who the
+ * person is; the engine signs them in (`host.identity`, ADR 0039): it finds or
+ * creates the account, refuses a disabled one or one this tenant has no claim
+ * to, opens the session and audits it.
+ */
+export const callback: RouteHandler = async (request, { host }) => {
+  const identity = host.identity;
+  if (!identity) throw new Error('[saml] /callback needs engine 3.0.0-beta.113');
+  const config = await readConfig(host.collections);
+  if (!config?.enabled) return answer({ error: 'SAML SSO is not configured or disabled' }, 503);
 
-    let body: Record<string, string>;
-    try {
-      const formData = await readMultipart(c);
-      if (!formData) return c.json(MULTIPART_REQUIRED, 400);
-      body = Object.fromEntries(formData.entries()) as Record<string, string>;
-    } catch {
-      return c.json({ error: 'Invalid form data in SAML callback' }, 400);
-    }
+  let body: Record<string, string>;
+  try {
+    const formData = await readMultipart({ req: request });
+    if (!formData) return answer(MULTIPART_REQUIRED, 400);
+    body = Object.fromEntries(formData.entries()) as Record<string, string>;
+  } catch {
+    return answer({ error: 'Invalid form data in SAML callback' }, 400);
+  }
 
-    if (!body.SAMLResponse) return c.json({ error: 'Missing SAMLResponse' }, 400);
+  if (!body.SAMLResponse) return answer({ error: 'Missing SAMLResponse' }, 400);
+  // Unverified until validation passes: an identifier for the audit row only.
+  const claimedId = extractAssertionId(body.SAMLResponse) ?? 'unknown assertion';
+  const refused = (identifier: string, reason: string) =>
+    identity.signInRefused({ provider: 'saml', identifier, reason });
 
-    let profile: any;
-    try {
-      const saml = await createSamlInstance(config);
-      profile = await validateSamlResponse(saml, body);
-    } catch (err: any) {
-      return c.json({ error: `SAML validation failed: ${err.message}` }, 401);
-    }
+  let profile: any;
+  try {
+    const saml = await createSamlInstance(config);
+    profile = await validateSamlResponse(saml, body);
+  } catch (err: any) {
+    await refused(claimedId, `validation failed: ${err.message}`);
+    return answer({ error: `SAML validation failed: ${err.message}` }, 401);
+  }
 
-    // Replay: this assertion must not have been accepted before.
-    //
-    // node-saml's InResponseTo binding is off (see the note in
-    // `createSamlInstance`): the per-request instances share no cache, so it
-    // could only ever reject logins, never protect any. This is what replaces
-    // it, and it is wider — InResponseTo can only tie an SP-initiated response
-    // to a request we issued, while an id recorded once covers the IdP-initiated
-    // flow too.
-    //
-    // Placed AFTER signature validation on purpose: consuming an id from an
-    // unverified document would let anyone burn a legitimate assertion by
-    // posting its id first, turning replay protection into a denial of service.
-    const assertionId = extractAssertionId(body.SAMLResponse);
-    if (!assertionId) {
-      return c.json({ error: 'SAML assertion carries no ID; refusing to accept it' }, 401);
-    }
+  // Replay: this assertion must not have been accepted before.
+  //
+  // node-saml's InResponseTo binding is off (see the note in
+  // `createSamlInstance`): the per-request instances share no cache, so it
+  // could only ever reject logins, never protect any. This is what replaces
+  // it, and it is wider — InResponseTo can only tie an SP-initiated response
+  // to a request we issued, while an id recorded once covers the IdP-initiated
+  // flow too.
+  //
+  // Placed AFTER signature validation on purpose: consuming an id from an
+  // unverified document would let anyone burn a legitimate assertion by
+  // posting its id first, turning replay protection into a denial of service.
+  const assertionId = extractAssertionId(body.SAMLResponse);
+  if (!assertionId) {
+    await refused(claimedId, 'assertion carries no ID');
+    return answer({ error: 'SAML assertion carries no ID; refusing to accept it' }, 401);
+  }
 
-    const email = profile[config.mapEmail] ?? profile.email ?? profile.nameID;
-    const name = profile[config.mapName] ?? profile.displayName ?? email;
+  const email = profile[config.mapEmail] ?? profile.email ?? profile.nameID;
+  const name = profile[config.mapName] ?? profile.displayName ?? email;
 
-    if (!email) return c.json({ error: 'IdP did not return an email address' }, 400);
+  if (!email) {
+    await refused(String(profile.nameID ?? assertionId), 'no email address in the assertion');
+    return answer({ error: 'IdP did not return an email address' }, 400);
+  }
 
-    // The claim goes HERE — after every check that can still answer with a
-    // `return`, and before anything that writes.
-    //
-    // The first version of this put it directly after signature validation,
-    // which burns an id for a login that never happened. `/ext/*` runs inside
-    // the request's tenant transaction, so a THROW after this point rolls the
-    // claim back with everything else — but `return c.json(…, 400)` is not a
-    // throw. It is a normal return, the transaction commits, and the id is
-    // consumed. The `!email` check above it is exactly that case: an IdP with a
-    // misconfigured attribute mapping answers 400, the operator fixes the
-    // mapping, the user retries the SAME assertion and is told it has already
-    // been used. The replay guard becomes a lockout, and the only cure is
-    // waiting for the IdP to mint a new one.
-    //
-    // Everything below either throws — `provisionUser`,
-    // `createBetterAuthSession` — or succeeds, so the claim now commits with the
-    // login and rolls back without it. The two refusals that do not throw (a
-    // disabled account, an account this tenant has no claim to) return after
-    // nothing but the claim was written: that assertion is spent.
-    //
-    // An EXPLICIT transaction, not the request's.
-    //
-    // Four writes have to happen together or not at all: claim the assertion,
-    // provision the user, drop their previous sessions, create the new one. They
-    // were atomic today only because `/ext/*` runs inside the per-request tenant
-    // transaction — and `check:atomic-writes` flags exactly that, because the
-    // boundary is moving. When it does, a failure between the claim and the
-    // session leaves the assertion consumed and no session created, which is a
-    // lockout: the same assertion can never be presented again.
-    //
-    // `ctx.db.transaction()` JOINS the request transaction rather than nesting
-    // (Kysely refuses to nest), so this is correct both today and after the
-    // boundary moves. `internals.createBetterAuthSession` takes the handle, so a
-    // user provisioned here gets the session once it commits, and none if not.
-    const remoteIp = c.req.header('x-forwarded-for') ?? c.req.header('x-real-ip') ?? undefined;
-    const userAgent = c.req.header('user-agent') ?? undefined;
-
-    // The caller has no principal: the assertion is claimed as the system.
-    const outcome = await internals.asSystem(['saml_spent_assertions'], () => db.transaction().execute(async (trx: any) => {
+  // The claim goes HERE — after every check that can still answer with a
+  // `return`, and before anything that writes.
+  //
+  // `/ext/*` runs inside the request's tenant transaction, so a THROW after
+  // this point rolls the claim back with everything else — but a returned 400
+  // is not a throw: the transaction commits, and the id is consumed. A claim
+  // ahead of the `!email` check above burned the assertion of an IdP with a
+  // misconfigured attribute mapping, and the user retrying it after the fix
+  // was told it had already been used.
+  //
+  // `signIn` below either throws or succeeds, so the claim commits with the
+  // sign-in and rolls back without it. The two refusals it throws that are
+  // answered here (a disabled account, an account this tenant has no claim to)
+  // return after nothing but the claim was written: that assertion is spent.
+  //
+  // `ctx.db.transaction()` JOINS the request transaction rather than nesting
+  // (Kysely refuses to nest), so the claim and the sign-in are one act.
+  const { db, internals } = context();
+  const replayed = await internals.asSystem(['saml_spent_assertions'], () =>
+    db.transaction().execute(async (trx: any) => {
       // One statement, so the check and the claim cannot interleave: a second,
       // concurrent POST of the same assertion conflicts instead of returning a
       // row. `ON CONFLICT DO NOTHING` + `RETURNING` yields zero rows for a replay.
@@ -182,90 +177,56 @@ export function samlRoutes(ctx: ExtensionContext): Hono {
         ON CONFLICT (tenant_id, assertion_id) DO NOTHING
         RETURNING assertion_id
       `.execute(trx);
-      if (claimed.rows.length === 0) return { replayed: true as const };
-
+      if (claimed.rows.length === 0) return true;
       // Opportunistic sweep. Unguarded: a failure here aborts the transaction in
       // Postgres whatever JavaScript does about it, so swallowing it would take
       // down the login it was meant not to disturb.
       await sql`DELETE FROM zvd_saml_spent_assertions WHERE expires_at < NOW()`.execute(trx);
+      return false;
+    }),
+  );
+  if (replayed) {
+    console.warn(`[saml] refused a replayed assertion: ${assertionId}`);
+    await refused(assertionId, 'assertion already used');
+    return answer({ error: 'This SAML assertion has already been used' }, 401);
+  }
 
-      // The account is the engine's to find or create (`provisionUser`,
-      // `identity:provision`): `"user"` is refused to `ctx.db` since engine #858,
-      // which made every SAML sign-in a 500. The address is matched
-      // case-insensitively, and an existing account comes back only when the
-      // running tenant may claim it — so one tenant's IdP cannot sign in as god,
-      // an instance admin or another tenant's administrator by asserting their
-      // address.
-      let user: { id: string };
-      try {
-        ({ user } = await internals.provisionUser({ email: String(email), name: String(name) }));
-      } catch (err: any) {
-        if (err?.code !== 'account_exists') throw err;
-        return { replayed: false as const, blocked: false as const, unclaimed: true as const };
-      }
-
-      // The session is the engine's to write: `session` is out of `ctx.db`'s
-      // reach (the `DELETE FROM session` here made every login a 500), and with
-      // Valkey better-auth reads sessions only from its cache. `replaceExisting`
-      // keeps one live session per user, limiting the blast radius of a leak.
-      try {
-        const { setCookie } = await internals.createBetterAuthSession(trx, user.id, {
-          ipAddress: remoteIp,
-          userAgent,
-          crossDomain,
-          replaceExisting: true,
-        });
-        return { replayed: false as const, blocked: false as const, unclaimed: false as const, setCookie };
-      } catch (err: any) {
-        // Refused before anything was written, so the claim still commits: a
-        // deactivated user's assertion is spent, not kept for later.
-        if (err?.code !== 'account_disabled') throw err;
-        return { replayed: false as const, blocked: true as const, unclaimed: false as const };
-      }
+  let headers: Headers;
+  try {
+    ({ headers } = await identity.signIn({
+      provider: 'saml',
+      subject: String(profile.nameID ?? email),
+      email: String(email),
+      name: String(name),
     }));
-
-    if (outcome.replayed) {
-      console.warn(`[saml] refused a replayed assertion: ${assertionId}`);
-      return c.json({ error: 'This SAML assertion has already been used' }, 401);
+  } catch (err) {
+    // Refused by the engine, which audited it. The claim still commits: a
+    // refused assertion is spent, not kept for later.
+    const { code, status } = err as { code?: string; status?: number };
+    if (code === 'account_disabled') return answer({ error: 'This account is disabled.' }, 403);
+    if (code === 'account_exists') {
+      return answer({ error: 'This identity provider cannot sign in to that account.' }, 403);
     }
-    if (outcome.blocked) return c.json({ error: 'This account is disabled.' }, 403);
-    if (outcome.unclaimed) {
-      return c.json({ error: 'This identity provider cannot sign in to that account.' }, 403);
-    }
-    const { setCookie } = outcome;
+    if (status === 400) return answer({ error: (err as Error).message }, 400);
+    throw err;
+  }
+  headers.set('location', landing(body.RelayState));
+  return new Response(null, { status: 302, headers });
+};
 
-    // Open-redirect guard: relative paths only (must start with `/`).
-    const rawRedirect = body.RelayState ?? '/admin';
-    const redirectTo = typeof rawRedirect === 'string' &&
-      rawRedirect.startsWith('/') &&
-      !rawRedirect.startsWith('//')  // blocks protocol-relative URLs
-      ? rawRedirect
-      : '/admin';
+/** GET /metadata — SP metadata XML for IdP registration. */
+export const metadata: RouteHandler = async (_request, { host }) => {
+  const config = await readConfig(host.collections);
+  if (!config) return answer({ error: 'SAML not configured' }, 503);
 
-    const response = c.redirect(redirectTo, 302);
-    response.headers.set('Set-Cookie', setCookie);
-    return response;
-  });
-
-  // GET /metadata — SP metadata XML for IdP registration
-  router.get('/metadata', async (c) => {
-    const config = await readConfig(c);
-    if (!config) return c.json({ error: 'SAML not configured' }, 503);
-
-    // Build the metadata instance without `privateKey`. On 5.x
-    // `generateServiceProviderMetadata` throws `Missing publicCert...` when the
-    // options carry a `privateKey` but no matching public cert to advertise, and
-    // this SP does not sign AuthnRequests (AuthnRequestsSigned=false), so the
-    // key is not needed here. Passing it as the first arg never worked anyway:
-    // that arg is the decryption cert, and 5.x nulls it unless `decryptionPvk`
-    // is set — so no private key was ever emitted into the public metadata.
-    const saml = await createSamlInstance({ ...config, privateKey: undefined });
-    const xml: string = saml.generateServiceProviderMetadata(null, null);
-
-    c.header('Content-Type', 'application/xml');
-    return c.body(xml);
-  });
-
-  // GET /config — read config (admin)
-  return router;
-}
+  // Build the metadata instance without `privateKey`. On 5.x
+  // `generateServiceProviderMetadata` throws `Missing publicCert...` when the
+  // options carry a `privateKey` but no matching public cert to advertise, and
+  // this SP does not sign AuthnRequests (AuthnRequestsSigned=false), so the
+  // key is not needed here. Passing it as the first arg never worked anyway:
+  // that arg is the decryption cert, and 5.x nulls it unless `decryptionPvk`
+  // is set — so no private key was ever emitted into the public metadata.
+  const saml = await createSamlInstance({ ...config, privateKey: undefined });
+  const xml: string = saml.generateServiceProviderMetadata(null, null);
+  return new Response(xml, { headers: { 'content-type': 'application/xml' } });
+};

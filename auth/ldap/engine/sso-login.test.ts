@@ -8,9 +8,10 @@
 // reads its own row only — a god's read reach is every firm.
 //
 // The directory is real LDAP over a socket, spoken by the real `ldapts` client.
-// The account is the engine's to find or create (`provisionUser`): a first
-// sign-in provisions it, and an address the tenant has no claim to — the
-// instance owner's — signs nobody in.
+// `/login` is a declared public route (ADR 0039) that signs the person in with
+// `host.identity.signIn`: the engine finds or creates the account — an address
+// the tenant has no claim to, the instance owner's, signs nobody in — opens the
+// session and audits success and failure with the provider as actor.
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { join } from 'node:path';
 // @ts-ignore — asn1 ships no types; it is ldapts' own BER codec.
@@ -183,6 +184,44 @@ d('auth/ldap — a directory sign-in is a session the engine accepts', () => {
     expect(await getSession(firstCookie)).toBeUndefined();
   });
 
+  /** The engine's sign-in audit rows naming `who` (the DN or the typed user name). */
+  const audited = (type: string, who: string) =>
+    e.harness.asEveryTenant(e.db, async (trx: any) =>
+      (
+        await e.sql`SELECT user_id, metadata->>'provider' AS provider, metadata->>'actor' AS actor,
+                           metadata->>'reason' AS reason
+                      FROM zv_audit_log
+                     WHERE event_type = ${type}
+                       AND (metadata->>'subject' = ${who} OR metadata->>'identifier' = ${who})`.execute(trx)
+      ).rows,
+    );
+
+  it('a sign-in and a refused one each leave the engine audit entry, the provider as actor', async () => {
+    const res = await login(alice);
+    expect(res.status).toBe(200);
+    const { user } = (await res.json()) as { user: { id: string } };
+    const ok = await audited('auth.login_success', `uid=${alice.uid},dc=test`);
+    expect(ok.length).toBeGreaterThan(0);
+    expect(ok.at(-1)).toMatchObject({ user_id: user.id, provider: 'ldap', actor: 'ext:auth/ldap' });
+
+    expect((await login({ ...alice, password: 'wrong' })).status).toBe(401);
+    const failed = await audited('auth.login_failed', alice.uid);
+    expect(failed.length).toBeGreaterThan(0);
+    expect(failed.at(-1)).toMatchObject({ user_id: null, provider: 'ldap', actor: 'ext:auth/ldap' });
+  });
+
+  it('GET /api/sign-in/providers lists the directory, for any front end', async () => {
+    const res = await e.engineApp.request('/api/sign-in/providers');
+    const { providers } = (await res.json()) as { providers: Record<string, unknown>[] };
+    expect(providers).toContainEqual({
+      id: 'ldap',
+      label: 'LDAP / Active Directory',
+      kind: 'credentials',
+      extension: 'auth/ldap',
+      url: '/ext/auth/ldap/login',
+    });
+  });
+
   it('refuses a deactivated user with 403 and no cookie', async () => {
     const id = await account(bob.mail, true);
     const res = await login(bob);
@@ -190,6 +229,8 @@ d('auth/ldap — a directory sign-in is a session the engine accepts', () => {
     expect(res.headers.get('set-cookie')).toBeNull();
     const rows = await e.sql`SELECT 1 FROM session WHERE "userId" = ${id}`.execute(e.db);
     expect(rows.rows).toHaveLength(0);
+    const refused = await audited('auth.login_failed', `uid=${bob.uid},dc=test`);
+    expect(refused.at(-1)).toMatchObject({ user_id: id, provider: 'ldap', reason: 'account_disabled' });
   });
 
   it('a first sign-in provisions the account through the engine', async () => {

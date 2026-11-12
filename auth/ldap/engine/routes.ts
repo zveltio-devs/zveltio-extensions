@@ -1,7 +1,7 @@
 /**
  * LDAP / Active Directory auth routes
  *
- * POST /ext/auth/ldap/login    — Authenticate with LDAP credentials
+ * POST /ext/auth/ldap/login    — Authenticate with LDAP credentials (declared, public)
  * POST /ext/auth/ldap/test     — Test LDAP connection (engine object `admin`)
  *
  * The configuration is the collection `ldap_settings`, one row per tenant,
@@ -13,7 +13,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import { ldapAuthenticate, type LdapConfig } from './ldap-provider.js';
-import type { ExtensionContext, HostCollections } from '@zveltio/sdk/extension';
+import type { ExtensionContext, HostCollections, RouteHandler } from '@zveltio/sdk/extension';
 
 const CredentialsSchema = z.object({
   username: z.string().min(1),
@@ -43,12 +43,13 @@ class LdapConfigUnreadable extends Error {
  * admits the caller's READ REACH — every firm for a god — so the tenant match
  * is what keeps a god in firm B off firm A's directory. One row per tenant
  * (`scope` is unique), so the page holds the own row unless the caller reaches
- * more firms with a saved row than it lists.
+ * more firms with a saved row than it lists. With no `tenant` (`/login`, read
+ * as the system, whose reach is the request's firm) the one row it reads.
  */
-async function getLdapConfig(c: any, collections: HostCollections): Promise<Settings | null> {
-  const tenant = (c.get('tenant') as { id?: string } | null | undefined)?.id;
+async function getLdapConfig(collections: HostCollections, tenant?: string): Promise<Settings | null> {
   const { records } = await collections.list('ldap_settings', { limit: 100 });
-  const row = (records as Record<string, any>[]).find((r) => r.tenant_id === tenant);
+  const rows = records as Record<string, any>[];
+  const row = tenant === undefined ? rows[0] : rows.find((r) => r.tenant_id === tenant);
   if (!row) return null;
   if (typeof row.bind_password !== 'string' || row.bind_password === '') throw new LdapConfigUnreadable();
   return {
@@ -65,43 +66,133 @@ async function getLdapConfig(c: any, collections: HostCollections): Promise<Sett
   };
 }
 
-export function ldapRoutes(ctx: ExtensionContext): Hono {
-  const { db, auth, internals, host } = ctx;
-
-  // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
-  // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
-  // a handler is therefore already RLS-scoped — there is one spelling, so there
-  // is none to forget.
-
-  // ctx.internals.createBetterAuthSession is the only way to produce a session
-  // the engine's `auth.api.getSession({ headers })` will accept: better-auth
-  // writes it where it reads sessions (its pool, or its Valkey cache) and names
-  // the cookie.
-  if (!internals?.createBetterAuthSession) {
-    throw new Error('[ldap] engine internals missing createBetterAuthSession — Zveltio version mismatch');
-  }
-  if (!host) throw new Error('[ldap] engine has no route host (needs 3.0.0-beta.103) — Zveltio version mismatch');
-  const crossDomain = ctx.config?.crossDomainAuth ?? false;
-
-  // In production, refuse non-TLS LDAP URLs. ldap:// on port 389 carries
-  // both the bind password and user credentials in cleartext over the
-  // wire — fine for dev against a local container, never acceptable in
-  // prod. Operators who really need ldap:// can set
-  // ALLOW_INSECURE_LDAP=true to opt out.
-  function assertLdapTransportSafe(url: string): void {
-    const inProd = ctx.config?.isProduction ?? false;
-    const allowInsecure = ctx.config?.allowInsecureLdap ?? false;
-    if (!inProd || allowInsecure) return;
-    const lower = url.toLowerCase().trim();
-    if (!lower.startsWith('ldaps://')) {
-      throw new Error(
-        `LDAP URL "${url}" is not using ldaps:// — refusing the connection ` +
+/**
+ * In production, refuse non-TLS LDAP URLs. ldap:// on port 389 carries both the
+ * bind password and user credentials in cleartext over the wire — fine for dev
+ * against a local container, never acceptable in prod. Operators who really
+ * need ldap:// can set ALLOW_INSECURE_LDAP=true to opt out.
+ */
+function assertLdapTransportSafe(ctx: Pick<ExtensionContext, 'config'>, url: string): void {
+  const inProd = ctx.config?.isProduction ?? false;
+  const allowInsecure = ctx.config?.allowInsecureLdap ?? false;
+  if (!inProd || allowInsecure) return;
+  const lower = url.toLowerCase().trim();
+  if (!lower.startsWith('ldaps://')) {
+    throw new Error(
+      `LDAP URL "${url}" is not using ldaps:// — refusing the connection ` +
         `in production. Set ALLOW_INSECURE_LDAP=true to override (NOT ` +
         `recommended; bind credentials and user passwords cross the wire ` +
         `in cleartext over ldap://).`,
-      );
-    }
+    );
   }
+}
+
+/**
+ * Read the config for a request, turning an unreadable one into a 500 that
+ * says so rather than reporting LDAP as unconfigured.
+ */
+async function loadConfig(
+  read: () => Promise<Settings | null>,
+): Promise<{ config: Settings | null; error: Response | null }> {
+  try {
+    return { config: await read(), error: null };
+  } catch (err) {
+    // The data API refused the caller (`/test` without a read grant on
+    // `ldap_settings`): its answer, not "unreadable".
+    const status = (err as { status?: number }).status;
+    if (typeof status === 'number' && status >= 400 && status < 500) {
+      return { config: null, error: Response.json({ error: (err as Error).message }, { status }) };
+    }
+    // The detail is the operator's, in the log: `/login` answers anyone.
+    console.error('[ldap] config unreadable:', (err as Error).message);
+    return {
+      config: null,
+      error: Response.json({ error: 'LDAP configuration is unreadable' }, { status: 500 }),
+    };
+  }
+}
+
+/**
+ * What `/login` keeps from `register`: a declared handler is handed the request
+ * and its `host` only, and reading the settings is more than the anonymous
+ * caller may (`asSystem`, `data:system`).
+ */
+let kept: Pick<ExtensionContext, 'config' | 'internals'> | undefined;
+
+export function keepContext(ctx: ExtensionContext): void {
+  kept = ctx;
+}
+
+const answer = (body: unknown, status: number) => Response.json(body, { status });
+
+/**
+ * POST /login — sign in with directory credentials. Declared public in the
+ * manifest, and the start of the `ldap` sign-in provider: the directory says
+ * who the person is, the engine signs them in (`host.identity`, ADR 0039) — it
+ * finds or creates the account, refuses a disabled one or one this tenant has
+ * no claim to, opens the session and audits it.
+ */
+export const login: RouteHandler = async (request, { host }) => {
+  const ctx = kept;
+  const identity = host.identity;
+  if (!ctx || !identity) throw new Error('[ldap] /login needs engine 3.0.0-beta.113');
+  const parsed = CredentialsSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) return answer({ success: false, error: parsed.error }, 400);
+  const { username, password } = parsed.data;
+  // The caller has no principal yet: the settings are read as the system
+  // (`data:system`, audited), whose reach is the request's tenant.
+  const loaded = await loadConfig(() =>
+    ctx.internals.asSystem(['ldap_settings'], () => getLdapConfig(host.collections)),
+  );
+  if (loaded.error) return loaded.error;
+  const config = loaded.config;
+  if (!config?.enabled) return answer({ error: 'LDAP authentication is not configured or disabled' }, 503);
+  try {
+    assertLdapTransportSafe(ctx, config.url);
+  } catch (err) {
+    return answer({ error: (err as Error).message }, 503);
+  }
+
+  const refused = (reason: string) =>
+    identity.signInRefused({ provider: 'ldap', identifier: username, reason });
+
+  let ldapUser: Awaited<ReturnType<typeof ldapAuthenticate>>;
+  try {
+    ldapUser = await ldapAuthenticate(config, username, password);
+  } catch (err) {
+    await refused((err as Error).message);
+    return answer({ error: `Authentication failed: ${(err as Error).message}` }, 401);
+  }
+  if (!ldapUser.email) {
+    await refused('no email attribute');
+    return answer({ error: 'LDAP user does not have an email address configured' }, 400);
+  }
+
+  try {
+    const { user, headers } = await identity.signIn({
+      provider: 'ldap',
+      subject: ldapUser.dn,
+      email: ldapUser.email,
+      ...(ldapUser.displayName ? { name: ldapUser.displayName } : {}),
+    });
+    return Response.json({ user }, { headers });
+  } catch (err) {
+    // Refused by the engine, which audited it: the directory said yes, the
+    // instance says no.
+    const { code, status } = err as { code?: string; status?: number };
+    if (code === 'account_disabled') return answer({ error: 'This account is disabled.' }, 403);
+    if (code === 'account_exists') {
+      return answer({ error: 'This directory cannot sign in to that account.' }, 403);
+    }
+    if (status === 400) return answer({ error: (err as Error).message }, 400);
+    throw err;
+  }
+};
+
+/** The routes `register` mounts: `/test`, for an administrator. */
+export function ldapRoutes(ctx: ExtensionContext): Hono {
+  const { auth, internals, host } = ctx;
+  if (!host) throw new Error('[ldap] engine has no route host (needs 3.0.0-beta.103) — Zveltio version mismatch');
 
   // The engine object `admin` (ADR 0002), asked as the tenant admin.
   async function adminCaller(c: any): Promise<any | Response> {
@@ -113,162 +204,20 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
 
   const router = new Hono();
 
-  /**
-   * Read the config for a request, turning an unreadable one into a 500 that
-   * says so rather than reporting LDAP as unconfigured.
-   */
-  async function loadConfig(
-    c: any,
-    read: () => Promise<Settings | null>,
-  ): Promise<{ config: Settings | null; error: Response | null }> {
-    try {
-      return { config: await read(), error: null };
-    } catch (err) {
-      // The data API refused the caller (`/test` without a read grant on
-      // `ldap_settings`): its answer, not "unreadable".
-      const status = (err as { status?: number }).status;
-      if (typeof status === 'number' && status >= 400 && status < 500) {
-        return { config: null, error: c.json({ error: (err as Error).message }, status) };
-      }
-      // The detail is the operator's, in the log: `/login` answers anyone.
-      console.error('[ldap] config unreadable:', (err as Error).message);
-      return { config: null, error: c.json({ error: 'LDAP configuration is unreadable' }, 500) };
-    }
-  }
-
-  // POST /login — authenticate user via LDAP
-  router.post('/login', zValidator('json', CredentialsSchema), async (c) => {
-    // The caller has no principal yet: the settings are read as the system
-    // (`data:system`, audited), in the request's tenant only.
-    const loaded = await loadConfig(c, () =>
-      internals.asSystem(['ldap_settings'], () => getLdapConfig(c, host(c).collections)),
-    );
-    if (loaded.error) return loaded.error;
-    const config = loaded.config;
-    if (!config?.enabled) return c.json({ error: 'LDAP authentication is not configured or disabled' }, 503);
-    try { assertLdapTransportSafe(config.url); } catch (err) {
-      return c.json({ error: (err as Error).message }, 503);
-    }
-
-    const { username, password } = c.req.valid('json');
-    const remoteIp = c.req.header('x-forwarded-for') ?? c.req.header('x-real-ip') ?? 'unknown';
-    const userAgent = c.req.header('user-agent') ?? null;
-
-    let ldapUser: any;
-    // Through the engine (`ctx.internals.audit`): `zv_audit_log` is the
-    // engine's, refused to `ctx.db` since engine #858. A failed write is logged
-    // and does not turn a refused login into a 500.
-    const auditFailure = async (err: any) => {
-      await internals
-        .audit({
-          type: 'auth.login_failed',
-          resourceType: 'session',
-          ip: remoteIp,
-          metadata: { provider: 'ldap', username, user_agent: userAgent, error: err?.message },
-        })
-        .catch((auditErr) => {
-          console.warn('[ldap] failed-login audit write failed:', (auditErr as Error).message);
-        });
-    };
-
-    try {
-      ldapUser = await ldapAuthenticate(config, username, password);
-    } catch (err: any) {
-      await auditFailure(err);
-      return c.json({ error: `Authentication failed: ${err.message}` }, 401);
-    }
-
-    if (!ldapUser.email) {
-      await auditFailure({ message: 'no email attribute' });
-      return c.json({ error: 'LDAP user does not have an email address configured' }, 400);
-    }
-
-    // Signing in is one act: the user record, the revocation of their previous
-    // sessions, the new session, and the audit row.
-    //
-    // The `.catch` that used to sit on the session delete was the dangerous one.
-    // The comment above states a security property — one active SSO session per
-    // user, so a leaked token stops working at the next sign-in — and swallowing
-    // the failure meant the property silently did not hold while the login
-    // succeeded and reported nothing. Inside a transaction it contained nothing
-    // either: Postgres refuses every statement after a failed one, so the
-    // session creation below would have died and been reported as something
-    // else entirely.
-    //
-    // The audit `try/catch` goes for the same reason. An SSO login with no audit
-    // row is a sign-in nobody can see afterwards.
-    //
-    // The session is the engine's to write: `session` is out of `ctx.db`'s reach
-    // (the `DELETE FROM session` here made every login a 500), and with Valkey
-    // better-auth reads sessions only from its cache. `replaceExisting` keeps one
-    // live SSO session per user, so a leaked token stops working at the next
-    // sign-in.
-    //
-    // The account is the engine's to find or create (`provisionUser`,
-    // `identity:provision`): `"user"` is refused to `ctx.db` since engine #858,
-    // which made every directory sign-in a 500. The engine matches the address
-    // case-insensitively and hands back an existing account only when the
-    // running tenant may claim it — never god, an instance admin, or another
-    // tenant's administrator. That matters here: the address comes from a
-    // directory attribute some directories let users edit themselves.
-    let signedIn: { user: any; token: string; setCookie: string };
-    try {
-      signedIn = await db.transaction().execute(async (trx) => {
-        const { user: u } = await internals.provisionUser({
-          email: ldapUser.email,
-          name: ldapUser.displayName || undefined,
-        });
-
-        const session = await internals.createBetterAuthSession(trx, u.id, {
-          ipAddress: remoteIp === 'unknown' ? undefined : remoteIp,
-          userAgent: userAgent ?? undefined,
-          crossDomain,
-          replaceExisting: true,
-        });
-
-        await internals.audit({
-          type: 'auth.login_success',
-          userId: u.id,
-          resourceType: 'session',
-          ip: remoteIp,
-          metadata: { provider: 'ldap', username, user_agent: userAgent },
-        });
-
-        return { user: u, ...session };
-      });
-    } catch (err: any) {
-      // A deactivated account: the directory said yes, the instance says no.
-      // An account this tenant has no claim to: the person signs in another way.
-      if (err?.code === 'account_disabled') {
-        await auditFailure(err);
-        return c.json({ error: 'This account is disabled.' }, 403);
-      }
-      if (err?.code === 'account_exists') {
-        await auditFailure(err);
-        return c.json({ error: 'This directory cannot sign in to that account.' }, 403);
-      }
-      throw err;
-    }
-    const { user, token, setCookie } = signedIn;
-
-    c.header('Set-Cookie', setCookie);
-    return c.json({
-      token,
-      user: { id: user.id, email: user.email, name: user.name },
-    });
-  });
-
   // POST /test — test LDAP connectivity with provided credentials (admin)
   router.post('/test', zValidator('json', CredentialsSchema), async (c) => {
     const admin = await adminCaller(c);
     if (admin instanceof Response) return admin;
 
     // As the caller: the settings are read under the caller's own grants.
-    const loaded = await loadConfig(c, () => getLdapConfig(c, host(c).collections));
+    const tenant = (c.get('tenant') as { id?: string } | null | undefined)?.id;
+    const loaded = await loadConfig(() => getLdapConfig(host(c).collections, tenant ?? ''));
     if (loaded.error) return loaded.error;
     const config = loaded.config;
     if (!config) return c.json({ error: 'LDAP not configured' }, 503);
-    try { assertLdapTransportSafe(config.url); } catch (err) {
+    try {
+      assertLdapTransportSafe(ctx, config.url);
+    } catch (err) {
       return c.json({ error: (err as Error).message }, 503);
     }
 

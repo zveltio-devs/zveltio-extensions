@@ -6,17 +6,13 @@
 // one, so the routes read it through `ctx.host(c).collections` (ADR 0025), as
 // the system inside `asSystem`, in the request's firm only.
 //
-// The ACS ran `DELETE FROM session` and the session insert on the request's
-// transaction — as `zveltio_rls`, which has had no grant on `session` since
-// engine migration 044 — so every SAML login answered 500. With Valkey the row
-// would not have been read anyway. The session is now the host's to write
-// (`createBetterAuthSession`), and the harness wires the engine's real one, so
-// "signed in" here means the engine's `getSession` read the cookie back.
+// The ACS is a declared public route (ADR 0039) that signs the person in with
+// `host.identity.signIn`: the engine finds or creates the account — an address
+// the tenant has no claim to, the instance owner's, signs nobody in — opens the
+// session and audits success and failure with the provider as actor. "Signed
+// in" here means the engine's `getSession` read the cookie back.
 //
-// The assertion is genuinely signed and validated by the real node-saml. The
-// account is the engine's to find or create (`provisionUser`): a first sign-in
-// provisions it, and an address the tenant has no claim to — the instance
-// owner's — signs nobody in.
+// The assertion is genuinely signed and validated by the real node-saml.
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { join } from 'node:path';
 // @ts-ignore — node-forge ships no types in this repository.
@@ -174,6 +170,50 @@ d('auth/saml — an assertion is a session the engine accepts', () => {
     expect(await getSession(firstCookie)).toBeUndefined();
   });
 
+  /** The engine's sign-in audit rows naming `who` (the NameID, or the assertion id). */
+  const audited = (type: string, who: string) =>
+    e.harness.asEveryTenant(e.db, async (trx: any) =>
+      (
+        await e.sql`SELECT user_id, metadata->>'provider' AS provider, metadata->>'actor' AS actor,
+                           metadata->>'reason' AS reason
+                      FROM zv_audit_log
+                     WHERE event_type = ${type}
+                       AND (metadata->>'subject' = ${who} OR metadata->>'identifier' = ${who})`.execute(trx)
+      ).rows,
+    );
+
+  it('a sign-in and a refused one each leave the engine audit entry, the provider as actor', async () => {
+    const email = `frank-${tag}@saml.test`;
+    const ok = await acs(email);
+    expect(ok.status).toBe(302);
+    const id = await getSession(ok.headers.get('set-cookie') ?? '');
+    const signedIn = await audited('auth.login_success', email);
+    expect([signedIn.length, signedIn[0]]).toMatchObject([
+      1,
+      { user_id: id, provider: 'saml', actor: 'ext:auth/saml' },
+    ]);
+
+    // A replay is refused at the provider: the engine audits it on its word.
+    const assertion = idp.response(email);
+    expect((await acs(email, assertion)).status).toBe(302);
+    expect((await acs(email, assertion)).status).toBe(401);
+    const aid = /<saml:Assertion ID="([^"]+)"/.exec(Buffer.from(assertion, 'base64').toString())?.[1] ?? '';
+    const failed = await audited('auth.login_failed', aid);
+    expect([failed.length, failed[0]?.provider, failed[0]?.reason]).toEqual([1, 'saml', 'assertion already used']);
+  });
+
+  it('GET /api/sign-in/providers lists the identity provider, for any front end', async () => {
+    const res = await e.engineApp.request('/api/sign-in/providers');
+    const { providers } = (await res.json()) as { providers: Record<string, unknown>[] };
+    expect(providers).toContainEqual({
+      id: 'saml',
+      label: 'SAML single sign-on',
+      kind: 'redirect',
+      extension: 'auth/saml',
+      url: '/ext/auth/saml/login',
+    });
+  });
+
   it('refuses a deactivated user with 403, no cookie, and spends the assertion', async () => {
     const email = `dave-${tag}@saml.test`;
     const id = await account(email, true);
@@ -184,6 +224,8 @@ d('auth/saml — an assertion is a session the engine accepts', () => {
     expect(res.headers.get('set-cookie')).toBeNull();
     const rows = await e.sql`SELECT 1 FROM session WHERE "userId" = ${id}`.execute(e.db);
     expect(rows.rows).toHaveLength(0);
+    const refused = await audited('auth.login_failed', email);
+    expect(refused.at(-1)).toMatchObject({ user_id: id, provider: 'saml', reason: 'account_disabled' });
     // Reactivated, the refused assertion still cannot be presented again.
     await e.sql`UPDATE "user" SET banned = false WHERE id = ${id}`.execute(e.db);
     expect((await acs(email, assertion)).status).toBe(401);

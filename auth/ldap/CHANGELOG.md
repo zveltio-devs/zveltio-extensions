@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.0.0 (2026-11-12)
+
+- feat!: signing in is the engine's (ADR 0039): `POST /login` is a declared public route answered by a plain function, and signs the person in with `host.identity.signIn` instead of `provisionUser`, `createBetterAuthSession` and `audit`. The engine finds or creates the account, refuses a disabled one or one the tenant has no claim to (403, as before), opens the session and writes `auth.login_success` with `provider: "ldap"` and the DN as subject; a refused directory bind or an entry without a mail address is audited through `host.identity.signInRefused`. A first sign-in's success entry is no longer lost: it was written outside the request's transaction, before the new account existed there
+- feat!: the `/login` answer is `{ user }` with the session cookie; the unsigned `token` field is gone (it never authenticated a bearer request). A client that sends no session cookie gets the signed token in the `set-auth-token` header, as from the engine's own sign-in
+- feat: the manifest declares the `ldap` sign-in provider (`credentials`, `POST /login`), so any front end lists it from `GET /api/sign-in/providers`
+- chore: `identity:provision` is no longer requested; `publicRoutes` is replaced by `routes`
+- Needs engine 3.0.0-beta.113
 ## 2.1.1 (2026-11-09)
 
 - build: repacked with hono 4.13.17 and kysely 0.29.8, in lockstep with the engine; no behaviour change

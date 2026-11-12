@@ -14389,10 +14389,10 @@ class LdapConfigUnreadable extends Error {
     this.name = "LdapConfigUnreadable";
   }
 }
-async function getLdapConfig(c, collections) {
-  const tenant = c.get("tenant")?.id;
+async function getLdapConfig(collections, tenant) {
   const { records } = await collections.list("ldap_settings", { limit: 100 });
-  const row = records.find((r) => r.tenant_id === tenant);
+  const rows = records;
+  const row = tenant === undefined ? rows[0] : rows.find((r) => r.tenant_id === tenant);
   if (!row)
     return null;
   if (typeof row.bind_password !== "string" || row.bind_password === "")
@@ -14410,24 +14410,92 @@ async function getLdapConfig(c, collections) {
     tlsVerify: row.tls_verify !== false
   };
 }
-function ldapRoutes(ctx) {
-  const { db, auth, internals, host } = ctx;
-  if (!internals?.createBetterAuthSession) {
-    throw new Error("[ldap] engine internals missing createBetterAuthSession \u2014 Zveltio version mismatch");
+function assertLdapTransportSafe(ctx, url) {
+  const inProd = ctx.config?.isProduction ?? false;
+  const allowInsecure = ctx.config?.allowInsecureLdap ?? false;
+  if (!inProd || allowInsecure)
+    return;
+  const lower = url.toLowerCase().trim();
+  if (!lower.startsWith("ldaps://")) {
+    throw new Error(`LDAP URL "${url}" is not using ldaps:// \u2014 refusing the connection ` + `in production. Set ALLOW_INSECURE_LDAP=true to override (NOT ` + `recommended; bind credentials and user passwords cross the wire ` + `in cleartext over ldap://).`);
   }
+}
+async function loadConfig(read) {
+  try {
+    return { config: await read(), error: null };
+  } catch (err) {
+    const status = err.status;
+    if (typeof status === "number" && status >= 400 && status < 500) {
+      return { config: null, error: Response.json({ error: err.message }, { status }) };
+    }
+    console.error("[ldap] config unreadable:", err.message);
+    return {
+      config: null,
+      error: Response.json({ error: "LDAP configuration is unreadable" }, { status: 500 })
+    };
+  }
+}
+var kept;
+function keepContext(ctx) {
+  kept = ctx;
+}
+var answer = (body, status) => Response.json(body, { status });
+var login = async (request, { host }) => {
+  const ctx = kept;
+  const identity = host.identity;
+  if (!ctx || !identity)
+    throw new Error("[ldap] /login needs engine 3.0.0-beta.113");
+  const parsed = CredentialsSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success)
+    return answer({ success: false, error: parsed.error }, 400);
+  const { username, password } = parsed.data;
+  const loaded = await loadConfig(() => ctx.internals.asSystem(["ldap_settings"], () => getLdapConfig(host.collections)));
+  if (loaded.error)
+    return loaded.error;
+  const config = loaded.config;
+  if (!config?.enabled)
+    return answer({ error: "LDAP authentication is not configured or disabled" }, 503);
+  try {
+    assertLdapTransportSafe(ctx, config.url);
+  } catch (err) {
+    return answer({ error: err.message }, 503);
+  }
+  const refused = (reason) => identity.signInRefused({ provider: "ldap", identifier: username, reason });
+  let ldapUser;
+  try {
+    ldapUser = await ldapAuthenticate(config, username, password);
+  } catch (err) {
+    await refused(err.message);
+    return answer({ error: `Authentication failed: ${err.message}` }, 401);
+  }
+  if (!ldapUser.email) {
+    await refused("no email attribute");
+    return answer({ error: "LDAP user does not have an email address configured" }, 400);
+  }
+  try {
+    const { user, headers } = await identity.signIn({
+      provider: "ldap",
+      subject: ldapUser.dn,
+      email: ldapUser.email,
+      ...ldapUser.displayName ? { name: ldapUser.displayName } : {}
+    });
+    return Response.json({ user }, { headers });
+  } catch (err) {
+    const { code, status } = err;
+    if (code === "account_disabled")
+      return answer({ error: "This account is disabled." }, 403);
+    if (code === "account_exists") {
+      return answer({ error: "This directory cannot sign in to that account." }, 403);
+    }
+    if (status === 400)
+      return answer({ error: err.message }, 400);
+    throw err;
+  }
+};
+function ldapRoutes(ctx) {
+  const { auth, internals, host } = ctx;
   if (!host)
     throw new Error("[ldap] engine has no route host (needs 3.0.0-beta.103) \u2014 Zveltio version mismatch");
-  const crossDomain = ctx.config?.crossDomainAuth ?? false;
-  function assertLdapTransportSafe(url) {
-    const inProd = ctx.config?.isProduction ?? false;
-    const allowInsecure = ctx.config?.allowInsecureLdap ?? false;
-    if (!inProd || allowInsecure)
-      return;
-    const lower = url.toLowerCase().trim();
-    if (!lower.startsWith("ldaps://")) {
-      throw new Error(`LDAP URL "${url}" is not using ldaps:// \u2014 refusing the connection ` + `in production. Set ALLOW_INSECURE_LDAP=true to override (NOT ` + `recommended; bind credentials and user passwords cross the wire ` + `in cleartext over ldap://).`);
-    }
-  }
   async function adminCaller(c) {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     if (!session)
@@ -14437,106 +14505,19 @@ function ldapRoutes(ctx) {
     return session.user;
   }
   const router = new Hono2;
-  async function loadConfig(c, read) {
-    try {
-      return { config: await read(), error: null };
-    } catch (err) {
-      const status = err.status;
-      if (typeof status === "number" && status >= 400 && status < 500) {
-        return { config: null, error: c.json({ error: err.message }, status) };
-      }
-      console.error("[ldap] config unreadable:", err.message);
-      return { config: null, error: c.json({ error: "LDAP configuration is unreadable" }, 500) };
-    }
-  }
-  router.post("/login", zValidator("json", CredentialsSchema), async (c) => {
-    const loaded = await loadConfig(c, () => internals.asSystem(["ldap_settings"], () => getLdapConfig(c, host(c).collections)));
-    if (loaded.error)
-      return loaded.error;
-    const config = loaded.config;
-    if (!config?.enabled)
-      return c.json({ error: "LDAP authentication is not configured or disabled" }, 503);
-    try {
-      assertLdapTransportSafe(config.url);
-    } catch (err) {
-      return c.json({ error: err.message }, 503);
-    }
-    const { username, password } = c.req.valid("json");
-    const remoteIp = c.req.header("x-forwarded-for") ?? c.req.header("x-real-ip") ?? "unknown";
-    const userAgent = c.req.header("user-agent") ?? null;
-    let ldapUser;
-    const auditFailure = async (err) => {
-      await internals.audit({
-        type: "auth.login_failed",
-        resourceType: "session",
-        ip: remoteIp,
-        metadata: { provider: "ldap", username, user_agent: userAgent, error: err?.message }
-      }).catch((auditErr) => {
-        console.warn("[ldap] failed-login audit write failed:", auditErr.message);
-      });
-    };
-    try {
-      ldapUser = await ldapAuthenticate(config, username, password);
-    } catch (err) {
-      await auditFailure(err);
-      return c.json({ error: `Authentication failed: ${err.message}` }, 401);
-    }
-    if (!ldapUser.email) {
-      await auditFailure({ message: "no email attribute" });
-      return c.json({ error: "LDAP user does not have an email address configured" }, 400);
-    }
-    let signedIn;
-    try {
-      signedIn = await db.transaction().execute(async (trx) => {
-        const { user: u } = await internals.provisionUser({
-          email: ldapUser.email,
-          name: ldapUser.displayName || undefined
-        });
-        const session = await internals.createBetterAuthSession(trx, u.id, {
-          ipAddress: remoteIp === "unknown" ? undefined : remoteIp,
-          userAgent: userAgent ?? undefined,
-          crossDomain,
-          replaceExisting: true
-        });
-        await internals.audit({
-          type: "auth.login_success",
-          userId: u.id,
-          resourceType: "session",
-          ip: remoteIp,
-          metadata: { provider: "ldap", username, user_agent: userAgent }
-        });
-        return { user: u, ...session };
-      });
-    } catch (err) {
-      if (err?.code === "account_disabled") {
-        await auditFailure(err);
-        return c.json({ error: "This account is disabled." }, 403);
-      }
-      if (err?.code === "account_exists") {
-        await auditFailure(err);
-        return c.json({ error: "This directory cannot sign in to that account." }, 403);
-      }
-      throw err;
-    }
-    const { user, token, setCookie } = signedIn;
-    c.header("Set-Cookie", setCookie);
-    return c.json({
-      token,
-      user: { id: user.id, email: user.email, name: user.name }
-    });
-  });
   router.post("/test", zValidator("json", CredentialsSchema), async (c) => {
     const admin = await adminCaller(c);
     if (admin instanceof Response)
       return admin;
-    const loaded = await loadConfig(c, () => getLdapConfig(c, host(c).collections));
+    const tenant = c.get("tenant")?.id;
+    const loaded = await loadConfig(() => getLdapConfig(host(c).collections, tenant ?? ""));
     if (loaded.error)
       return loaded.error;
     const config = loaded.config;
     if (!config)
       return c.json({ error: "LDAP not configured" }, 503);
     try {
-      assertLdapTransportSafe(config.url);
+      assertLdapTransportSafe(ctx, config.url);
     } catch (err) {
       return c.json({ error: err.message }, 503);
     }
@@ -14556,7 +14537,9 @@ var extension = {
   name: "auth/ldap",
   category: "auth",
   mountStrategy: "subapp",
+  routes: { login },
   async register(app, ctx) {
+    keepContext(ctx);
     app.route("/", ldapRoutes(ctx));
   }
 };
