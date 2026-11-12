@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.0.0 (2026-11-12)
+
+- feat!: the directory is the engine's (ADR 0039 decision 9). SCIM maps the protocol onto `host.identity`'s `provision`, `update`, `setActive`, `remove`, `list` and `get`; the extension no longer holds `auth:users` and calls no directory internal (`provisionUser`, `listTenantUsers`, `updateUserProfile`, `setUserActive`, `liftOwnBan`, `addTenantMember`, `removeTenantMember`, `setTenantMembershipEnd`, `revokeUserSessions`, `deleteUser`), and writes no SQL: `scim_tokens` and `scim_users` go through `host.collections`. Needs engine 3.0.0-beta.114
+- feat!: a provider reaches only the accounts it provisioned, in its tenant. A member an administrator invited, another tenant's or another provider's account answers 404 and is not listed (the `userName eq` probe included); 2.x read, renamed, suspended and removed every member of its tenant. Accounts 2.x provisioned are carried over by the engine (migration 120, from `scim_users`), with the SCIM `id` the IdP holds
+- feat!: **upgrade step:** every route is declared in the manifest (ADR 0039) and SCIM moves from `/scim/v2` to `/ext/auth/scim/v2` — change the provider's Tenant URL. Tokens stay valid. `POST /tokens` answers `base_url: /ext/auth/scim/v2`
+- feat: the engine audits each act (`identity.provisioned`, `identity.updated`, `identity.active_set`, `identity.removed`) with `ext:auth/scim` as the actor; a deleted account's `user.deleted` names `ext:auth/scim` (2.x named the token, which the `extension.as_system` row of the request still does)
+- feat: a provisioning refused after a write rolls the whole request back (a profile changed while the deactivation sent with it was refused); refused before any write, it answers the SCIM error as before. A refusal the engine names (`not_in_force`, `user_not_owned`, `role_not_allowed`) answers 403
+- chore: `scim_users` keeps only `externalId` (`user_id`, `external_id`); its `active`, `suspended_at` and `held_valid_to` are no longer written — the engine's link holds them
+- test: the suite runs the packed bundle on the engine's own `/ext/*` chain (`onEngine`) and proves a member the provider did not provision is out of its reach
+
 ## 2.0.2 (2026-11-09)
 
 - build: repacked with hono 4.13.17 and kysely 0.29.8, in lockstep with the engine; no behaviour change

@@ -9,26 +9,24 @@ deactivated automatically.
 ## The address you give the provider
 
 ```
-https://YOUR-DOMAIN/scim/v2
+https://YOUR-DOMAIN/ext/auth/scim/v2
 ```
 
-**At the root, not under `/ext/`.** The extension mounts there deliberately,
-because identity providers expect a standard SCIM address and some will not accept
-arbitrary paths.
-
-Worth saying explicitly because it is easy to get wrong:
-`/ext/auth/scim/...` returns **401** and looks like a token problem. It is not —
-there is simply no service there.
+Every route of an extension is declared in its manifest and served under
+`/ext/<name>` (ADR 0039). **Upgrading from 2.x:** the address moved from
+`/scim/v2` to `/ext/auth/scim/v2` — change the provider's Tenant URL; the token
+and the users it provisioned stay.
 
 The full addresses the provider will call:
 
 ```
-GET    /scim/v2/ServiceProviderConfig
-GET    /scim/v2/Users
-POST   /scim/v2/Users
-GET    /scim/v2/Users/{id}
-PATCH  /scim/v2/Users/{id}
-DELETE /scim/v2/Users/{id}
+GET    /ext/auth/scim/v2/ServiceProviderConfig
+GET    /ext/auth/scim/v2/Users
+POST   /ext/auth/scim/v2/Users
+GET    /ext/auth/scim/v2/Users/{id}
+PUT    /ext/auth/scim/v2/Users/{id}
+PATCH  /ext/auth/scim/v2/Users/{id}
+DELETE /ext/auth/scim/v2/Users/{id}
 ```
 
 ---
@@ -37,8 +35,8 @@ DELETE /scim/v2/Users/{id}
 
 **This is the step people forget**, and without it nothing works.
 
-The extension asks for `auth:users`, `identity:provision`, `secrets`,
-`data:system` and `data:write`. They are **declared** in the manifest but not
+The extension asks for `identity:provision`, `secrets`, `data:system` and
+`data:write`. They are **declared** in the manifest but not
 granted automatically — an administrator has to approve them explicitly. That is
 by design: an extension asking for more power has to ask visibly.
 
@@ -51,9 +49,10 @@ and every call answers 500: the provider has no user behind it, so the extension
 reads `scim_tokens` and writes `scim_users` as the system, inside the token's
 tenant (audited per call).
 
-Without `auth:users` it cannot revoke a session, block a sign-in or delete an
-account, so every provisioning, (de)activation and delete answers 500 until it
-is approved — the IdP retries, so nothing is lost.
+Without `identity:provision` the engine refuses every provisioning call with
+`403 capability_required`: the directory is the engine's (`host.identity`, ADR
+0039 decision 9) and an extension reaches it only with the approved capability.
+The extension holds no broader user power (`auth:users` is no longer requested).
 
 Approval happens from the **Marketplace**, on the extension's card, at
 installation or after an update that asks for a new capability.
@@ -86,8 +85,14 @@ minted again, and 1.x provisioning state is not carried over.
 Provisioning creates **new** accounts. If the email already has an account on
 the instance — for example, the person also works for another tenant — the
 provider gets `409 uniqueness` and nothing changes. A tenant administrator adds
-an existing account to the tenant by invitation; from then on the provider can
-read, update and deprovision it.
+an existing account to the tenant by invitation.
+
+**A provider reaches only the accounts it provisioned**, in its tenant: the
+engine keeps the link between an account and the provider that created it. A
+member an administrator invited, another tenant's account or another
+provider's is `404` to it, and absent from `GET /Users` (the `userName eq`
+probe included). Accounts provisioned by 2.x are carried over by the engine
+(migration 120) and stay the provider's.
 
 ---
 
@@ -97,7 +102,7 @@ In Azure AD / Okta, under provisioning:
 
 | Field | Value |
 |---|---|
-| Tenant URL | `https://YOUR-DOMAIN/scim/v2` |
+| Tenant URL | `https://YOUR-DOMAIN/ext/auth/scim/v2` |
 | Secret Token | the `zvscim_…` token from Step 2 |
 
 Then **Test Connection**. The provider calls `ServiceProviderConfig`; if that
@@ -169,8 +174,8 @@ re-dates a membership the provider had deactivated — the business's date wins.
    (403), and open realtime connections to it close within a minute;
 2. if the user no longer belongs to any tenant, deletes the account too, with all
    its sessions — the same way an administrator's delete does: grants removed,
-   and a `user.deleted` audit entry naming the SCIM token (`scim:<token id>`) and
-   the tenant. On a single-tenant instance this is every deletion;
+   and a `user.deleted` audit entry with `ext:auth/scim` as the actor and the
+   tenant. On a single-tenant instance this is every deletion;
 3. otherwise **deletes all their sessions, immediately**, once no tenant has them
    in force (the other memberships have ended or not started). While another
    tenant still has them, their session stays and keeps working there, as on
@@ -184,11 +189,17 @@ still get in on Monday with a browser left open.
 ## If something does not work
 
 **500 on every call, with a valid token** — almost certainly the capabilities are
-not approved (`secrets`, `data:system`). Check Step 1.
+not approved (`secrets`, `data:system`). Check Step 1. **403
+`capability_required`** on provisioning: `identity:provision` is not approved.
 
-**401 on `ServiceProviderConfig` too** — wrong token, the address is under
-`/ext/` instead of the root, or (multi-tenant) the request does not name the
-token's tenant: use the tenant's hostname.
+**401 on `ServiceProviderConfig` too** — wrong token, or (multi-tenant) the
+request does not name the token's tenant: use the tenant's hostname.
+
+**404 on the old address `/scim/v2`** — 3.0.0 serves SCIM at
+`/ext/auth/scim/v2`; change the provider's Tenant URL.
+
+Every provisioning act — provision, update, (de)activation, removal — leaves an
+`identity.*` audit entry the engine writes, with `ext:auth/scim` as the actor.
 
 **500 "SCIM is not configured on this server"** — the `secrets` capability is not
 approved, or the instance's auth secret (`BETTER_AUTH_SECRET`) is missing from
