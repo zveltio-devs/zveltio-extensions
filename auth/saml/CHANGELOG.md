@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.1 (2026-11-12)
+
+- fix: a person the tenant does not admit (`not_a_member`) or a sign-in through an extension without `auth:session` (`capability_required`) is answered like an account the provider has no claim to: 403 with the extension's message, and the assertion is spent. Before, the engine's problem response passed through and the request rolled back. Needs engine 3.0.0-beta.113
+
 ## 2.2.0 (2026-11-12)
 
 - feat: signing in is the engine's (ADR 0039): `/login`, `/callback` and `/metadata` are declared public routes answered by plain functions, and the ACS signs the person in with `host.identity.signIn` instead of `provisionUser` and `createBetterAuthSession`. The engine finds or creates the account, refuses a disabled one or one the tenant has no claim to (403, the assertion spent, as before), opens the session and writes `auth.login_success` with `provider: "saml"` and the NameID as subject. A response that fails validation, a replayed assertion and one with no address are now audited (`auth.login_failed`) through `host.identity.signInRefused`; SAML wrote no audit entry before

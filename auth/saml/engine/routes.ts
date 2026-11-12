@@ -204,7 +204,7 @@ export const callback: RouteHandler = async (request, { host }) => {
     // refused assertion is spent, not kept for later.
     const { code, status } = err as { code?: string; status?: number };
     if (code === 'account_disabled') return answer({ error: 'This account is disabled.' }, 403);
-    if (code === 'account_exists') {
+    if (code === 'account_exists' || code === 'not_a_member' || code === 'capability_required') {
       return answer({ error: 'This identity provider cannot sign in to that account.' }, 403);
     }
     if (status === 400) return answer({ error: (err as Error).message }, 400);
