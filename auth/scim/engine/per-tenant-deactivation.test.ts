@@ -85,6 +85,11 @@ d('auth/scim — multi-tenant deactivation is per tenant', () => {
       await sql`INSERT INTO zv_tenant_users (tenant_id, user_id, role, valid_from, valid_to)
                 VALUES (${t.id}::uuid, ${p.userId}, 'member', now() - interval '1 day',
                         ${t.validTo ?? null}::timestamptz)`.execute(db);
+      // Each tenant's IdP provisioned them (as 2.x did, carried over by engine
+      // migration 120: the SCIM id is the user id). The engine reaches only
+      // accounts a provider holds (ADR 0039 decision 9).
+      await sql`INSERT INTO zv_identity_links (tenant_id, provider, subject, user_id)
+                VALUES (${t.id}::uuid, 'auth/scim', ${p.userId}, ${p.userId})`.execute(db);
     }
     return p;
   };
