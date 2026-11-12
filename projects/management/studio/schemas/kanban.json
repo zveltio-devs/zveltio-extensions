@@ -1,0 +1,32 @@
+{
+  "spec": "zveltio.view/2",
+  "title": "projects.management.kanban.title",
+  "type": "split",
+  "panes": [
+    {
+      "id": "project",
+      "type": "list",
+      "collection": "projects",
+      "fields": ["name", { "field": "status", "label": "projects.management.col.status", "display": "badge" }],
+      "sort": "-created_at",
+      "search": true
+    },
+    {
+      "type": "board",
+      "collection": "tasks",
+      "groupBy": "status",
+      "filter": [{ "field": "project_id", "op": "eq", "value": { "$selected": "project" } }],
+      "card": [
+        "title",
+        {
+          "field": "priority",
+          "label": "projects.management.col.priority",
+          "display": "badge",
+          "tones": { "low": "muted", "medium": "info", "high": "warning", "critical": "danger" }
+        },
+        { "field": "due_date", "label": "projects.management.col.dueDate" }
+      ],
+      "move": "patch"
+    }
+  ]
+}

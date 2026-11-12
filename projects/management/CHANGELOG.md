@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.0 (2026-11-12)
+
+- feat: the Kanban page is a `zveltio.view/2` view (ADR 0042): projects on the left, the selected project's tasks in one column per status; dragging a card patches its status through the data API as the signed-in user. The extension ships no Svelte code
+- the per-column "add task" box is gone: create tasks on the Projects page
+- requires engine 3.0.0-beta.112 (Studio draws `board`)
+
 ## 2.0.0 (2026-10-29)
 
 - feat!: the data lives in ten declared collections (`schema/collections/`), created and owned by the engine; no SQL migrations
