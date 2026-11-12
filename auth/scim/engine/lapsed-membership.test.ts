@@ -23,8 +23,6 @@ const PATCH_OP = 'urn:ietf:params:scim:api:messages:2.0:PatchOp';
 const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001';
 
 type ScimUser = { id: string; active: boolean };
-// biome-ignore lint/suspicious/noExplicitAny: the harness app is untyped
-type App = any;
 
 d('auth/scim — a lapsed membership reads as active: false and is not writable', () => {
   const pool = new Pool({ connectionString: process.env.TEST_DATABASE_URL });
@@ -48,11 +46,10 @@ d('auth/scim — a lapsed membership reads as active: false and is not writable'
     return idp;
   };
 
-  const provision = async (
-    app: App,
-    json: Record<string, string>,
-    tag: string,
-  ): Promise<{ id: string; email: string }> => {
+  type Idp = Awaited<ReturnType<typeof scimApp>>;
+  /** `id`: the engine user; `sid`: the SCIM id (the provider's subject). */
+  const provision = async (idp: Idp, tag: string): Promise<{ id: string; sid: string; email: string }> => {
+    const { app, json } = idp;
     const email = `scim-${tag}-${crypto.randomUUID()}@test.local`;
     const res = await app.request('/scim/v2/Users', {
       method: 'POST',
@@ -60,9 +57,10 @@ d('auth/scim — a lapsed membership reads as active: false and is not writable'
       body: JSON.stringify({ schemas: [SCIM_USER], userName: email, active: true }),
     });
     expect(res.status).toBe(201);
-    const { id } = (await res.json()) as { id: string };
+    const { id: sid } = (await res.json()) as { id: string };
+    const id = await idp.userIdOf(sid);
     userIds.push(id);
-    return { id, email };
+    return { id, sid, email };
   };
 
   const lapse = async (tenant: string, userId: string, how: 'expired' | 'future') => {
@@ -94,11 +92,12 @@ d('auth/scim — a lapsed membership reads as active: false and is not writable'
     const t = await sql<{ n: number }>`SELECT COUNT(*)::int AS n FROM zv_tenants`.execute(db);
     expect(t.rows[0]!.n).toBe(1);
 
-    const { app, json } = await idpOf(DEFAULT_TENANT_ID);
-    const u = await provision(app, json, 'solo');
+    const idp = await idpOf(DEFAULT_TENANT_ID);
+    const { app, json } = idp;
+    const u = await provision(idp, 'solo');
     await lapse(DEFAULT_TENANT_ID, u.id, 'expired');
 
-    const off = await app.request(`/scim/v2/Users/${u.id}`, {
+    const off = await app.request(`/scim/v2/Users/${u.sid}`, {
       method: 'PATCH',
       headers: json,
       body: patchActive(false, 'path'),
@@ -106,7 +105,7 @@ d('auth/scim — a lapsed membership reads as active: false and is not writable'
     expect(off.status).toBe(200);
     expect((await account(u.id))!.banned).toBe(true);
 
-    const on = await app.request(`/scim/v2/Users/${u.id}`, {
+    const on = await app.request(`/scim/v2/Users/${u.sid}`, {
       method: 'PUT',
       headers: json,
       body: JSON.stringify({ schemas: [SCIM_USER], userName: u.email, displayName: 'Solo Renamed' }),
@@ -121,11 +120,12 @@ d('auth/scim — a lapsed membership reads as active: false and is not writable'
     await sql`
       INSERT INTO zv_tenants (id, slug, name) VALUES (${tenantId}::uuid, ${`lapsed-${tenantId}`}, 'Lapsed')
     `.execute(db);
-    const { app, json } = await idpOf(tenantId);
+    const idp = await idpOf(tenantId);
+    const { app, json } = idp;
 
-    const expired = await provision(app, json, 'expired');
-    const future = await provision(app, json, 'future');
-    const current = await provision(app, json, 'current');
+    const expired = await provision(idp, 'expired');
+    const future = await provision(idp, 'future');
+    const current = await provision(idp, 'current');
     await lapse(tenantId, expired.id, 'expired');
     await lapse(tenantId, future.id, 'future');
 
@@ -139,14 +139,14 @@ d('auth/scim — a lapsed membership reads as active: false and is not writable'
     // …and is told the truth about it.
     expect(found.Resources[0]!.active).toBe(false);
 
-    const one = await app.request(`/scim/v2/Users/${future.id}`, { headers: json });
+    const one = await app.request(`/scim/v2/Users/${future.sid}`, { headers: json });
     expect(one.status).toBe(200);
     expect(((await one.json()) as ScimUser).active).toBe(false);
 
     const list = await app.request('/scim/v2/Users', { headers: json });
     const all = ((await list.json()) as { Resources: ScimUser[] }).Resources;
     const activeOf = Object.fromEntries(all.map((u) => [u.id, u.active]));
-    expect(activeOf).toEqual({ [expired.id]: false, [future.id]: false, [current.id]: true });
+    expect(activeOf).toEqual({ [expired.sid]: false, [future.sid]: false, [current.sid]: true });
 
     // Every write but DELETE is refused, with a reason the IdP admin can read.
     const before = { expired: await account(expired.id), future: await account(future.id) };
@@ -155,13 +155,13 @@ d('auth/scim — a lapsed membership reads as active: false and is not writable'
       Operations: [{ op: 'replace', path: 'displayName', value: 'Renamed' }],
     });
     const writes: Array<[string, string, string]> = [
-      [expired.id, 'PATCH', patchActive(true, 'path')],
-      [expired.id, 'PATCH', patchActive(false, 'path')],
-      [future.id, 'PATCH', patchActive(true, 'value')],
-      [future.id, 'PATCH', patchActive(false, 'value')],
-      [expired.id, 'PATCH', rename],
-      [future.id, 'PUT', JSON.stringify({ schemas: [SCIM_USER], userName: 'taken@test.local', displayName: 'X' })],
-      [expired.id, 'PUT', JSON.stringify({ schemas: [SCIM_USER], userName: expired.email, active: false })],
+      [expired.sid, 'PATCH', patchActive(true, 'path')],
+      [expired.sid, 'PATCH', patchActive(false, 'path')],
+      [future.sid, 'PATCH', patchActive(true, 'value')],
+      [future.sid, 'PATCH', patchActive(false, 'value')],
+      [expired.sid, 'PATCH', rename],
+      [future.sid, 'PUT', JSON.stringify({ schemas: [SCIM_USER], userName: 'taken@test.local', displayName: 'X' })],
+      [expired.sid, 'PUT', JSON.stringify({ schemas: [SCIM_USER], userName: expired.email, active: false })],
     ];
     const answers: Array<[string, number, string | undefined]> = [];
     for (const [id, method, body] of writes) {
@@ -175,19 +175,19 @@ d('auth/scim — a lapsed membership reads as active: false and is not writable'
     expect({ expired: await account(expired.id), future: await account(future.id) }).toEqual(before);
     expect(before.expired!.banned).not.toBe(true);
     // `active: true` reopened nothing.
-    const still = await app.request(`/scim/v2/Users/${expired.id}`, { headers: json });
+    const still = await app.request(`/scim/v2/Users/${expired.sid}`, { headers: json });
     expect(still.status).toBe(200);
     expect(((await still.json()) as ScimUser).active).toBe(false);
 
     // A member in force is written as before.
-    const renamed = await app.request(`/scim/v2/Users/${current.id}`, {
+    const renamed = await app.request(`/scim/v2/Users/${current.sid}`, {
       method: 'PATCH',
       headers: json,
       body: rename,
     });
     expect(renamed.status).toBe(200);
     expect((await account(current.id))!.name).toBe('Renamed');
-    const put = await app.request(`/scim/v2/Users/${current.id}`, {
+    const put = await app.request(`/scim/v2/Users/${current.sid}`, {
       method: 'PUT',
       headers: json,
       body: JSON.stringify({ schemas: [SCIM_USER], userName: current.email, displayName: 'Put', active: false }),
@@ -197,7 +197,7 @@ d('auth/scim — a lapsed membership reads as active: false and is not writable'
     expect(await account(current.id)).toEqual({ name: 'Put', email: current.email, banned: true });
 
     // Offboarding a lapsed member still works; with no other tenant the account goes.
-    const del = await app.request(`/scim/v2/Users/${expired.id}`, { method: 'DELETE', headers: json });
+    const del = await app.request(`/scim/v2/Users/${expired.sid}`, { method: 'DELETE', headers: json });
     expect(del.status).toBe(204);
     expect(await account(expired.id)).toBeUndefined();
   });
@@ -208,12 +208,13 @@ d('auth/scim — a lapsed membership reads as active: false and is not writable'
     expect(t.rows[0]!.n).toBeGreaterThan(1);
 
     const other = await idpOf(tenantId);
-    const { app, json: dflt } = await idpOf(DEFAULT_TENANT_ID);
+    const dfltIdp = await idpOf(DEFAULT_TENANT_ID);
+    const { app, json: dflt } = dfltIdp;
     // Provisioned by the other tenant only: no default-tenant row.
-    const outsider = await provision(other.app, other.json, 'outsider');
-    const insider = await provision(app, dflt, 'insider');
+    const outsider = await provision(other, 'outsider');
+    const insider = await provision(dfltIdp, 'insider');
 
-    const get = await app.request(`/scim/v2/Users/${outsider.id}`, { headers: dflt });
+    const get = await app.request(`/scim/v2/Users/${outsider.sid}`, { headers: dflt });
     expect(get.status).toBe(404);
     const probe = await app.request(
       `/scim/v2/Users?filter=${encodeURIComponent(`userName eq "${outsider.email}"`)}`,
@@ -222,14 +223,14 @@ d('auth/scim — a lapsed membership reads as active: false and is not writable'
     expect(((await probe.json()) as { totalResults: number }).totalResults).toBe(0);
     const list = await app.request('/scim/v2/Users?count=200', { headers: dflt });
     const ids = ((await list.json()) as { Resources: ScimUser[] }).Resources.map((u) => u.id);
-    expect(ids).toContain(insider.id);
-    expect(ids).not.toContain(outsider.id);
+    expect(ids).toContain(insider.sid);
+    expect(ids).not.toContain(outsider.sid);
     for (const [method, body] of [
       ['PATCH', patchActive(false, 'path')],
       ['PUT', JSON.stringify({ schemas: [SCIM_USER], userName: outsider.email, active: false })],
       ['DELETE', undefined],
     ] as const) {
-      const res = await app.request(`/scim/v2/Users/${outsider.id}`, { method, headers: dflt, body });
+      const res = await app.request(`/scim/v2/Users/${outsider.sid}`, { method, headers: dflt, body });
       expect(res.status).toBe(404);
     }
     expect((await account(outsider.id))!.banned).not.toBe(true);
