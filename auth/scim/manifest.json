@@ -3,12 +3,11 @@
   "displayName": "SCIM Provisioning",
   "category": "auth",
   "description": "SCIM 2.0 user provisioning for Azure AD / Entra, Okta and other identity providers — bearer tokens, Users CRUD, active-flag offboarding",
-  "version": "2.0.2",
-  "zveltioMinVersion": "3.0.0-beta.102",
+  "version": "3.0.0",
+  "zveltioMinVersion": "3.0.0-beta.114",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-scim",
   "permissions": [
-    "auth:users",
     "identity:provision",
     "secrets",
     "data:system",
@@ -16,6 +15,62 @@
   ],
   "i18nPrefixes": [
     "auth.scim"
+  ],
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/tokens",
+      "access": "caller",
+      "handler": "mintToken"
+    },
+    {
+      "method": "GET",
+      "path": "/v2/ServiceProviderConfig",
+      "access": "public",
+      "handler": "serviceProviderConfig"
+    },
+    {
+      "method": "GET",
+      "path": "/v2/Users",
+      "access": "public",
+      "handler": "listUsers"
+    },
+    {
+      "method": "POST",
+      "path": "/v2/Users",
+      "access": "public",
+      "handler": "createUser"
+    },
+    {
+      "method": "GET",
+      "path": "/v2/Users/:id",
+      "access": "public",
+      "handler": "getUser"
+    },
+    {
+      "method": "PUT",
+      "path": "/v2/Users/:id",
+      "access": "public",
+      "handler": "replaceUser"
+    },
+    {
+      "method": "PATCH",
+      "path": "/v2/Users/:id",
+      "access": "public",
+      "handler": "patchUser"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v2/Users/:id",
+      "access": "public",
+      "handler": "deleteUser"
+    },
+    {
+      "method": "GET",
+      "path": "/v2/Groups",
+      "access": "public",
+      "handler": "listGroups"
+    }
   ],
   "contributes": {
     "engine": true,
@@ -44,9 +99,6 @@
       }
     ]
   },
-  "globalRoutes": [
-    "/scim/v2/*"
-  ],
   "collections": [
     "scim_tokens",
     "scim_users"

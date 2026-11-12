@@ -1,29 +1,42 @@
 import type { ZveltioExtension } from '@zveltio/sdk/extension';
-import { buildScimApp, scimAdminRoutes } from './routes.js';
+import {
+  createUser,
+  deleteUser,
+  getUser,
+  keepContext,
+  listGroups,
+  listUsers,
+  mintToken,
+  patchUser,
+  replaceUser,
+  serviceProviderConfig,
+} from './routes.js';
 
 /**
  * auth/scim — SCIM 2.0 provisioning for Azure AD / Entra, Okta and friends.
- * Tokens and provisioning state are the declared collections `scim_tokens` and
- * `scim_users`; /ext/auth/scim/tokens mints a token (the raw value exists only
- * there). The SCIM protocol itself is a root-level public route (/scim/v2/*,
- * bearer-auth'd) so IdPs can reach it at the URL shape they expect.
+ * Every route is declared in the manifest (ADR 0039) and served under
+ * /ext/auth/scim: the SCIM protocol at /ext/auth/scim/v2 (public, bearer-auth'd),
+ * minting a token at /ext/auth/scim/tokens. The directory itself is the
+ * engine's, through `host.identity` (ADR 0039 decision 9).
  */
 const extension: ZveltioExtension = {
   name: 'auth/scim',
   category: 'auth',
   mountStrategy: 'subapp',
+  routes: {
+    mintToken,
+    serviceProviderConfig,
+    listUsers,
+    getUser,
+    createUser,
+    replaceUser,
+    patchUser,
+    deleteUser,
+    listGroups,
+  },
 
-  async register(app, ctx) {
-    app.route('/', scimAdminRoutes(ctx));
-    if (typeof ctx.registerPublicRoute === 'function') {
-      const scim = buildScimApp(ctx);
-      ctx.registerPublicRoute({
-        method: 'ALL',
-        path: '/scim/v2/*',
-        // biome-ignore lint/suspicious/noExplicitAny: Hono context via PublicRouteSpec
-        handler: (c: any) => scim.fetch(c.req.raw),
-      });
-    }
+  async register(_app, ctx) {
+    keepContext(ctx);
   },
 };
 
