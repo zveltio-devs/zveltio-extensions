@@ -1,70 +1,24 @@
 {
-  "sduiSchema": 1,
+  "spec": "zveltio.view/2",
   "title": "content.document-templates.title",
-  "subtitle": "content.document-templates.subtitle",
-  "newLabel": "content.document-templates.btn.new",
-  "resources": [
+  "type": "list",
+  "collection": "document_templates",
+  "fields": [
     {
-      "id": "templates",
-      "dataSource": "/api/data/document_templates?sort=name&limit=500",
-      "dataPath": "records",
-      "columns": [
-        {
-          "key": "name",
-          "label": "common.col.name"
-        },
-        {
-          "key": "description",
-          "label": "common.col.description"
-        },
-        {
-          "key": "is_active",
-          "label": "common.col.active",
-          "type": "boolean"
-        }
-      ],
-      "rowActions": [
-        {
-          "id": "edit",
-          "kind": "edit",
-          "label": "common.edit"
-        },
-        {
-          "id": "delete",
-          "icon": "Trash2",
-          "variant": "text-error",
-          "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/api/data/document_templates/{id}",
-          "confirm": "ext.confirmDelete"
-        }
-      ],
-      "form": {
-        "endpoint": "/api/data/document_templates",
-        "fields": [
-          {
-            "name": "name",
-            "label": "content.document-templates.ui.name",
-            "colSpan": 1,
-            "required": true
-          },
-          {
-            "name": "description",
-            "label": "content.document-templates.col.description",
-            "colSpan": 2,
-            "type": "textarea"
-          },
-          {
-            "name": "html_body",
-            "label": "content.document-templates.bodyHint",
-            "type": "textarea",
-            "rows": 12,
-            "mono": true,
-            "colSpan": 2,
-            "default": "<h1>{{title}}</h1>\n<p>Hello {{client_name}}</p>"
-          }
-        ]
-      }
+      "field": "name",
+      "label": "common.col.name"
+    },
+    {
+      "field": "description",
+      "label": "common.col.description"
+    },
+    {
+      "field": "is_active",
+      "label": "common.col.active"
     }
-  ]
+  ],
+  "sort": "name",
+  "edit": true,
+  "delete": true,
+  "create": true
 }

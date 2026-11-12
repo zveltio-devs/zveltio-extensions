@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.2.0 (2026-11-12)
+
+- feat: the Studio page is a `zveltio.view/2` view (ADR 0042): it names its collections and actions instead of URLs, and Studio draws it from the specification
+- change: the messages status filter is gone; the list shows every message
+- requires engine 3.0.0-beta.111
+
 ## 2.1.0 (2026-11-12)
 
 - Twilio's status callback (`POST /webhook/twilio`) is a declared route: the

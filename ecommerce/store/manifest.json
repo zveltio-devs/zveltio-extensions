@@ -3,8 +3,8 @@
   "displayName": "eCommerce",
   "category": "ecommerce",
   "description": "Product catalog, orders, coupons, shipping, carts and reviews, with checkout and moderation as actions",
-  "version": "2.0.0",
-  "zveltioMinVersion": "3.0.0-beta.93",
+  "version": "2.1.0",
+  "zveltioMinVersion": "3.0.0-beta.111",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-ecommerce",
   "permissions": [

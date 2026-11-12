@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.2.0 (2026-11-12)
+
+- feat: the Studio page is a `zveltio.view/2` view (ADR 0042): it names its collections and actions instead of URLs, and Studio draws it from the specification
+- requires engine 3.0.0-beta.111
+
 ## 2.1.0 (2026-10-31)
 
 - feat: `refundOrder` is gated on `pos_z_reports:execute` instead of `pos_orders:execute`, so an operator can let a cashier sell without letting them refund. Who already ran `checkout` needs `pos_z_reports:execute` to keep refunding

@@ -1,91 +1,110 @@
 {
-  "sduiSchema": 1,
+  "spec": "zveltio.view/2",
   "title": "hr.leave.title",
-  "subtitle": "hr.leave.subtitle",
-  "newLabel": "hr.leave.new",
-  "resources": [
+  "type": "list",
+  "collection": "leave_requests",
+  "fields": [
     {
-      "id": "requests",
-      "dataSource": "/api/data/leave_requests?expand=leave_type_id&sort=start_date&order=desc&limit=500",
-      "dataPath": "records",
-      "filters": [
+      "field": "leave_type_id",
+      "label": "common.col.leaveType"
+    },
+    {
+      "field": "start_date",
+      "label": "common.col.from"
+    },
+    {
+      "field": "end_date",
+      "label": "common.col.to"
+    },
+    {
+      "field": "working_days",
+      "label": "common.col.days",
+      "display": "mono"
+    },
+    {
+      "field": "status",
+      "label": "common.col.status",
+      "display": "badge",
+      "tones": {
+        "pending": "warning",
+        "approved": "success",
+        "rejected": "danger",
+        "cancelled": "muted"
+      }
+    }
+  ],
+  "sort": "-start_date",
+  "rowActions": [
+    {
+      "action": "approveRequest",
+      "label": "hr.leave.btn.approve",
+      "tone": "success",
+      "input": {
+        "id": {
+          "$record": "id"
+        }
+      },
+      "when": [
         {
-          "param": "status",
-          "options": [
-            { "value": "all", "label": "common.filter.all" },
-            { "value": "pending", "label": "common.status.pending" },
-            { "value": "approved", "label": "common.status.approved" },
-            { "value": "rejected", "label": "common.status.rejected" }
+          "field": "status",
+          "op": "eq",
+          "value": "pending"
+        }
+      ]
+    },
+    {
+      "action": "rejectRequest",
+      "label": "hr.leave.btn.reject",
+      "tone": "danger",
+      "input": {
+        "id": {
+          "$record": "id"
+        }
+      },
+      "prompt": [
+        "reason"
+      ],
+      "when": [
+        {
+          "field": "status",
+          "op": "eq",
+          "value": "pending"
+        }
+      ]
+    },
+    {
+      "action": "cancelRequest",
+      "label": "hr.leave.btn.cancel",
+      "tone": "warning",
+      "input": {
+        "id": {
+          "$record": "id"
+        }
+      },
+      "when": [
+        {
+          "field": "status",
+          "op": "in",
+          "value": [
+            "pending",
+            "approved"
           ]
         }
-      ],
-      "columns": [
-        { "key": "leave_type_id_expanded.name", "label": "common.col.leaveType" },
-        { "key": "start_date", "label": "common.col.from", "type": "date" },
-        { "key": "end_date", "label": "common.col.to", "type": "date" },
-        { "key": "working_days", "label": "common.col.days", "type": "mono" },
-        {
-          "key": "status",
-          "label": "common.col.status",
-          "type": "badge",
-          "badge": {
-            "colors": { "pending": "badge-warning", "approved": "badge-success", "rejected": "badge-error", "cancelled": "badge-ghost" }
-          }
-        }
-      ],
-      "rowActions": [
-        {
-          "id": "approve",
-          "icon": "CheckCircle",
-          "label": "hr.leave.btn.approve",
-          "variant": "text-success",
-          "method": "POST",
-          "endpoint": "/ext/hr/leave/actions/approveRequest",
-          "visibleWhen": { "field": "status", "equals": "pending" },
-          "body": { "id": "{id}" }
-        },
-        {
-          "id": "reject",
-          "icon": "XCircle",
-          "label": "hr.leave.btn.reject",
-          "variant": "text-error",
-          "method": "POST",
-          "endpoint": "/ext/hr/leave/actions/rejectRequest",
-          "visibleWhen": { "field": "status", "equals": "pending" },
-          "prompt": {
-            "title": "hr.leave.btn.reject",
-            "submitLabel": "hr.leave.btn.reject",
-            "fields": [{ "name": "reason", "label": "common.col.reason", "type": "textarea", "required": true }]
-          },
-          "body": { "id": "{id}" }
-        },
-        {
-          "id": "cancel",
-          "icon": "Ban",
-          "label": "hr.leave.btn.cancel",
-          "variant": "text-warning",
-          "method": "POST",
-          "endpoint": "/ext/hr/leave/actions/cancelRequest",
-          "visibleWhen": { "field": "status", "in": ["pending", "approved"] },
-          "body": { "id": "{id}" }
-        }
-      ],
-      "form": {
-        "endpoint": "/ext/hr/leave/actions/requestLeave",
-        "fields": [
-          {
-            "name": "employee_id", "label": "common.col.employee", "type": "relation", "colSpan": 2, "required": true,
-            "relation": { "dataSource": "/api/data/employees?status[eq]=active&sort=last_name&order=asc&limit=500", "dataPath": "records", "valueKey": "id", "labelKey": ["first_name", "last_name"] }
-          },
-          {
-            "name": "leave_type_id", "label": "common.col.leaveType", "type": "relation", "colSpan": 2, "required": true,
-            "relation": { "dataSource": "/api/data/leave_types?sort=name&order=asc&limit=500", "dataPath": "records", "valueKey": "id", "labelKey": "name" }
-          },
-          { "name": "start_date", "label": "common.col.from", "type": "date", "colSpan": 1, "required": true },
-          { "name": "end_date", "label": "common.col.to", "type": "date", "colSpan": 1, "required": true },
-          { "name": "reason", "label": "common.col.reason", "type": "textarea", "colSpan": 2 }
-        ]
-      }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "action": "requestLeave",
+      "tone": "info",
+      "label": "hr.leave.new",
+      "prompt": [
+        "employee_id",
+        "leave_type_id",
+        "start_date",
+        "end_date",
+        "reason"
+      ]
     }
   ]
 }

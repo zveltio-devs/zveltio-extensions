@@ -1,385 +1,161 @@
 {
-  "sduiSchema": 1,
+  "spec": "zveltio.view/2",
   "title": "i18n.translations.title",
-  "subtitle": "i18n.translations.subtitle",
-  "newLabel": "common.new",
-  "resources": [
+  "type": "tabs",
+  "items": [
     {
-      "id": "keys",
-      "label": "i18n.translations.tab.keys",
-      "icon": "Key",
-      "dataSource": "/api/data/i18n_keys?sort=key&order=asc&limit=500",
-      "dataPath": "records",
-      "search": {
-        "param": "search",
-        "placeholder": "i18n.translations.ui.search_keys"
-      },
-      "columns": [
+      "type": "list",
+      "collection": "i18n_keys",
+      "title": "i18n.translations.tab.keys",
+      "fields": [
         {
-          "key": "key",
+          "field": "key",
           "label": "common.col.key",
-          "type": "mono"
+          "display": "mono"
         },
         {
-          "key": "context",
+          "field": "context",
           "label": "i18n.translations.col.context"
         },
         {
-          "key": "default_value",
+          "field": "default_value",
           "label": "i18n.translations.col.default"
         },
         {
-          "key": "description",
+          "field": "description",
           "label": "common.col.description"
         }
       ],
-      "rowActions": [
-        {
-          "id": "delete",
-          "icon": "Trash2",
-          "variant": "text-error",
-          "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/api/data/i18n_keys/{id}",
-          "confirm": "i18n.translations.confirmDeleteKey"
-        }
-      ],
-      "form": {
-        "endpoint": "/api/data/i18n_keys",
-        "fields": [
-          {
-            "name": "key",
-            "label": "common.col.key",
-            "required": true,
-            "mono": true,
-            "colSpan": 1
-          },
-          {
-            "name": "context",
-            "label": "i18n.translations.col.context",
-            "colSpan": 1
-          },
-          {
-            "name": "default_value",
-            "label": "i18n.translations.col.default",
-            "colSpan": 2
-          },
-          {
-            "name": "description",
-            "label": "common.col.description",
-            "colSpan": 2
-          }
-        ]
-      }
+      "sort": "key",
+      "search": true,
+      "delete": true,
+      "create": true
     },
     {
-      "id": "translations",
-      "label": "i18n.translations.tab.translations",
-      "icon": "Languages",
-      "dataSource": "/api/data/i18n_translations?expand=key_id,locale_id&sort=updated_at&order=desc&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "i18n_translations",
+      "title": "i18n.translations.tab.translations",
+      "fields": [
         {
-          "key": "key_id_expanded.key",
+          "field": "key_id",
           "label": "common.col.key",
-          "type": "mono"
+          "display": "mono"
         },
         {
-          "key": "locale_id_expanded.code",
+          "field": "locale_id",
           "label": "i18n.translations.col.locale"
         },
         {
-          "key": "value",
+          "field": "value",
           "label": "i18n.translations.col.translation"
         },
         {
-          "key": "reviewed",
-          "label": "i18n.translations.col.reviewed",
-          "type": "boolean"
+          "field": "reviewed",
+          "label": "i18n.translations.col.reviewed"
         },
         {
-          "key": "is_machine_translated",
-          "label": "i18n.translations.col.machine",
-          "type": "boolean"
+          "field": "is_machine_translated",
+          "label": "i18n.translations.col.machine"
         }
       ],
+      "sort": "-updated_at",
+      "delete": true,
       "rowActions": [
         {
-          "id": "approve",
+          "action": "approve",
           "label": "i18n.translations.btn.approve",
-          "icon": "CheckCircle",
-          "method": "POST",
-          "endpoint": "/ext/i18n/translations/actions/approve",
-          "body": {
-            "id": "{id}"
+          "input": {
+            "id": {
+              "$record": "id"
+            }
           },
           "confirm": "i18n.translations.confirmApprove"
-        },
-        {
-          "id": "delete",
-          "icon": "Trash2",
-          "variant": "text-error",
-          "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/api/data/i18n_translations/{id}",
-          "confirm": "ext.confirmDelete"
         }
       ],
-      "form": {
-        "endpoint": "/api/data/i18n_translations",
-        "fields": [
-          {
-            "name": "key_id",
-            "label": "common.col.key",
-            "type": "relation",
-            "required": true,
-            "colSpan": 1,
-            "relation": {
-              "dataSource": "/api/data/i18n_keys?sort=key&order=asc&limit=500",
-              "dataPath": "records",
-              "valueKey": "id",
-              "labelKey": "key"
-            }
-          },
-          {
-            "name": "locale_id",
-            "label": "i18n.translations.col.locale",
-            "type": "relation",
-            "required": true,
-            "colSpan": 1,
-            "relation": {
-              "dataSource": "/api/data/i18n_locales?sort=code&order=asc&limit=500",
-              "dataPath": "records",
-              "valueKey": "id",
-              "labelKey": "code"
-            }
-          },
-          {
-            "name": "value",
-            "label": "i18n.translations.col.translation",
-            "required": true,
-            "colSpan": 2
-          },
-          {
-            "name": "reviewed",
-            "label": "i18n.translations.col.reviewed",
-            "type": "boolean",
-            "colSpan": 1
-          },
-          {
-            "name": "is_machine_translated",
-            "label": "i18n.translations.col.machine",
-            "type": "boolean",
-            "colSpan": 1
-          }
-        ]
-      }
+      "create": true
     },
     {
-      "id": "approvals",
-      "label": "i18n.translations.tab.approvals",
-      "icon": "BadgeCheck",
-      "dataSource": "/api/data/i18n_approvals?expand=translation_id&sort=created_at&order=desc&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "i18n_approvals",
+      "title": "i18n.translations.tab.approvals",
+      "fields": [
         {
-          "key": "created_at",
-          "label": "common.col.date",
-          "type": "date"
+          "field": "created_at",
+          "label": "common.col.date"
         },
         {
-          "key": "value",
+          "field": "value",
           "label": "i18n.translations.col.translation"
         },
         {
-          "key": "translation_id_expanded.value",
+          "field": "translation_id",
           "label": "i18n.translations.col.current"
         }
-      ]
+      ],
+      "sort": "-created_at"
     },
     {
-      "id": "locales",
-      "label": "i18n.translations.tab.locales",
-      "icon": "Globe",
-      "dataSource": "/api/data/i18n_locales?sort=code&order=asc&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "i18n_locales",
+      "title": "i18n.translations.tab.locales",
+      "fields": [
         {
-          "key": "code",
+          "field": "code",
           "label": "i18n.translations.col.localeCode",
-          "type": "mono"
+          "display": "mono"
         },
         {
-          "key": "name",
+          "field": "name",
           "label": "i18n.translations.col.localeName"
         },
         {
-          "key": "is_active",
-          "label": "common.col.active",
-          "type": "boolean"
+          "field": "is_active",
+          "label": "common.col.active"
         }
       ],
-      "rowActions": [
-        {
-          "id": "delete",
-          "icon": "Trash2",
-          "variant": "text-error",
-          "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/api/data/i18n_locales/{id}",
-          "confirm": "i18n.translations.confirmDeleteLocale"
-        }
-      ],
-      "form": {
-        "endpoint": "/api/data/i18n_locales",
-        "fields": [
-          {
-            "name": "code",
-            "label": "i18n.translations.col.localeCode",
-            "required": true,
-            "mono": true,
-            "colSpan": 1
-          },
-          {
-            "name": "name",
-            "label": "i18n.translations.col.localeName",
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "is_active",
-            "label": "common.col.active",
-            "type": "boolean",
-            "default": true,
-            "colSpan": 2
-          }
-        ]
-      }
+      "sort": "code",
+      "delete": true,
+      "create": true
     },
     {
-      "id": "settings",
-      "label": "i18n.translations.tab.settings",
-      "icon": "Settings",
-      "dataSource": "/api/data/i18n_settings?expand=default_locale&limit=1",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "i18n_settings",
+      "title": "i18n.translations.tab.settings",
+      "fields": [
         {
-          "key": "default_locale_expanded.code",
+          "field": "default_locale",
           "label": "i18n.translations.col.defaultLocale",
-          "type": "mono"
-        },
-        {
-          "key": "default_locale_expanded.name",
-          "label": "i18n.translations.col.localeName"
+          "display": "mono"
         }
       ],
-      "rowActions": [
-        {
-          "id": "delete",
-          "icon": "Trash2",
-          "variant": "text-error",
-          "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/api/data/i18n_settings/{id}",
-          "confirm": "ext.confirmDelete"
-        }
-      ],
-      "form": {
-        "endpoint": "/api/data/i18n_settings",
-        "fields": [
-          {
-            "name": "default_locale",
-            "label": "i18n.translations.col.defaultLocale",
-            "type": "relation",
-            "required": true,
-            "colSpan": 1,
-            "relation": {
-              "dataSource": "/api/data/i18n_locales?sort=code&order=asc&limit=500",
-              "dataPath": "records",
-              "valueKey": "id",
-              "labelKey": "code"
-            }
-          }
-        ]
-      }
+      "delete": true,
+      "create": true
     },
     {
-      "id": "glossary",
-      "label": "i18n.translations.tab.glossary",
-      "icon": "BookOpen",
-      "dataSource": "/api/data/i18n_glossary?expand=locale_id&sort=term&order=asc&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "i18n_glossary",
+      "title": "i18n.translations.tab.glossary",
+      "fields": [
         {
-          "key": "term",
+          "field": "term",
           "label": "i18n.translations.col.term"
         },
         {
-          "key": "locale_id_expanded.code",
+          "field": "locale_id",
           "label": "i18n.translations.col.locale"
         },
         {
-          "key": "translation",
+          "field": "translation",
           "label": "i18n.translations.col.translation"
         },
         {
-          "key": "forbidden",
-          "label": "i18n.translations.col.forbidden",
-          "type": "boolean"
+          "field": "forbidden",
+          "label": "i18n.translations.col.forbidden"
         }
       ],
-      "rowActions": [
-        {
-          "id": "delete",
-          "icon": "Trash2",
-          "variant": "text-error",
-          "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/api/data/i18n_glossary/{id}",
-          "confirm": "ext.confirmDelete"
-        }
-      ],
-      "form": {
-        "endpoint": "/api/data/i18n_glossary",
-        "fields": [
-          {
-            "name": "term",
-            "label": "i18n.translations.col.term",
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "locale_id",
-            "label": "i18n.translations.col.locale",
-            "type": "relation",
-            "required": true,
-            "colSpan": 1,
-            "relation": {
-              "dataSource": "/api/data/i18n_locales?sort=code&order=asc&limit=500",
-              "dataPath": "records",
-              "valueKey": "id",
-              "labelKey": "code"
-            }
-          },
-          {
-            "name": "translation",
-            "label": "i18n.translations.col.translation",
-            "required": true,
-            "colSpan": 2
-          },
-          {
-            "name": "definition",
-            "label": "common.col.description",
-            "colSpan": 2
-          },
-          {
-            "name": "forbidden",
-            "label": "i18n.translations.col.forbidden",
-            "type": "boolean",
-            "colSpan": 2
-          }
-        ]
-      }
+      "sort": "term",
+      "delete": true,
+      "create": true
     }
   ]
 }

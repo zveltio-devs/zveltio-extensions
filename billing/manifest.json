@@ -3,8 +3,8 @@
   "displayName": "Billing & Usage",
   "category": "billing",
   "description": "Usage metering and Stripe billing integration",
-  "version": "2.1.1",
-  "zveltioMinVersion": "3.0.0-beta.97",
+  "version": "2.2.0",
+  "zveltioMinVersion": "3.0.0-beta.111",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-billing",
   "permissions": [

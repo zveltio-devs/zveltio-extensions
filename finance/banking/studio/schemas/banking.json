@@ -1,234 +1,156 @@
 {
-  "sduiSchema": 1,
+  "spec": "zveltio.view/2",
   "title": "finance.banking.title",
-  "subtitle": "finance.banking.subtitle",
-  "newLabel": "finance.banking.newAccount",
-  "resources": [
+  "type": "tabs",
+  "items": [
     {
-      "id": "accounts",
-      "label": "finance.banking.tab.accounts",
-      "icon": "Landmark",
-      "dataSource": "/api/data/bank_accounts?sort=created_at&order=desc&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "bank_accounts",
+      "title": "finance.banking.tab.accounts",
+      "fields": [
         {
-          "key": "name",
+          "field": "name",
           "label": "common.col.name"
         },
         {
-          "key": "bank_name",
+          "field": "bank_name",
           "label": "common.col.bank"
         },
         {
-          "key": "iban",
+          "field": "iban",
           "label": "common.col.iban",
-          "type": "mono"
+          "display": "mono"
         },
         {
-          "key": "currency",
+          "field": "currency",
           "label": "common.col.currency",
-          "type": "mono"
+          "display": "mono"
         },
         {
-          "key": "balance",
-          "label": "common.col.balance",
-          "type": "currency",
-          "currency": {
-            "codeKey": "currency"
-          }
+          "field": "balance",
+          "label": "common.col.balance"
         },
         {
-          "key": "is_active",
-          "label": "common.col.active",
-          "type": "boolean"
+          "field": "is_active",
+          "label": "common.col.active"
         }
       ],
+      "sort": "-created_at",
+      "edit": true,
       "rowActions": [
         {
-          "id": "edit",
-          "kind": "edit",
-          "label": "common.edit"
-        },
-        {
-          "id": "refresh",
-          "icon": "RefreshCw",
+          "action": "refreshBalance",
           "label": "finance.banking.action.refresh",
-          "method": "POST",
-          "endpoint": "/ext/finance/banking/actions/refreshBalance",
-          "body": {
-            "id": "{id}"
-          }
-        }
-      ],
-      "form": {
-        "endpoint": "/api/data/bank_accounts",
-        "fields": [
-          {
-            "name": "name",
-            "label": "common.col.name",
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "bank_name",
-            "label": "common.col.bank",
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "iban",
-            "label": "common.col.iban",
-            "mono": true,
-            "colSpan": 1
-          },
-          {
-            "name": "currency",
-            "label": "common.col.currency",
-            "colSpan": 1,
-            "default": "RON"
-          },
-          {
-            "name": "account_type",
-            "label": "common.col.type",
-            "type": "select",
-            "colSpan": 1,
-            "default": "checking",
-            "options": [
-              {
-                "value": "checking",
-                "label": "finance.banking.type.checking"
-              },
-              {
-                "value": "savings",
-                "label": "finance.banking.type.savings"
-              },
-              {
-                "value": "credit",
-                "label": "finance.banking.type.credit"
-              },
-              {
-                "value": "cash",
-                "label": "finance.banking.type.cash"
-              }
-            ]
-          },
-          {
-            "name": "opening_balance",
-            "label": "finance.banking.ui.opening_balance",
-            "type": "number",
-            "colSpan": 1,
-            "default": 0
-          },
-          {
-            "name": "notes",
-            "label": "common.col.notes",
-            "type": "textarea",
-            "colSpan": 2
-          }
-        ]
-      }
-    },
-    {
-      "id": "transactions",
-      "label": "finance.banking.tab.transactions",
-      "icon": "ArrowLeftRight",
-      "dataSource": "/api/data/bank_transactions?account_id[eq]={masterId}&sort=date&order=desc&limit=500",
-      "dataPath": "records",
-      "master": {
-        "dataSource": "/api/data/bank_accounts?sort=created_at&order=desc&limit=500",
-        "dataPath": "records",
-        "idKey": "id",
-        "titleKey": "name",
-        "subtitle": {
-          "keys": [
-            "bank_name",
-            "iban"
-          ],
-          "sep": " · "
-        },
-        "badgeKey": "currency"
-      },
-      "columns": [
-        {
-          "key": "date",
-          "label": "common.col.date",
-          "type": "date"
-        },
-        {
-          "key": "description",
-          "label": "common.col.description",
-          "secondary": "counterparty_name"
-        },
-        {
-          "key": "type",
-          "label": "common.col.type",
-          "type": "badge",
-          "badge": {
-            "colors": {
-              "credit": "badge-success",
-              "debit": "badge-warning"
+          "input": {
+            "id": {
+              "$record": "id"
             }
           }
-        },
-        {
-          "key": "amount",
-          "label": "common.col.amount",
-          "type": "number"
-        },
-        {
-          "key": "category",
-          "label": "common.col.category"
-        },
-        {
-          "key": "is_reconciled",
-          "label": "finance.banking.status.reconciled",
-          "type": "boolean"
         }
       ],
-      "rowActions": [
+      "create": true
+    },
+    {
+      "type": "split",
+      "panes": [
         {
-          "id": "reconcile",
-          "icon": "Check",
-          "label": "finance.banking.action.reconcile",
-          "method": "POST",
-          "endpoint": "/ext/finance/banking/actions/reconcile",
-          "visibleWhen": {
-            "field": "is_reconciled",
-            "equals": false
-          },
-          "body": {
-            "transaction_id": "{id}",
-            "linked_type": "manual"
-          }
+          "type": "list",
+          "id": "master",
+          "collection": "bank_accounts",
+          "fields": [
+            "name",
+            "bank_name",
+            "iban",
+            "currency"
+          ],
+          "sort": "-created_at"
         },
         {
-          "id": "payInvoice",
-          "icon": "FileCheck",
-          "label": "finance.banking.action.payInvoice",
-          "method": "POST",
-          "endpoint": "/ext/finance/banking/actions/reconcile",
-          "visibleWhen": {
-            "field": "type",
-            "equals": "credit"
-          },
-          "prompt": {
-            "title": "finance.banking.action.payInvoice",
-            "submitLabel": "finance.banking.action.payInvoice",
-            "fields": [
-              {
-                "name": "linked_id",
-                "label": "finance.banking.prompt.invoiceId",
-                "type": "text",
-                "required": true
+          "type": "list",
+          "collection": "bank_transactions",
+          "fields": [
+            {
+              "field": "date",
+              "label": "common.col.date"
+            },
+            {
+              "field": "description",
+              "label": "common.col.description"
+            },
+            {
+              "field": "type",
+              "label": "common.col.type",
+              "display": "badge",
+              "tones": {
+                "credit": "success",
+                "debit": "warning"
               }
-            ]
-          },
-          "body": {
-            "transaction_id": "{id}",
-            "linked_type": "invoice"
-          }
+            },
+            {
+              "field": "amount",
+              "label": "common.col.amount"
+            },
+            {
+              "field": "category",
+              "label": "common.col.category"
+            },
+            {
+              "field": "is_reconciled",
+              "label": "finance.banking.status.reconciled"
+            }
+          ],
+          "filter": [
+            {
+              "field": "account_id",
+              "op": "eq",
+              "value": {
+                "$selected": "master"
+              }
+            }
+          ],
+          "sort": "-date",
+          "rowActions": [
+            {
+              "action": "reconcile",
+              "label": "finance.banking.action.reconcile",
+              "input": {
+                "transaction_id": {
+                  "$record": "id"
+                },
+                "linked_type": "manual"
+              },
+              "when": [
+                {
+                  "field": "is_reconciled",
+                  "op": "eq",
+                  "value": false
+                }
+              ]
+            },
+            {
+              "action": "reconcile",
+              "label": "finance.banking.action.payInvoice",
+              "input": {
+                "transaction_id": {
+                  "$record": "id"
+                },
+                "linked_type": "invoice"
+              },
+              "prompt": [
+                "linked_id"
+              ],
+              "when": [
+                {
+                  "field": "type",
+                  "op": "eq",
+                  "value": "credit"
+                }
+              ]
+            }
+          ]
         }
-      ]
+      ],
+      "title": "finance.banking.tab.transactions"
     }
   ]
 }

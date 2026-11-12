@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.3.0 (2026-11-12)
+
+- feat: the Studio page is a `zveltio.view/2` view (ADR 0042): it names its collections and actions instead of URLs, and Studio draws it from the specification
+- change: the orders, receptions and contracts status filters are gone; the lists show every row
+- requires engine 3.0.0-beta.111
+
 ## 2.2.0 (2026-11-02)
 
 - feat: an order decision names the order's author (`order_author`, copied by `approveOrder` and `cancelOrder`). The row rule `procurement_order_decisions: order_author neq user_id` keeps anyone from approving or cancelling an order they created; the refused action rolls back (ADR 0016). With the rule on, an author no longer reads the decision rows of their own orders; the order's status still shows the outcome

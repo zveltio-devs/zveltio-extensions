@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.3.0 (2026-11-12)
+
+- feat: the Studio page is a `zveltio.view/2` view (ADR 0042): it names its collections and actions instead of URLs, and Studio draws it from the specification
+- requires engine 3.0.0-beta.111
+
 ## 2.2.0 (2026-11-02)
 
 - feat: a settlement names who wrote what it settles (`author`: the invoice's issuer for `invoice_paid`, the subscriber's creator for a cancel). The row rule `subscription_settlements: author neq user_id` keeps anyone from settling an invoice they issued or cancelling a subscriber they created; the refused action rolls back (ADR 0016). With the rule on, that author no longer reads those settlement rows

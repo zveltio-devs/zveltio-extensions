@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.1.0 (2026-11-12)
+
+- feat: the Studio page is a `zveltio.view/2` view (ADR 0042): it names its collections and actions instead of URLs, and Studio draws it from the specification
+- requires engine 3.0.0-beta.111
+
 ## 2.0.0 (2026-11-03)
 
 - feat!: location history is the collection `geo_location_history`, declared in `schema/collections/` and created and owned by the engine, with a `location` field (`{ "lat", "lng" }`, a native point, ADR 0019); no SQL migrations, `zv_geo_location_history` is no longer created, positions recorded by 1.x are not carried over and the old table is left in place

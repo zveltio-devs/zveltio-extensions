@@ -1,619 +1,308 @@
 {
-  "sduiSchema": 1,
+  "spec": "zveltio.view/2",
   "title": "compliance.ro.procurement.title",
-  "subtitle": "compliance.ro.procurement.subtitle",
-  "newLabel": "common.new",
-  "resources": [
+  "type": "tabs",
+  "items": [
     {
-      "id": "orders",
-      "label": "compliance.ro.procurement.tab.orders",
-      "icon": "Package",
-      "dataSource": "/api/data/procurement_orders?sort=date&order=desc&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "procurement_orders",
+      "title": "compliance.ro.procurement.tab.orders",
+      "fields": [
         {
-          "key": "number",
+          "field": "number",
           "label": "common.col.number",
-          "type": "mono"
+          "display": "mono"
         },
         {
-          "key": "supplier_name",
+          "field": "supplier_name",
           "label": "compliance.ro.procurement.col.supplier"
         },
         {
-          "key": "description",
+          "field": "description",
           "label": "common.col.description"
         },
         {
-          "key": "total",
-          "label": "common.col.total",
-          "type": "currency",
-          "currency": {
-            "codeKey": "currency"
-          }
+          "field": "total",
+          "label": "common.col.total"
         },
         {
-          "key": "status",
+          "field": "status",
           "label": "common.col.status",
-          "type": "badge",
-          "badge": {
-            "colors": {
-              "draft": "badge-warning",
-              "approved": "badge-info",
-              "received": "badge-success",
-              "cancelled": "badge-error"
-            }
+          "display": "badge",
+          "tones": {
+            "draft": "warning",
+            "approved": "info",
+            "received": "success",
+            "cancelled": "danger"
           }
         },
         {
-          "key": "date",
-          "label": "common.col.date",
-          "type": "date"
+          "field": "date",
+          "label": "common.col.date"
         }
       ],
+      "sort": "-date",
       "rowActions": [
         {
-          "id": "approve",
-          "icon": "CheckCircle",
+          "action": "approveOrder",
           "label": "common.approve",
-          "method": "POST",
-          "endpoint": "/ext/compliance/ro/procurement/actions/approveOrder",
-          "visibleWhen": {
-            "field": "status",
-            "equals": "draft"
+          "tone": "success",
+          "input": {
+            "id": {
+              "$record": "id"
+            }
           },
-          "body": {
-            "id": "{id}"
-          },
-          "variant": "text-success"
+          "when": [
+            {
+              "field": "status",
+              "op": "eq",
+              "value": "draft"
+            }
+          ]
         },
         {
-          "id": "receive",
-          "icon": "PackageCheck",
+          "action": "receiveOrder",
           "label": "compliance.ro.procurement.action.receive",
-          "method": "POST",
-          "endpoint": "/ext/compliance/ro/procurement/actions/receiveOrder",
-          "visibleWhen": {
-            "field": "status",
-            "equals": "approved"
+          "input": {
+            "id": {
+              "$record": "id"
+            }
           },
-          "body": {
-            "id": "{id}"
-          }
+          "when": [
+            {
+              "field": "status",
+              "op": "eq",
+              "value": "approved"
+            }
+          ]
         },
         {
-          "id": "cancel",
-          "icon": "XCircle",
+          "action": "cancelOrder",
           "label": "compliance.ro.procurement.action.cancel",
-          "method": "POST",
-          "endpoint": "/ext/compliance/ro/procurement/actions/cancelOrder",
-          "body": {
-            "id": "{id}"
+          "tone": "danger",
+          "input": {
+            "id": {
+              "$record": "id"
+            }
           },
-          "variant": "text-error",
-          "prompt": {
-            "title": "compliance.ro.procurement.action.cancel",
-            "submitLabel": "compliance.ro.procurement.action.cancel",
-            "fields": [
-              {
-                "name": "reason",
-                "label": "compliance.ro.procurement.field.reason",
-                "type": "textarea",
-                "required": true
-              }
-            ]
-          },
-          "visibleWhen": {
-            "field": "status",
-            "in": [
-              "draft",
-              "approved"
-            ]
-          }
+          "prompt": [
+            "reason"
+          ],
+          "when": [
+            {
+              "field": "status",
+              "op": "in",
+              "value": [
+                "draft",
+                "approved"
+              ]
+            }
+          ]
         },
         {
-          "id": "delete",
-          "icon": "Trash2",
+          "action": "deleteDraft",
           "label": "common.delete",
-          "method": "POST",
-          "endpoint": "/ext/compliance/ro/procurement/actions/deleteDraft",
-          "visibleWhen": {
-            "field": "status",
-            "equals": "draft"
+          "tone": "danger",
+          "input": {
+            "id": {
+              "$record": "id"
+            }
           },
-          "body": {
-            "id": "{id}"
-          },
-          "variant": "text-error",
-          "confirm": "ext.confirmDelete"
+          "confirm": "ext.confirmDelete",
+          "when": [
+            {
+              "field": "status",
+              "op": "eq",
+              "value": "draft"
+            }
+          ]
         }
       ],
-      "form": {
-        "endpoint": "/ext/compliance/ro/procurement/actions/createOrder",
-        "fields": [
-          {
-            "name": "number",
-            "label": "common.col.number",
-            "required": true,
-            "mono": true,
-            "colSpan": 1
-          },
-          {
-            "name": "date",
-            "label": "common.col.date",
-            "type": "date",
-            "required": true,
-            "colSpan": 1,
-            "default": "today"
-          },
-          {
-            "name": "supplier_name",
-            "label": "compliance.ro.procurement.col.supplier",
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "supplier_cui",
-            "label": "compliance.ro.procurement.ui.cui",
-            "required": true,
-            "mono": true,
-            "colSpan": 1
-          },
-          {
-            "name": "description",
-            "label": "common.col.description",
-            "type": "textarea",
-            "required": true,
-            "colSpan": 2
-          },
-          {
-            "name": "currency",
-            "label": "common.col.currency",
-            "colSpan": 1,
-            "default": "RON"
-          },
-          {
-            "name": "items",
-            "label": "compliance.ro.procurement.form.lineItemsJson",
-            "type": "json",
-            "mono": true,
-            "rows": 6,
-            "colSpan": 2,
-            "default": "[{\"description\":\"\",\"quantity\":1,\"unit\":\"BUC\",\"unit_price\":0,\"vat_rate\":21}]"
-          }
-        ]
-      },
-      "filters": [
+      "actions": [
         {
-          "param": "status",
-          "options": [
-            {
-              "value": "all",
-              "label": "compliance.ro.procurement.filter.all"
-            },
-            {
-              "value": "draft",
-              "label": "compliance.ro.procurement.status.draft"
-            },
-            {
-              "value": "approved",
-              "label": "compliance.ro.procurement.status.approved"
-            },
-            {
-              "value": "received",
-              "label": "compliance.ro.procurement.status.received"
-            },
-            {
-              "value": "cancelled",
-              "label": "compliance.ro.procurement.status.cancelled"
-            }
+          "action": "createOrder",
+          "tone": "info",
+          "label": "common.new",
+          "prompt": [
+            "number",
+            "date",
+            "supplier_name",
+            "supplier_cui",
+            "description",
+            "currency",
+            "items"
           ]
         }
       ]
     },
     {
-      "id": "receptions",
-      "label": "compliance.ro.procurement.tab.receptions",
-      "icon": "ClipboardCheck",
-      "dataSource": "/api/data/procurement_reception_notes?sort=date&order=desc&limit=500",
-      "dataPath": "records",
-      "filters": [
+      "type": "list",
+      "collection": "procurement_reception_notes",
+      "title": "compliance.ro.procurement.tab.receptions",
+      "fields": [
         {
-          "param": "status",
-          "options": [
+          "field": "number",
+          "label": "common.col.number",
+          "display": "mono"
+        },
+        {
+          "field": "supplier_name",
+          "label": "compliance.ro.procurement.col.supplier"
+        },
+        {
+          "field": "total_value",
+          "label": "common.col.total"
+        },
+        {
+          "field": "status",
+          "label": "common.col.status",
+          "display": "badge",
+          "tones": {
+            "draft": "warning",
+            "confirmed": "success"
+          }
+        },
+        {
+          "field": "date",
+          "label": "common.col.date"
+        }
+      ],
+      "sort": "-date",
+      "rowActions": [
+        {
+          "action": "confirmReceptionNote",
+          "label": "compliance.ro.procurement.action.confirm",
+          "tone": "success",
+          "input": {
+            "id": {
+              "$record": "id"
+            }
+          },
+          "when": [
             {
-              "value": "all",
-              "label": "compliance.ro.procurement.filter.all"
-            },
-            {
-              "value": "draft",
-              "label": "compliance.ro.procurement.status.draft"
-            },
-            {
-              "value": "confirmed",
-              "label": "compliance.ro.procurement.status.confirmed"
+              "field": "status",
+              "op": "eq",
+              "value": "draft"
             }
           ]
         }
       ],
-      "columns": [
+      "actions": [
         {
-          "key": "number",
-          "label": "common.col.number",
-          "type": "mono"
-        },
-        {
-          "key": "supplier_name",
-          "label": "compliance.ro.procurement.col.supplier"
-        },
-        {
-          "key": "total_value",
-          "label": "common.col.total",
-          "type": "currency",
-          "currency": {
-            "codeKey": "currency"
-          }
-        },
-        {
-          "key": "status",
-          "label": "common.col.status",
-          "type": "badge",
-          "badge": {
-            "colors": {
-              "draft": "badge-warning",
-              "confirmed": "badge-success"
-            }
-          }
-        },
-        {
-          "key": "date",
-          "label": "common.col.date",
-          "type": "date"
+          "action": "createReceptionNote",
+          "tone": "info",
+          "label": "common.new",
+          "prompt": [
+            "number",
+            "date",
+            "supplier_name",
+            "discrepancies",
+            "items"
+          ]
         }
-      ],
-      "rowActions": [
-        {
-          "id": "confirm",
-          "icon": "CheckCircle",
-          "label": "compliance.ro.procurement.action.confirm",
-          "method": "POST",
-          "endpoint": "/ext/compliance/ro/procurement/actions/confirmReceptionNote",
-          "visibleWhen": {
-            "field": "status",
-            "equals": "draft"
-          },
-          "body": {
-            "id": "{id}"
-          },
-          "variant": "text-success"
-        }
-      ],
-      "form": {
-        "endpoint": "/ext/compliance/ro/procurement/actions/createReceptionNote",
-        "fields": [
-          {
-            "name": "number",
-            "label": "common.col.number",
-            "required": true,
-            "mono": true,
-            "colSpan": 1
-          },
-          {
-            "name": "date",
-            "label": "common.col.date",
-            "type": "date",
-            "required": true,
-            "colSpan": 1,
-            "default": "today"
-          },
-          {
-            "name": "supplier_name",
-            "label": "compliance.ro.procurement.col.supplier",
-            "required": true,
-            "colSpan": 2
-          },
-          {
-            "name": "discrepancies",
-            "label": "compliance.ro.procurement.field.discrepancies",
-            "type": "textarea",
-            "colSpan": 2
-          },
-          {
-            "name": "items",
-            "label": "compliance.ro.procurement.form.lineItemsJson",
-            "type": "json",
-            "mono": true,
-            "rows": 6,
-            "colSpan": 2,
-            "default": "[{\"description\":\"\",\"ordered_qty\":1,\"received_qty\":1,\"unit\":\"BUC\",\"unit_price\":0}]"
-          }
-        ]
-      }
+      ]
     },
     {
-      "id": "suppliers",
-      "label": "compliance.ro.procurement.tab.suppliers",
-      "icon": "Users",
-      "dataSource": "/api/data/procurement_suppliers?sort=name&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "procurement_suppliers",
+      "title": "compliance.ro.procurement.tab.suppliers",
+      "fields": [
         {
-          "key": "name",
+          "field": "name",
           "label": "common.col.name"
         },
         {
-          "key": "cui",
+          "field": "cui",
           "label": "compliance.ro.procurement.ui.cui",
-          "type": "mono"
+          "display": "mono"
         },
         {
-          "key": "county",
+          "field": "county",
           "label": "compliance.ro.procurement.ui.judet"
         },
         {
-          "key": "category",
+          "field": "category",
           "label": "common.col.category"
         },
         {
-          "key": "contact_email",
+          "field": "contact_email",
           "label": "common.col.email"
         }
       ],
-      "rowActions": [
-        {
-          "id": "edit",
-          "kind": "edit",
-          "label": "common.edit"
-        }
-      ],
-      "form": {
-        "endpoint": "/api/data/procurement_suppliers",
-        "fields": [
-          {
-            "name": "name",
-            "label": "common.col.name",
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "cui",
-            "label": "compliance.ro.procurement.ui.cui",
-            "required": true,
-            "mono": true,
-            "colSpan": 1
-          },
-          {
-            "name": "county",
-            "label": "compliance.ro.procurement.ui.judet",
-            "colSpan": 1
-          },
-          {
-            "name": "category",
-            "label": "common.col.category",
-            "colSpan": 1
-          },
-          {
-            "name": "contact_email",
-            "label": "common.col.email",
-            "type": "email",
-            "colSpan": 2
-          }
-        ]
-      }
+      "sort": "name",
+      "edit": true,
+      "create": true
     },
     {
-      "id": "contracts",
-      "label": "compliance.ro.procurement.tab.contracts",
-      "icon": "FileSignature",
-      "dataSource": "/api/data/procurement_contracts?sort=created_at&order=desc&limit=500",
-      "dataPath": "records",
-      "filters": [
+      "type": "list",
+      "collection": "procurement_contracts",
+      "title": "compliance.ro.procurement.tab.contracts",
+      "fields": [
         {
-          "param": "status",
-          "options": [
-            {
-              "value": "all",
-              "label": "compliance.ro.procurement.filter.all"
-            },
-            {
-              "value": "draft",
-              "label": "compliance.ro.procurement.status.draft"
-            },
-            {
-              "value": "active",
-              "label": "compliance.ro.procurement.status.active"
-            },
-            {
-              "value": "expired",
-              "label": "compliance.ro.procurement.status.expired"
-            },
-            {
-              "value": "cancelled",
-              "label": "compliance.ro.procurement.status.cancelled"
-            },
-            {
-              "value": "terminated",
-              "label": "compliance.ro.procurement.status.terminated"
-            }
-          ]
-        }
-      ],
-      "columns": [
-        {
-          "key": "number",
+          "field": "number",
           "label": "common.col.number",
-          "type": "mono"
+          "display": "mono"
         },
         {
-          "key": "title",
+          "field": "title",
           "label": "common.col.name"
         },
         {
-          "key": "supplier_name",
+          "field": "supplier_name",
           "label": "compliance.ro.procurement.col.supplier"
         },
         {
-          "key": "value",
-          "label": "common.col.total",
-          "type": "currency",
-          "currency": {
-            "codeKey": "currency"
-          }
+          "field": "value",
+          "label": "common.col.total"
         },
         {
-          "key": "status",
+          "field": "status",
           "label": "common.col.status",
-          "type": "badge",
-          "badge": {
-            "colors": {
-              "draft": "badge-warning",
-              "active": "badge-success",
-              "expired": "badge-ghost",
-              "cancelled": "badge-error",
-              "terminated": "badge-error"
-            }
+          "display": "badge",
+          "tones": {
+            "draft": "warning",
+            "active": "success",
+            "expired": "muted",
+            "cancelled": "danger",
+            "terminated": "danger"
           }
         },
         {
-          "key": "end_date",
-          "label": "common.col.date",
-          "type": "date"
+          "field": "end_date",
+          "label": "common.col.date"
         }
       ],
-      "rowActions": [
-        {
-          "id": "edit",
-          "kind": "edit",
-          "label": "common.edit"
-        }
-      ],
-      "form": {
-        "endpoint": "/api/data/procurement_contracts",
-        "fields": [
-          {
-            "name": "number",
-            "label": "common.col.number",
-            "required": true,
-            "mono": true,
-            "colSpan": 1
-          },
-          {
-            "name": "title",
-            "label": "common.col.name",
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "supplier_name",
-            "label": "compliance.ro.procurement.col.supplier",
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "supplier_cui",
-            "label": "compliance.ro.procurement.ui.cui",
-            "required": true,
-            "mono": true,
-            "colSpan": 1
-          },
-          {
-            "name": "value",
-            "label": "common.col.total",
-            "type": "number",
-            "colSpan": 1
-          },
-          {
-            "name": "currency",
-            "label": "common.col.currency",
-            "colSpan": 1,
-            "default": "RON"
-          },
-          {
-            "name": "start_date",
-            "label": "compliance.ro.procurement.field.startDate",
-            "type": "date",
-            "colSpan": 1
-          },
-          {
-            "name": "end_date",
-            "label": "compliance.ro.procurement.field.endDate",
-            "type": "date",
-            "colSpan": 1
-          }
-        ]
-      }
+      "sort": "-created_at",
+      "edit": true,
+      "create": true
     },
     {
-      "id": "budget",
-      "label": "compliance.ro.procurement.tab.budget",
-      "icon": "BarChart3",
-      "dataSource": "/api/data/procurement_budget_lines?sort=code&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "procurement_budget_lines",
+      "title": "compliance.ro.procurement.tab.budget",
+      "fields": [
         {
-          "key": "code",
+          "field": "code",
           "label": "common.col.code",
-          "type": "mono"
+          "display": "mono"
         },
         {
-          "key": "name",
+          "field": "name",
           "label": "common.col.name"
         },
         {
-          "key": "year",
+          "field": "year",
           "label": "common.col.year",
-          "type": "mono"
+          "display": "mono"
         },
         {
-          "key": "allocated",
-          "label": "compliance.ro.procurement.allocated",
-          "type": "currency",
-          "currency": {
-            "code": "RON"
-          }
+          "field": "allocated",
+          "label": "compliance.ro.procurement.allocated"
         }
       ],
-      "form": {
-        "endpoint": "/api/data/procurement_budget_lines",
-        "fields": [
-          {
-            "name": "code",
-            "label": "common.col.code",
-            "required": true,
-            "mono": true,
-            "colSpan": 1
-          },
-          {
-            "name": "name",
-            "label": "common.col.name",
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "year",
-            "label": "common.col.year",
-            "type": "number",
-            "required": true,
-            "colSpan": 1,
-            "default": 2026
-          },
-          {
-            "name": "allocated",
-            "label": "compliance.ro.procurement.allocated",
-            "type": "number",
-            "required": true,
-            "colSpan": 1,
-            "default": 0
-          }
-        ]
-      },
-      "rowActions": [
-        {
-          "id": "edit",
-          "kind": "edit",
-          "label": "common.edit"
-        }
-      ]
+      "sort": "code",
+      "edit": true,
+      "create": true
     }
   ]
 }

@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.4.0 (2026-11-12)
+
+- feat: the Studio page is a `zveltio.view/2` view (ADR 0042): it names its collections and actions instead of URLs, and Studio draws it from the specification
+- requires engine 3.0.0-beta.111
+
 ## 2.3.0 (2026-10-31)
 
 - feat: an invoice's status, number, series, paid amount, paid date and conversion source, a credit note's status, number and applied amount, every payment and a series' counter are written only by invoicing's actions (`writtenBy: "actions"`); a PATCH through `/api/data` is refused

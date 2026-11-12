@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.0 (2026-11-12)
+
+- feat: the Studio page is a `zveltio.view/2` view (ADR 0042): it names its collections and actions instead of URLs, and Studio draws it from the specification
+- change: the tickets status filter is gone (search stays)
+- requires engine 3.0.0-beta.111
+
 ## 2.0.0 (2026-10-30)
 
 - feat!: tickets, messages, categories, canned responses, CSAT, escalation rules and the escalation log are collections declared in `schema/collections/`, created and owned by the engine; no SQL migrations

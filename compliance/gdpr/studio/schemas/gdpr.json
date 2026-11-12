@@ -1,190 +1,190 @@
 {
-  "sduiSchema": 1,
+  "spec": "zveltio.view/2",
   "title": "compliance.gdpr.title",
-  "subtitle": "compliance.gdpr.subtitle",
-  "resources": [
+  "type": "tabs",
+  "items": [
     {
-      "id": "requests",
-      "label": "compliance.gdpr.tab.requests",
-      "icon": "Users",
-      "dataSource": "/api/data/gdpr_subject_requests?sort=created_at&order=desc&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "gdpr_subject_requests",
+      "title": "compliance.gdpr.tab.requests",
+      "fields": [
         {
-          "key": "request_type",
+          "field": "request_type",
           "label": "common.col.type",
-          "type": "badge",
-          "badge": {
-            "colors": {}
-          }
+          "display": "badge"
         },
         {
-          "key": "created_by",
+          "field": "created_by",
           "label": "common.col.subject"
         },
         {
-          "key": "created_at",
-          "label": "compliance.gdpr.col.requested",
-          "type": "date"
+          "field": "created_at",
+          "label": "compliance.gdpr.col.requested"
         },
         {
-          "key": "status",
+          "field": "status",
           "label": "common.col.status",
-          "type": "badge",
-          "badge": {
-            "colors": {
-              "pending": "badge-warning",
-              "in_progress": "badge-info",
-              "completed": "badge-success",
-              "rejected": "badge-error",
-              "withdrawn": "badge-ghost"
-            }
+          "display": "badge",
+          "tones": {
+            "pending": "warning",
+            "in_progress": "info",
+            "completed": "success",
+            "rejected": "danger",
+            "withdrawn": "muted"
           }
         }
       ],
+      "sort": "-created_at",
       "rowActions": [
         {
-          "id": "start",
+          "action": "setRequestStatus",
           "label": "compliance.gdpr.btn.start",
-          "icon": "Play",
-          "method": "POST",
-          "endpoint": "/ext/compliance/gdpr/actions/setRequestStatus",
-          "body": {
-            "id": "{id}",
+          "input": {
+            "id": {
+              "$record": "id"
+            },
             "status": "in_progress"
           },
-          "visibleWhen": {
-            "field": "status",
-            "equals": "pending"
-          }
+          "when": [
+            {
+              "field": "status",
+              "op": "eq",
+              "value": "pending"
+            }
+          ]
         },
         {
-          "id": "fulfill",
+          "action": "setRequestStatus",
           "label": "compliance.gdpr.btn.fulfill",
-          "method": "POST",
-          "endpoint": "/ext/compliance/gdpr/actions/setRequestStatus",
-          "body": {
-            "id": "{id}",
+          "input": {
+            "id": {
+              "$record": "id"
+            },
             "status": "completed"
           },
-          "visibleWhen": {
-            "field": "status",
-            "in": [
-              "pending",
-              "in_progress"
-            ]
-          }
+          "when": [
+            {
+              "field": "status",
+              "op": "in",
+              "value": [
+                "pending",
+                "in_progress"
+              ]
+            }
+          ]
         },
         {
-          "id": "reject",
+          "action": "setRequestStatus",
           "label": "common.reject",
-          "variant": "text-error",
-          "method": "POST",
-          "endpoint": "/ext/compliance/gdpr/actions/setRequestStatus",
-          "body": {
-            "id": "{id}",
+          "tone": "danger",
+          "input": {
+            "id": {
+              "$record": "id"
+            },
             "status": "rejected"
           },
-          "visibleWhen": {
-            "field": "status",
-            "in": [
-              "pending",
-              "in_progress"
-            ]
-          }
+          "when": [
+            {
+              "field": "status",
+              "op": "in",
+              "value": [
+                "pending",
+                "in_progress"
+              ]
+            }
+          ]
         }
       ]
     },
     {
-      "id": "breaches",
-      "label": "compliance.gdpr.tab.breaches",
-      "icon": "XCircle",
-      "dataSource": "/api/data/gdpr_breaches?sort=discovered_at&order=desc&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "gdpr_breaches",
+      "title": "compliance.gdpr.tab.breaches",
+      "fields": [
         {
-          "key": "discovered_at",
-          "label": "common.col.date",
-          "type": "date"
+          "field": "discovered_at",
+          "label": "common.col.date"
         },
         {
-          "key": "description",
+          "field": "description",
           "label": "common.col.description"
         },
         {
-          "key": "severity",
+          "field": "severity",
           "label": "compliance.gdpr.col.severity",
-          "type": "badge",
-          "badge": {
-            "colors": {
-              "low": "badge-info",
-              "medium": "badge-warning",
-              "high": "badge-error",
-              "critical": "badge-error"
-            }
+          "display": "badge",
+          "tones": {
+            "low": "info",
+            "medium": "warning",
+            "high": "danger",
+            "critical": "danger"
           }
         },
         {
-          "key": "affected_records_estimate",
+          "field": "affected_records_estimate",
           "label": "compliance.gdpr.col.affected"
         },
         {
-          "key": "dpa_reported_at",
-          "label": "compliance.gdpr.col.notifiedDpa",
-          "type": "boolean"
+          "field": "dpa_reported_at",
+          "label": "compliance.gdpr.col.notifiedDpa"
         }
-      ]
+      ],
+      "sort": "-discovered_at"
     },
     {
-      "id": "consents",
-      "label": "compliance.gdpr.tab.consents",
-      "dataSource": "/api/data/gdpr_consent_records?sort=created_at&order=desc&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "gdpr_consent_records",
+      "title": "compliance.gdpr.tab.consents",
+      "fields": [
         {
-          "key": "created_by",
+          "field": "created_by",
           "label": "common.col.subject"
         },
         {
-          "key": "purpose",
+          "field": "purpose",
           "label": "compliance.gdpr.col.purpose"
         },
         {
-          "key": "created_at",
-          "label": "compliance.gdpr.col.granted",
-          "type": "date"
+          "field": "created_at",
+          "label": "compliance.gdpr.col.granted"
         },
         {
-          "key": "withdrawn_at",
-          "label": "compliance.gdpr.col.withdrawn",
-          "type": "date"
+          "field": "withdrawn_at",
+          "label": "compliance.gdpr.col.withdrawn"
         }
-      ]
+      ],
+      "sort": "-created_at"
     },
     {
-      "id": "records",
-      "label": "compliance.gdpr.tab.records",
-      "icon": "Boxes",
-      "dataSource": "/api/data/gdpr_processing_activities?is_active[eq]=true&sort=name&order=asc&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "gdpr_processing_activities",
+      "title": "compliance.gdpr.tab.records",
+      "fields": [
         {
-          "key": "name",
+          "field": "name",
           "label": "compliance.gdpr.col.activity"
         },
         {
-          "key": "legal_basis",
+          "field": "legal_basis",
           "label": "compliance.gdpr.col.lawfulBasis"
         },
         {
-          "key": "data_categories",
+          "field": "data_categories",
           "label": "compliance.gdpr.col.categories"
         },
         {
-          "key": "retention_period_days",
+          "field": "retention_period_days",
           "label": "compliance.gdpr.col.retention"
         }
-      ]
+      ],
+      "filter": [
+        {
+          "field": "is_active",
+          "op": "eq",
+          "value": true
+        }
+      ],
+      "sort": "name"
     }
   ]
 }

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.0 (2026-11-12)
+
+- feat: the Studio page is a `zveltio.view/2` view (ADR 0042): it names its collections and actions instead of URLs, and Studio draws it from the specification
+- change: stock is no longer coloured and an order status is changed through the row form, not in the cell
+- requires engine 3.0.0-beta.111
+
 ## 2.0.0 (2026-10-31)
 
 - feat!: categories, products, variants, customers, shipping zones and rates, tax rules, coupons, orders and their items, carts, reviews and the order series are collections declared in `schema/collections/` (`ec_*`), created and owned by the engine; no SQL migrations

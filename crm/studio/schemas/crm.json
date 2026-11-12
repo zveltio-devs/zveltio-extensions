@@ -1,477 +1,149 @@
 {
-  "sduiSchema": 1,
+  "spec": "zveltio.view/2",
   "title": "crm.title",
-  "subtitle": "crm.subtitle",
-  "newLabel": "common.new",
-  "resources": [
+  "type": "tabs",
+  "items": [
     {
-      "id": "contacts",
-      "label": "crm.tab.contacts",
-      "icon": "Users",
-      "dataSource": "/api/data/contacts?expand=organization_id&sort=created_at&order=desc&limit=500",
-      "dataPath": "records",
-      "search": {
-        "fields": [
-          "first_name",
-          "last_name",
-          "email",
-          "company"
-        ],
-        "placeholder": "common.search"
-      },
-      "columns": [
+      "type": "list",
+      "collection": "contacts",
+      "title": "crm.tab.contacts",
+      "fields": [
         {
-          "key": "first_name",
-          "label": "crm.col.name",
-          "join": {
-            "keys": [
-              "first_name",
-              "last_name"
-            ],
-            "sep": " "
-          }
-        },
-        {
-          "key": "email",
-          "label": "crm.col.email"
-        },
-        {
-          "key": "organization_id_expanded.name",
-          "label": "crm.col.organization"
-        },
-        {
-          "key": "phone",
-          "label": "crm.col.phone"
-        },
-        {
-          "key": "company",
-          "label": "crm.col.company"
-        },
-        {
-          "key": "created_at",
-          "label": "common.added",
-          "type": "date"
-        }
-      ],
-      "rowActions": [
-        {
-          "id": "delete",
-          "icon": "Trash2",
-          "variant": "text-error",
-          "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/api/data/contacts/{id}",
-          "confirm": "ext.confirmDelete"
-        }
-      ],
-      "form": {
-        "endpoint": "/api/data/contacts",
-        "fields": [
-          {
-            "name": "first_name",
-            "label": "crm.form.firstName",
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "last_name",
-            "label": "crm.form.lastName",
-            "colSpan": 1
-          },
-          {
-            "name": "organization_id",
-            "label": "crm.form.organization",
-            "type": "relation",
-            "colSpan": 1,
-            "relation": {
-              "dataSource": "/api/data/organizations?sort=name&order=asc&limit=500",
-              "dataPath": "records",
-              "valueKey": "id",
-              "labelKey": "name"
-            }
-          },
-          {
-            "name": "organization_role",
-            "label": "crm.form.orgRole",
-            "colSpan": 1
-          },
-          {
-            "name": "email",
-            "label": "crm.col.email",
-            "type": "email",
-            "colSpan": 1
-          },
-          {
-            "name": "phone",
-            "label": "crm.col.phone",
-            "colSpan": 1
-          },
-          {
-            "name": "job_title",
-            "label": "crm.form.jobTitle",
-            "colSpan": 1
-          },
-          {
-            "name": "source",
-            "label": "crm.form.source",
-            "colSpan": 1
-          },
-          {
-            "name": "notes",
-            "label": "crm.form.notes",
-            "type": "textarea",
-            "rows": 3,
-            "colSpan": 2
-          }
-        ]
-      }
-    },
-    {
-      "id": "organizations",
-      "label": "crm.tab.organizations",
-      "icon": "Building2",
-      "dataSource": "/api/data/organizations?sort=name&order=asc&limit=500",
-      "dataPath": "records",
-      "search": {
-        "fields": [
-          "name"
-        ],
-        "placeholder": "common.search"
-      },
-      "columns": [
-        {
-          "key": "name",
+          "field": "first_name",
           "label": "crm.col.name"
         },
         {
-          "key": "industry",
-          "label": "crm.col.industry"
-        },
-        {
-          "key": "email",
+          "field": "email",
           "label": "crm.col.email"
         },
         {
-          "key": "created_at",
-          "label": "common.added",
-          "type": "date"
-        }
-      ],
-      "rowActions": [
+          "field": "organization_id",
+          "label": "crm.col.organization"
+        },
         {
-          "id": "delete",
-          "icon": "Trash2",
-          "variant": "text-error",
-          "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/api/data/organizations/{id}",
-          "confirm": "ext.confirmDelete"
+          "field": "phone",
+          "label": "crm.col.phone"
+        },
+        {
+          "field": "company",
+          "label": "crm.col.company"
+        },
+        {
+          "field": "created_at",
+          "label": "common.added"
         }
       ],
-      "form": {
-        "endpoint": "/api/data/organizations",
-        "fields": [
-          {
-            "name": "name",
-            "label": "crm.col.name",
-            "required": true,
-            "colSpan": 2
-          },
-          {
-            "name": "legal_name",
-            "label": "crm.form.legalName",
-            "colSpan": 1
-          },
-          {
-            "name": "type",
-            "label": "crm.form.type",
-            "type": "select",
-            "colSpan": 1,
-            "default": "company",
-            "options": [
-              {
-                "value": "company",
-                "label": "crm.type.company"
-              },
-              {
-                "value": "nonprofit",
-                "label": "crm.ui.nonprofit"
-              },
-              {
-                "value": "government",
-                "label": "crm.ui.government"
-              },
-              {
-                "value": "individual",
-                "label": "crm.ui.individual"
-              }
-            ]
-          },
-          {
-            "name": "tax_id",
-            "label": "crm.ui.tax_id_cui",
-            "colSpan": 1
-          },
-          {
-            "name": "vat_payer",
-            "label": "crm.ui.vat_payer",
-            "type": "boolean",
-            "colSpan": 1
-          },
-          {
-            "name": "registration_no",
-            "label": "crm.form.registrationNo",
-            "colSpan": 1
-          },
-          {
-            "name": "industry",
-            "label": "crm.col.industry",
-            "colSpan": 1
-          },
-          {
-            "name": "website",
-            "label": "crm.form.website",
-            "colSpan": 1
-          },
-          {
-            "name": "email",
-            "label": "crm.col.email",
-            "type": "email",
-            "colSpan": 1
-          },
-          {
-            "name": "phone",
-            "label": "crm.col.phone",
-            "colSpan": 1
-          },
-          {
-            "name": "notes",
-            "label": "crm.form.notes",
-            "type": "textarea",
-            "rows": 3,
-            "colSpan": 2
-          }
-        ]
-      }
+      "sort": "-created_at",
+      "search": true,
+      "delete": true,
+      "create": true
     },
     {
-      "id": "deals",
-      "label": "crm.tab.deals",
-      "icon": "TrendingUp",
-      "dataSource": "/api/data/transactions?sort=created_at&order=desc&limit=500",
-      "dataPath": "records",
-      "search": {
-        "fields": [
-          "number"
-        ],
-        "placeholder": "common.search"
-      },
-      "columns": [
+      "type": "list",
+      "collection": "organizations",
+      "title": "crm.tab.organizations",
+      "fields": [
         {
-          "key": "number",
+          "field": "name",
+          "label": "crm.col.name"
+        },
+        {
+          "field": "industry",
+          "label": "crm.col.industry"
+        },
+        {
+          "field": "email",
+          "label": "crm.col.email"
+        },
+        {
+          "field": "created_at",
+          "label": "common.added"
+        }
+      ],
+      "sort": "name",
+      "search": true,
+      "delete": true,
+      "create": true
+    },
+    {
+      "type": "list",
+      "collection": "transactions",
+      "title": "crm.tab.deals",
+      "fields": [
+        {
+          "field": "number",
           "label": "crm.col.number"
         },
         {
-          "key": "type",
+          "field": "type",
           "label": "crm.col.type",
-          "type": "badge",
-          "badge": {
-            "colors": {
-              "invoice": "badge-info",
-              "payment": "badge-success",
-              "credit_note": "badge-warning",
-              "expense": "badge-ghost",
-              "transfer": "badge-ghost",
-              "other": "badge-ghost"
-            },
-            "labels": {
-              "invoice": "crm.txType.invoice",
-              "payment": "crm.txType.payment",
-              "credit_note": "crm.txType.credit_note",
-              "expense": "crm.txType.expense",
-              "transfer": "crm.txType.transfer",
-              "other": "crm.txType.other"
-            }
+          "display": "badge",
+          "tones": {
+            "invoice": "info",
+            "payment": "success",
+            "credit_note": "warning",
+            "expense": "muted",
+            "transfer": "muted",
+            "other": "muted"
           }
         },
         {
-          "key": "status",
+          "field": "status",
           "label": "crm.col.status",
-          "type": "badge",
-          "badge": {
-            "colors": {
-              "draft": "badge-ghost",
-              "pending": "badge-warning",
-              "completed": "badge-success",
-              "cancelled": "badge-error",
-              "refunded": "badge-info"
-            },
-            "labels": {
-              "draft": "crm.txStatus.draft",
-              "pending": "crm.txStatus.pending",
-              "completed": "crm.txStatus.completed",
-              "cancelled": "crm.txStatus.cancelled",
-              "refunded": "crm.txStatus.refunded"
-            }
+          "display": "badge",
+          "tones": {
+            "draft": "muted",
+            "pending": "warning",
+            "completed": "success",
+            "cancelled": "danger",
+            "refunded": "info"
           }
         },
         {
-          "key": "total_amount",
+          "field": "total_amount",
           "label": "crm.col.amount"
         },
         {
-          "key": "currency",
+          "field": "currency",
           "label": "common.col.currency"
         },
         {
-          "key": "due_date",
-          "label": "crm.col.dueDate",
-          "type": "date"
+          "field": "due_date",
+          "label": "crm.col.dueDate"
         },
         {
-          "key": "created_at",
-          "label": "common.added",
-          "type": "date"
+          "field": "created_at",
+          "label": "common.added"
         }
       ],
+      "sort": "-created_at",
+      "search": true,
+      "delete": true,
       "rowActions": [
         {
-          "id": "delete",
-          "icon": "Trash2",
-          "variant": "text-error",
-          "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/api/data/transactions/{id}",
-          "confirm": "ext.confirmDelete"
-        },
-        {
-          "id": "markPaid",
-          "icon": "CheckCircle",
+          "action": "markPaid",
           "label": "crm.action.markPaid",
-          "method": "POST",
-          "endpoint": "/ext/crm/actions/markPaid",
-          "body": {
-            "id": "{id}",
-            "paid_date": "{today}"
+          "input": {
+            "id": {
+              "$record": "id"
+            },
+            "paid_date": {
+              "$today": true
+            }
           },
-          "visibleWhen": {
-            "field": "status",
-            "in": [
-              "draft",
-              "pending"
-            ]
-          }
+          "when": [
+            {
+              "field": "status",
+              "op": "in",
+              "value": [
+                "draft",
+                "pending"
+              ]
+            }
+          ]
         }
       ],
-      "form": {
-        "endpoint": "/api/data/transactions",
-        "fields": [
-          {
-            "name": "type",
-            "label": "crm.form.type",
-            "type": "select",
-            "required": true,
-            "default": "invoice",
-            "colSpan": 1,
-            "options": [
-              {
-                "value": "invoice",
-                "label": "crm.txType.invoice"
-              },
-              {
-                "value": "payment",
-                "label": "crm.txType.payment"
-              },
-              {
-                "value": "credit_note",
-                "label": "crm.txType.credit_note"
-              },
-              {
-                "value": "expense",
-                "label": "crm.txType.expense"
-              },
-              {
-                "value": "transfer",
-                "label": "crm.txType.transfer"
-              },
-              {
-                "value": "other",
-                "label": "crm.txType.other"
-              }
-            ]
-          },
-          {
-            "name": "status",
-            "label": "crm.form.status",
-            "type": "select",
-            "default": "draft",
-            "colSpan": 1,
-            "options": [
-              {
-                "value": "draft",
-                "label": "crm.txStatus.draft"
-              },
-              {
-                "value": "pending",
-                "label": "crm.txStatus.pending"
-              },
-              {
-                "value": "completed",
-                "label": "crm.txStatus.completed"
-              },
-              {
-                "value": "cancelled",
-                "label": "crm.txStatus.cancelled"
-              },
-              {
-                "value": "refunded",
-                "label": "crm.txStatus.refunded"
-              }
-            ]
-          },
-          {
-            "name": "number",
-            "label": "crm.form.number",
-            "colSpan": 2
-          },
-          {
-            "name": "amount",
-            "label": "crm.form.amount",
-            "type": "number",
-            "colSpan": 1
-          },
-          {
-            "name": "tax_amount",
-            "label": "crm.form.taxAmount",
-            "type": "number",
-            "colSpan": 1
-          },
-          {
-            "name": "total_amount",
-            "label": "crm.form.totalAmount",
-            "type": "number",
-            "colSpan": 1
-          },
-          {
-            "name": "currency",
-            "label": "crm.form.currency",
-            "default": "RON",
-            "colSpan": 1
-          },
-          {
-            "name": "due_date",
-            "label": "crm.form.dueDate",
-            "type": "date",
-            "colSpan": 1
-          },
-          {
-            "name": "notes",
-            "label": "crm.form.notes",
-            "type": "textarea",
-            "colSpan": 2
-          }
-        ]
-      }
+      "create": true
     }
   ]
 }

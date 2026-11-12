@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.2.0 (2026-11-12)
+
+- feat: the Studio page is a `zveltio.view/2` view (ADR 0042): it names its collections and actions instead of URLs, and Studio draws it from the specification
+- requires engine 3.0.0-beta.111
+
 ## 2.1.0 (2026-10-31)
 
 - feat: a reconciled credit pays its invoice through finance/invoicing's own `recordPayment`, run by the engine (`host.actions.run`, manifest `calls`), instead of invoicing's code copied into this bundle; needs engine 3.0.0-beta.94 and invoicing 2.3.0

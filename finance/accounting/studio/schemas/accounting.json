@@ -1,326 +1,208 @@
 {
-  "sduiSchema": 1,
+  "spec": "zveltio.view/2",
   "title": "finance.accounting.title",
-  "subtitle": "finance.accounting.subtitle",
-  "newLabel": "finance.accounting.newEntry",
-  "resources": [
+  "type": "tabs",
+  "items": [
     {
-      "id": "entries",
-      "label": "finance.accounting.tab.entries",
-      "icon": "BookOpen",
-      "dataSource": "/api/data/journal_entries?sort=date&order=desc&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "journal_entries",
+      "title": "finance.accounting.tab.entries",
+      "fields": [
         {
-          "key": "date",
-          "label": "common.col.date",
-          "type": "date"
+          "field": "date",
+          "label": "common.col.date"
         },
         {
-          "key": "reference",
+          "field": "reference",
           "label": "common.col.docNumber",
-          "type": "mono"
+          "display": "mono"
         },
         {
-          "key": "description",
+          "field": "description",
           "label": "common.col.description"
         },
         {
-          "key": "status",
+          "field": "status",
           "label": "common.col.status",
-          "type": "badge",
-          "badge": {
-            "colors": {
-              "posted": "badge-success",
-              "draft": "badge-ghost",
-              "voided": "badge-error"
-            }
+          "display": "badge",
+          "tones": {
+            "posted": "success",
+            "draft": "muted",
+            "voided": "danger"
           }
         }
       ],
-      "readOnlyReason": "a journal entry needs balanced debit/credit lines; a flat form cannot express it, so this resource lists rather than creates (the createEntry action does). A dedicated page is the fix, not a schema field.",
+      "sort": "-date",
       "rowActions": [
         {
-          "id": "post",
-          "icon": "CheckCircle",
+          "action": "postEntry",
           "label": "finance.accounting.postEntry",
-          "variant": "text-success",
-          "method": "POST",
-          "endpoint": "/ext/finance/accounting/actions/postEntry",
-          "visibleWhen": {
-            "field": "status",
-            "equals": "draft"
+          "tone": "success",
+          "input": {
+            "id": {
+              "$record": "id"
+            }
           },
-          "body": {
-            "id": "{id}"
-          }
+          "when": [
+            {
+              "field": "status",
+              "op": "eq",
+              "value": "draft"
+            }
+          ]
         },
         {
-          "id": "void",
-          "icon": "Ban",
+          "action": "voidEntry",
           "label": "finance.accounting.voidEntry",
-          "variant": "text-warning",
-          "method": "POST",
-          "endpoint": "/ext/finance/accounting/actions/voidEntry",
-          "confirm": "finance.accounting.voidConfirm",
-          "visibleWhen": {
-            "field": "status",
-            "equals": "posted"
+          "tone": "warning",
+          "input": {
+            "id": {
+              "$record": "id"
+            }
           },
-          "body": {
-            "id": "{id}"
-          }
+          "confirm": "finance.accounting.voidConfirm",
+          "when": [
+            {
+              "field": "status",
+              "op": "eq",
+              "value": "posted"
+            }
+          ]
         },
         {
-          "id": "delete",
-          "icon": "Trash2",
+          "action": "deleteEntry",
           "label": "common.delete",
-          "variant": "text-error",
-          "method": "POST",
-          "endpoint": "/ext/finance/accounting/actions/deleteEntry",
-          "confirm": "finance.accounting.deleteConfirm",
-          "visibleWhen": {
-            "field": "status",
-            "equals": "draft"
+          "tone": "danger",
+          "input": {
+            "id": {
+              "$record": "id"
+            }
           },
-          "body": {
-            "id": "{id}"
-          }
+          "confirm": "finance.accounting.deleteConfirm",
+          "when": [
+            {
+              "field": "status",
+              "op": "eq",
+              "value": "draft"
+            }
+          ]
         }
       ]
     },
     {
-      "id": "accounts",
-      "label": "finance.accounting.tab.accounts",
-      "icon": "Coins",
-      "dataSource": "/api/data/accounts?sort=code&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "accounts",
+      "title": "finance.accounting.tab.accounts",
+      "fields": [
         {
-          "key": "code",
+          "field": "code",
           "label": "common.col.code",
-          "type": "mono"
+          "display": "mono"
         },
         {
-          "key": "name",
+          "field": "name",
           "label": "common.col.name"
         },
         {
-          "key": "type",
+          "field": "type",
           "label": "common.col.type",
-          "type": "badge",
-          "badge": {
-            "colors": {
-              "asset": "badge-info",
-              "liability": "badge-warning",
-              "equity": "badge-primary",
-              "revenue": "badge-success",
-              "expense": "badge-error"
-            }
+          "display": "badge",
+          "tones": {
+            "asset": "info",
+            "liability": "warning",
+            "equity": "info",
+            "revenue": "success",
+            "expense": "danger"
           }
         },
         {
-          "key": "is_active",
+          "field": "is_active",
           "label": "accounting.col.active",
-          "type": "badge",
-          "badge": {
-            "colors": {
-              "true": "badge-success",
-              "false": "badge-ghost"
-            },
-            "labels": {
-              "true": "accounting.yes",
-              "false": "accounting.no"
-            }
+          "display": "badge",
+          "tones": {
+            "true": "success",
+            "false": "muted"
           }
         }
       ],
-      "form": {
-        "endpoint": "/api/data/accounts",
-        "fields": [
-          {
-            "name": "code",
-            "label": "common.col.code",
-            "required": true,
-            "mono": true
-          },
-          {
-            "name": "name",
-            "label": "common.col.name",
-            "required": true
-          },
-          {
-            "name": "type",
-            "label": "common.col.type",
-            "type": "select",
-            "default": "asset",
-            "options": [
-              {
-                "value": "asset",
-                "label": "finance.accounting.ui.asset"
-              },
-              {
-                "value": "liability",
-                "label": "finance.accounting.ui.liability"
-              },
-              {
-                "value": "equity",
-                "label": "finance.accounting.ui.equity"
-              },
-              {
-                "value": "revenue",
-                "label": "finance.accounting.ui.revenue"
-              },
-              {
-                "value": "expense",
-                "label": "finance.accounting.ui.expense"
-              }
-            ]
-          },
-          {
-            "name": "parent_id",
-            "label": "common.col.parent",
-            "type": "relation",
-            "relation": {
-              "dataSource": "/api/data/accounts?sort=code&limit=500",
-              "dataPath": "records",
-              "valueKey": "id",
-              "labelKey": [
-                "code",
-                "name"
-              ]
-            }
-          }
-        ]
-      }
+      "sort": "code",
+      "create": true
     },
     {
-      "id": "fiscal",
-      "label": "finance.accounting.tab.fiscal",
-      "icon": "TrendingUp",
-      "dataSource": "/api/data/fiscal_years?sort=year&order=desc&limit=100",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "fiscal_years",
+      "title": "finance.accounting.tab.fiscal",
+      "fields": [
         {
-          "key": "year",
+          "field": "year",
           "label": "common.col.year"
         },
         {
-          "key": "start_date",
-          "label": "common.col.start",
-          "type": "date"
+          "field": "start_date",
+          "label": "common.col.start"
         },
         {
-          "key": "end_date",
-          "label": "common.col.end",
-          "type": "date"
+          "field": "end_date",
+          "label": "common.col.end"
         },
         {
-          "key": "status",
+          "field": "status",
           "label": "common.col.status",
-          "type": "badge",
-          "badge": {
-            "colors": {
-              "open": "badge-success",
-              "closed": "badge-ghost"
-            },
-            "labels": {
-              "open": "finance.accounting.status.open",
-              "closed": "finance.accounting.status.closed"
-            }
+          "display": "badge",
+          "tones": {
+            "open": "success",
+            "closed": "muted"
           }
         }
       ],
-      "form": {
-        "endpoint": "/api/data/fiscal_years",
-        "fields": [
-          {
-            "name": "year",
-            "label": "common.col.year",
-            "type": "number",
-            "required": true
-          },
-          {
-            "name": "start_date",
-            "label": "common.col.start",
-            "type": "date",
-            "required": true
-          },
-          {
-            "name": "end_date",
-            "label": "common.col.end",
-            "type": "date",
-            "required": true
-          }
-        ]
-      },
+      "sort": "-year",
       "rowActions": [
         {
-          "id": "close",
-          "icon": "Lock",
+          "action": "closeFiscalYear",
           "label": "finance.accounting.closeYear",
-          "variant": "text-warning",
-          "method": "POST",
-          "endpoint": "/ext/finance/accounting/actions/closeFiscalYear",
-          "confirm": "finance.accounting.closeConfirm",
-          "visibleWhen": {
-            "field": "status",
-            "equals": "open"
+          "tone": "warning",
+          "input": {
+            "id": {
+              "$record": "id"
+            }
           },
-          "body": {
-            "id": "{id}"
-          }
+          "confirm": "finance.accounting.closeConfirm",
+          "when": [
+            {
+              "field": "status",
+              "op": "eq",
+              "value": "open"
+            }
+          ]
         }
-      ]
+      ],
+      "create": true
     },
     {
-      "id": "cost-centers",
-      "label": "accounting.tab.costCenters",
-      "icon": "Boxes",
-      "dataSource": "/api/data/cost_centers?sort=code&limit=500",
-      "dataPath": "records",
-      "columns": [
+      "type": "list",
+      "collection": "cost_centers",
+      "title": "accounting.tab.costCenters",
+      "fields": [
         {
-          "key": "code",
+          "field": "code",
           "label": "accounting.col.code"
         },
         {
-          "key": "name",
+          "field": "name",
           "label": "accounting.col.name"
         },
         {
-          "key": "is_active",
+          "field": "is_active",
           "label": "accounting.col.active",
-          "type": "badge",
-          "badge": {
-            "colors": {
-              "true": "badge-success",
-              "false": "badge-ghost"
-            },
-            "labels": {
-              "true": "accounting.yes",
-              "false": "accounting.no"
-            }
+          "display": "badge",
+          "tones": {
+            "true": "success",
+            "false": "muted"
           }
         }
       ],
-      "form": {
-        "endpoint": "/api/data/cost_centers",
-        "fields": [
-          {
-            "name": "code",
-            "label": "accounting.col.code",
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "name",
-            "label": "accounting.col.name",
-            "required": true,
-            "colSpan": 1
-          }
-        ]
-      }
+      "sort": "code",
+      "create": true
     }
   ]
 }

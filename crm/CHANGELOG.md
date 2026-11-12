@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.0 (2026-11-12)
+
+- feat: the Studio page is a `zveltio.view/2` view (ADR 0042): it names its collections and actions instead of URLs, and Studio draws it from the specification
+- change: a contact shows its first name only (the joined full name is gone)
+- requires engine 3.0.0-beta.111
+
 ## 2.0.0 (2026-10-30)
 
 - feat!: contacts, organizations and transactions are collections declared in `schema/collections/`, created and owned by the engine; no SQL migrations

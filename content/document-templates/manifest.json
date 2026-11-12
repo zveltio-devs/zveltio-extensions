@@ -3,8 +3,8 @@
   "displayName": "Document Templates",
   "category": "content",
   "description": "HTML templates with {{variable}} interpolation, rendered to PDF as the caller",
-  "version": "2.0.1",
-  "zveltioMinVersion": "3.0.0-beta.99",
+  "version": "2.1.0",
+  "zveltioMinVersion": "3.0.0-beta.111",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-document-templates",
   "permissions": [
