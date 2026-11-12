@@ -14484,7 +14484,7 @@ var login = async (request, { host }) => {
     const { code, status } = err;
     if (code === "account_disabled")
       return answer({ error: "This account is disabled." }, 403);
-    if (code === "account_exists") {
+    if (code === "account_exists" || code === "not_a_member" || code === "capability_required") {
       return answer({ error: "This directory cannot sign in to that account." }, 403);
     }
     if (status === 400)

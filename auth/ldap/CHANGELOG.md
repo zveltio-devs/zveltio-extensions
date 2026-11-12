@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.1 (2026-11-12)
+
+- fix: a person the tenant does not admit (`not_a_member`) or a sign-in through an extension without `auth:session` (`capability_required`) is answered like an account the provider has no claim to: 403 with the extension's message. Before, the engine's problem response passed through and the request rolled back. Needs engine 3.0.0-beta.113
+
 ## 3.0.0 (2026-11-12)
 
 - feat!: signing in is the engine's (ADR 0039): `POST /login` is a declared public route answered by a plain function, and signs the person in with `host.identity.signIn` instead of `provisionUser`, `createBetterAuthSession` and `audit`. The engine finds or creates the account, refuses a disabled one or one the tenant has no claim to (403, as before), opens the session and writes `auth.login_success` with `provider: "ldap"` and the DN as subject; a refused directory bind or an entry without a mail address is audited through `host.identity.signInRefused`. A first sign-in's success entry is no longer lost: it was written outside the request's transaction, before the new account existed there

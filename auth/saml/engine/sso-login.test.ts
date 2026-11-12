@@ -99,6 +99,7 @@ d('auth/saml — an assertion is a session the engine accepts', () => {
   const firm = (k: string) => ({ id: crypto.randomUUID(), slug: `saml-${k}-${tag}` });
   const A = firm('a');
   const B = firm('b');
+  const C = firm('c');
   const spKey = forge.pki.privateKeyToPem(forge.pki.rsa.generateKeyPair(2048).privateKey);
   let e: Awaited<ReturnType<typeof onEngine>>;
   let god = '';
@@ -120,19 +121,20 @@ d('auth/saml — an assertion is a session the engine accepts', () => {
       (await getAuth().api.getSession({ headers: new Headers({ cookie: setCookie.split(';')[0] ?? '' }) }))?.user?.id;
     god = await e.harness.createGodSession(e.engineApp, e.db);
     owner = (await e.sql`SELECT email FROM "user" WHERE role = 'god'`.execute(e.db)).rows[0].email;
-    for (const t of [A, B]) {
+    for (const t of [A, B, C]) {
       await e.sql`INSERT INTO zv_tenants (id, slug, name, status) VALUES (${t.id}::uuid, ${t.slug}, ${t.slug}, 'active')`.execute(e.db);
     }
     await e.harness.asEveryTenant(e.db, (trx: any) => e.sql`DELETE FROM zvd_saml_settings`.execute(trx));
     await seed(DEFAULT, idp.config.issuer, null);
     await seed(A.id, 'sp-a', await encryptField(spKey));
     await seed(B.id, 'sp-b', null);
+    await seed(C.id, SP, null);
   }, 120_000);
 
   afterAll(async () => {
     if (!e) return;
     await e.done();
-    await e.sql`DELETE FROM zv_tenants WHERE id IN (${A.id}::uuid, ${B.id}::uuid)`.execute(e.db);
+    await e.sql`DELETE FROM zv_tenants WHERE id IN (${A.id}::uuid, ${B.id}::uuid, ${C.id}::uuid)`.execute(e.db);
   });
 
   const account = async (email: string, banned = false) => {
@@ -144,10 +146,10 @@ d('auth/saml — an assertion is a session the engine accepts', () => {
   };
 
   /** The IdP's form POST to the ACS, anonymous, in the default tenant. */
-  const acs = (email: string, samlResponse = idp.response(email)) => {
+  const acs = (email: string, samlResponse = idp.response(email), host = 'localhost') => {
     const form = new FormData();
     form.set('SAMLResponse', samlResponse);
-    return e.app.request('/ext/auth/saml/callback', { method: 'POST', body: form, headers: { host: 'localhost' } });
+    return e.app.request('/ext/auth/saml/callback', { method: 'POST', body: form, headers: { host } });
   };
   /** GET `path` in `slug`'s firm, as the god when `cookie` is given. */
   const get = (path: string, slug: string, cookie?: string) =>
@@ -229,6 +231,19 @@ d('auth/saml — an assertion is a session the engine accepts', () => {
     // Reactivated, the refused assertion still cannot be presented again.
     await e.sql`UPDATE "user" SET banned = false WHERE id = ${id}`.execute(e.db);
     expect((await acs(email, assertion)).status).toBe(401);
+  });
+
+  it('a person the firm does not admit is refused with 403, no account, and the assertion is spent', async () => {
+    const email = `grace-${tag}@saml.test`;
+    const assertion = idp.response(email);
+    const host = `${C.slug}.saml.test`;
+    const res = await acs(email, assertion, host);
+    expect(res.status).toBe(403);
+    expect(res.headers.get('set-cookie')).toBeNull();
+    const users = await e.sql`SELECT 1 FROM "user" WHERE email = ${email}`.execute(e.db);
+    expect(users.rows).toHaveLength(0);
+    expect((await audited('auth.login_failed', email)).at(-1)).toMatchObject({ provider: 'saml', reason: 'not_a_member' });
+    expect((await acs(email, assertion, host)).status).toBe(401);
   });
 
   it('a first sign-in provisions the account through the engine', async () => {
