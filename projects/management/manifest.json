@@ -3,8 +3,8 @@
   "displayName": "Project Management",
   "category": "projects",
   "description": "Projects, milestones, tasks, kanban board, team assignments and progress tracking",
-  "version": "2.0.0",
-  "zveltioMinVersion": "3.0.0-beta.92",
+  "version": "2.1.0",
+  "zveltioMinVersion": "3.0.0-beta.112",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-projects",
   "i18nPrefixes": [
@@ -33,7 +33,8 @@
       {
         "path": "/admin/projects/management/kanban",
         "label": "Kanban",
-        "icon": "Columns3"
+        "icon": "Columns3",
+        "schema": "schemas/kanban.json"
       }
     ],
     "navGroup": "projects"
