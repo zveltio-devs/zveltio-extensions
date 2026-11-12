@@ -3,8 +3,8 @@
   "displayName": "SMS / Push Notifications",
   "category": "sms",
   "description": "Send SMS through Twilio or Vonage, with templates and delivery reports",
-  "version": "2.0.1",
-  "zveltioMinVersion": "3.0.0-beta.103",
+  "version": "2.1.0",
+  "zveltioMinVersion": "3.0.0-beta.110",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-sms",
   "permissions": [
@@ -41,8 +41,13 @@
     "sms_templates",
     "sms_settings"
   ],
-  "publicRoutes": [
-    "/webhook/twilio"
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/webhook/twilio",
+      "access": "public",
+      "handler": "twilioStatus"
+    }
   ],
   "actions": [
     {
@@ -173,8 +178,8 @@
     }
   ],
   "integrity": {
-    "engineSha256": "12a7c01fe257dba8f873ddff06757af9fdb60e478e4289a41bb811ac869967a4",
-    "sourceSha256": "1d13cac1c674b483a6c610cccc3c093eaec118d2f1c5dafd4d6e1073dade5a7b",
+    "engineSha256": "cf2c922a7ab7e0aeac174a0c5584a3e17b47291aa9c7432e21ce2b40991bf654",
+    "sourceSha256": "6998b693a92df8aa4a4a8a5f99f2d33b4a5166aac93f19ceed58bda1bebf787b",
     "schemaSha256": "008ecadd651cee6e625769812a988f69f9b0e9e6cca59e409ce759b789970d14",
     "jobsSha256": "51253f77a7d71cbb1a2f0cb6d337af004db4766ad4cd3b1e12937c05395b2de6"
   }
