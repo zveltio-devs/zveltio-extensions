@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.3.0 (2026-11-12)
+
+- feat!: the Spatial explore page is a `zveltio.view/2` `map` of the recorded locations (`geo_location_history`, ADR 0042); the extension ships no Svelte page. The old page queried any collection by `near`/`within`; that query stays available as a data API filter (`<field>[near]=lat,lng,radius`, `<field>[within]=minLat,minLng,maxLat,maxLng`)
+- requires engine 3.0.0-beta.112
+
 ## 2.2.0 (2026-11-12)
 
 - feat: the maps draw tiles from the server the operator names (`ZVELTIO_MAP_TILES`, ADR 0043) instead of always asking `tile.openstreetmap.org`; with tiles `off` a map shows no tiles

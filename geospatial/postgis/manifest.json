@@ -3,7 +3,7 @@
   "displayName": "PostGIS",
   "category": "geospatial",
   "description": "Location history and map components — proximity and bounding-box search through the data API",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "zveltioMinVersion": "3.0.0-beta.112",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-postgis",
@@ -21,8 +21,9 @@
       },
       {
         "path": "/admin/geospatial/postgis/explore",
-        "label": "Spatial explore",
-        "icon": "MapPin"
+        "label": "Map",
+        "icon": "MapPin",
+        "schema": "schemas/explore.json"
       }
     ],
     "navGroup": "developer"
