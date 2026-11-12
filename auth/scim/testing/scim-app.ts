@@ -1,34 +1,63 @@
 import { createHmac, randomBytes } from 'node:crypto';
-import { sql } from 'kysely';
-import { mountForTest } from '../../../testing/ext-harness';
+import { onEngine } from '../../../testing/ext-harness';
 
 export const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001';
 
 /**
- * The SCIM app as one tenant's identity provider reaches it: every request runs
- * in that tenant's transaction, as the engine's tenant middleware makes it, and
- * carries a bearer token that tenant issued.
+ * The SCIM app as one tenant's identity provider reaches it: the packed bundle
+ * on the engine's own `/ext/*` chain (`onEngine`), where `host.identity` answers
+ * (ADR 0039), each request in that tenant (`x-tenant-slug`, as a per-tenant
+ * hostname would) with a bearer token that tenant issued.
  *
- * The token is seeded, not minted: minting writes `scim_tokens` through the data
- * API, which the harness does not mount (`index.test.ts` covers the route). The
- * hash is the host's (`deriveTokenHash`), as the harness computes it.
+ * `app.request('/scim/v2/…')` reaches `/ext/auth/scim/v2/…`, so a test reads
+ * as the IdP's own URLs. The token is seeded, not minted (`index.test.ts`
+ * covers minting); the hash is the host's (`deriveTokenHash`).
+ *
+ * `userIdOf(subject)` is the engine user id behind a SCIM `id`; `link(userId)` records an account as this provider's, as one provisioned by
+ * auth/scim 2.x was carried over (engine migration 120: subject = user id), so
+ * a test can drive an account it seeded by SQL.
  */
 export async function scimApp(engineDir: string, tenant = DEFAULT_TENANT_ID) {
-  const mounted = await mountForTest(engineDir, { tenant, transaction: true });
+  const on = await onEngine(engineDir);
+  const { sql, db } = on;
+  const slug =
+    tenant === DEFAULT_TENANT_ID
+      ? null
+      : ((await sql`SELECT slug FROM zv_tenants WHERE id = ${tenant}::uuid`.execute(db)).rows[0]?.slug as string);
   const name = `IdP ${crypto.randomUUID()}`;
   const token = `zvscim_${randomBytes(24).toString('hex')}`;
   const hash = createHmac('sha256', process.env.BETTER_AUTH_SECRET ?? '').update(token).digest('hex');
-  const row = await sql<{ id: string }>`
+  const row = await sql`
     INSERT INTO zvd_scim_tokens (tenant_id, name, token_hash)
     VALUES (${tenant}::uuid, ${name}, ${hash}) RETURNING id::text
-  `.execute(mounted.ctx.db);
+  `.execute(db);
   const bearer = { Authorization: `Bearer ${token}` };
+  const app = {
+    request: (path: string, init: RequestInit = {}) => {
+      const headers = new Headers(init.headers);
+      if (slug && !headers.has('x-tenant-slug')) headers.set('x-tenant-slug', slug);
+      return on.app.request(path.replace(/^\/scim\/v2/, '/ext/auth/scim/v2'), { ...init, headers });
+    },
+  };
   return {
-    ...mounted,
+    ...on,
+    app,
+    tenant,
+    slug,
     name,
     token,
-    tokenId: row.rows[0]!.id,
+    tokenId: row.rows[0]!.id as string,
     bearer,
     json: { ...bearer, 'content-type': 'application/json' },
+    /** The engine user id of the account this provider calls `subject` (its SCIM `id`). */
+    userIdOf: async (subject: string): Promise<string> =>
+      (
+        await sql`SELECT user_id FROM zv_identity_links
+                   WHERE tenant_id = ${tenant}::uuid AND provider = 'auth/scim' AND subject = ${subject}`.execute(db)
+      ).rows[0]?.user_id as string,
+    link: (userId: string) =>
+      sql`INSERT INTO zv_identity_links (tenant_id, provider, subject, user_id)
+          VALUES (${tenant}::uuid, 'auth/scim', ${userId}, ${userId})
+          ON CONFLICT DO NOTHING`.execute(db),
   };
 }

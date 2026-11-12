@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'bun:test';
 import { createHmac } from 'node:crypto';
 import { sql } from 'kysely';
-import { extensionContract, mountForTest } from '../../../testing/ext-harness';
+import { extensionContract, onEngine } from '../../../testing/ext-harness';
 import { scimApp } from '../testing/scim-app';
 
 await extensionContract(import.meta.dir);
@@ -84,50 +84,34 @@ d('auth/scim bespoke (SCIM 2.0 lifecycle)', () => {
   });
 
   // Minting is a data API write as the caller: who may mint is the engine's
-  // rule on `scim_tokens`, and only the hash is stored.
-  it('POST /tokens passes the data API refusal through', async () => {
-    const { app } = await mountForTest(import.meta.dir);
-    const res = await app.request('/tokens', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: 'Entra' }),
-    });
-    expect(res.status).toBe(403);
-    expect(JSON.stringify(await res.json())).not.toContain('zvscim_');
-  });
+  // rule on `scim_tokens` (no default grants), and only the hash is stored.
+  it('POST /tokens: refused without a grant, and for an administrator stores the hash only', async () => {
+    const { app: ext, engineApp, db, harness } = await onEngine(import.meta.dir);
+    const { app } = await scimApp(import.meta.dir);
+    const mint = (cookie: string) =>
+      ext.request('/ext/auth/scim/tokens', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', cookie },
+        body: JSON.stringify({ name: `Entra ${crypto.randomUUID()}` }),
+      });
+    const member = await harness.createMemberSession(engineApp, db);
+    const refused = await mint(member.cookie);
+    expect(refused.status).toBe(403);
+    expect(JSON.stringify(await refused.json())).not.toContain('zvscim_');
 
-  it('POST /tokens stores the hash only, and the raw token authenticates', async () => {
-    const { app, ctx } = await mountForTest(import.meta.dir, { transaction: true });
-    const name = `Entra ${crypto.randomUUID()}`;
-    const written: Array<{ collection: string; data: Record<string, unknown> }> = [];
-    ctx.internals.createRecord = async (_c: unknown, collection: string, data: Record<string, unknown>) => {
-      written.push({ collection, data });
-      // The data API's write, granted: the caller may create `scim_tokens`.
-      const row = await ctx.internals.asSystem(['scim_tokens'], () =>
-        sql<{ id: string }>`
-          INSERT INTO zvd_scim_tokens (name, token_hash) VALUES (${data.name}, ${data.token_hash}) RETURNING id::text
-        `.execute(ctx.db),
-      );
-      return { status: 201, body: { id: row.rows[0]!.id, ...data } };
-    };
-    const res = await app.request('/tokens', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name }),
-    });
-    expect(res.status).toBe(201);
-    const { token, id } = (await res.json()) as { token: string; id: string };
-    expect(token.startsWith('zvscim_')).toBe(true);
-    expect(written).toHaveLength(1);
-    expect(written[0]!.collection).toBe('scim_tokens');
+    const res = await mint(await harness.createGodSession(engineApp, db));
+    expect(res.status, await res.clone().text()).toBe(201);
+    const { token, id, base_url } = (await res.json()) as { token: string; id: string; base_url: string };
+    expect([token.startsWith('zvscim_'), base_url]).toEqual([true, '/ext/auth/scim/v2']);
     const hash = createHmac('sha256', process.env.BETTER_AUTH_SECRET ?? '').update(token).digest('hex');
-    expect(written[0]!.data).toEqual({ name, token_hash: hash });
+    const stored = await sql<{ token_hash: string }>`
+      SELECT token_hash FROM zvd_scim_tokens WHERE id = ${id}::uuid`.execute(db);
+    expect(stored.rows).toEqual([{ token_hash: hash }]);
 
     const spc = await app.request('/scim/v2/ServiceProviderConfig', { headers: { Authorization: `Bearer ${token}` } });
     expect(spc.status).toBe(200);
-    // Outside the request: the pool, which no row policy holds back.
     const used = await sql<{ last_used_at: Date | null }>`
-      DELETE FROM zvd_scim_tokens WHERE id = ${id}::uuid RETURNING last_used_at`.execute(ctx.db);
+      DELETE FROM zvd_scim_tokens WHERE id = ${id}::uuid RETURNING last_used_at`.execute(db);
     expect(used.rows[0]!.last_used_at).not.toBeNull();
   });
 });

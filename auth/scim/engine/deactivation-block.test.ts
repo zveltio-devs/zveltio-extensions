@@ -25,16 +25,17 @@ d('auth/scim — active=false blocks sign-in, active=true restores it', () => {
   });
 
   it('flags the user, ends their sessions, keeps their credentials, and undoes it', async () => {
-    const { app, json } = await scimApp(import.meta.dir);
+    const { app, json, userIdOf } = await scimApp(import.meta.dir);
 
-    const email = `scim-block-${Date.now()}@test.local`;
+    const email = `scim-block-${crypto.randomUUID()}@test.local`;
     const create = await app.request('/scim/v2/Users', {
       method: 'POST',
       headers: json,
       body: JSON.stringify({ schemas: [SCIM_USER], userName: email }),
     });
     expect(create.status).toBe(201);
-    const { id } = (await create.json()) as { id: string };
+    const { id: subject } = (await create.json()) as { id: string };
+    const id = await userIdOf(subject);
     await sql`
       INSERT INTO account (id, "accountId", "providerId", "userId", password, "createdAt", "updatedAt")
       VALUES (${crypto.randomUUID()}, ${id}, 'credential', ${id}, '$argon2id$kept', NOW(), NOW())
@@ -55,7 +56,7 @@ d('auth/scim — active=false blocks sign-in, active=true restores it', () => {
       return r.rows[0]!;
     };
     const setActive = (method: 'PATCH' | 'PUT', active: boolean) =>
-      app.request(`/scim/v2/Users/${id}`, {
+      app.request(`/scim/v2/Users/${subject}`, {
         method,
         headers: json,
         body: JSON.stringify(
@@ -89,15 +90,16 @@ d('auth/scim — active=false blocks sign-in, active=true restores it', () => {
   it('active=true does not lift a ban SCIM did not place, even single-tenant', async () => {
     const tenants = await sql<{ n: number }>`SELECT COUNT(*)::int AS n FROM zv_tenants`.execute(db);
     expect(tenants.rows[0]!.n).toBeLessThanOrEqual(1); // the branch under test
-    const { app, json } = await scimApp(import.meta.dir);
-    const email = `scim-adminban-${Date.now()}@test.local`;
+    const { app, json, userIdOf } = await scimApp(import.meta.dir);
+    const email = `scim-adminban-${crypto.randomUUID()}@test.local`;
     const create = await app.request('/scim/v2/Users', {
       method: 'POST',
       headers: json,
       body: JSON.stringify({ schemas: [SCIM_USER], userName: email }),
     });
     expect(create.status).toBe(201);
-    const { id } = (await create.json()) as { id: string };
+    const { id: subject } = (await create.json()) as { id: string };
+    const id = await userIdOf(subject);
     const ban = async () =>
       (
         await sql<{ banned: boolean | null; source: string | null }>`
@@ -110,11 +112,11 @@ d('auth/scim — active=false blocks sign-in, active=true restores it', () => {
       { schemas: [PATCH_OP], Operations: [{ op: 'replace', path: 'active', value: false }] },
       { schemas: [PATCH_OP], Operations: [{ op: 'replace', path: 'active', value: true }] },
     ]) {
-      const res = await app.request(`/scim/v2/Users/${id}`, { method: 'PATCH', headers: json, body: JSON.stringify(body) });
+      const res = await app.request(`/scim/v2/Users/${subject}`, { method: 'PATCH', headers: json, body: JSON.stringify(body) });
       expect(res.status).toBe(200);
       expect(await ban()).toEqual({ banned: true, source: 'unknown' });
     }
-    const put = await app.request(`/scim/v2/Users/${id}`, {
+    const put = await app.request(`/scim/v2/Users/${subject}`, {
       method: 'PUT',
       headers: json,
       body: JSON.stringify({ schemas: [SCIM_USER], userName: email, active: true }),
@@ -123,7 +125,9 @@ d('auth/scim — active=false blocks sign-in, active=true restores it', () => {
     expect(await ban()).toEqual({ banned: true, source: 'unknown' });
   });
 
-  it('refuses to deactivate or delete the instance owner, with a 400 naming why', async () => {
+  // The instance owner was provisioned by no identity provider: SCIM cannot
+  // reach it at all (ADR 0039 decision 9), as if it did not exist.
+  it('cannot reach the instance owner: 404, and nothing changes', async () => {
     const { app, json } = await scimApp(import.meta.dir);
     // The harness seeds its session user as the instance's one god.
     const god = '00000000-0000-4000-8000-00000000e001';
@@ -145,13 +149,9 @@ d('auth/scim — active=false blocks sign-in, active=true restores it', () => {
         ],
       }),
     });
-    expect(patch.status).toBe(400);
-    expect(((await patch.json()) as { detail: string }).detail).toContain('instance owner (god)');
-
+    expect(patch.status).toBe(404);
     const del = await app.request(`/scim/v2/Users/${god}`, { method: 'DELETE', headers: json });
-    expect(del.status).toBe(400);
-
-    // Refused as a whole: the rename in the same PatchOp did not land either.
+    expect(del.status).toBe(404);
     expect((await snapshot()).rows).toEqual(before);
   });
 });

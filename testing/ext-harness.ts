@@ -150,12 +150,6 @@ const engineHandleP = import(join(ENGINE_LIB, '..', 'engine-handle.js'));
  */
 const ENGINE_MEMBERS = [
   'isSingleTenantInstance',
-  'provisionUser',
-  'listTenantUsers',
-  'updateUserProfile',
-  'addTenantMember',
-  'removeTenantMember',
-  'setTenantMembershipEnd',
   'countMembers',
   'getDataStats',
   'listRoles',
@@ -274,14 +268,14 @@ async function engineDb(src: string): Promise<any> {
 }
 
 /**
- * The engine's own `deleteUser` / `revokeUserSessions` / `setUserActive`
- * (`lib/users.ts`), wired the way `buildExtensionInternals` wires them: the
- * caller's handle for the row and the audit, a privileged engine pool for
- * sessions and the sign-in block, and a live enforcer.
- * Not a copy — offboarding a user is exactly what a copy would get subtly wrong.
+ * The engine's own `deleteUser` (`lib/users.ts`), wired the way
+ * `buildExtensionInternals` wires it: the caller's handle for the row and the
+ * audit, a privileged engine pool for sessions, and a live enforcer.
+ * Not a copy — erasing a user is exactly what a copy would get subtly wrong.
  *
- * Signing in is not here: `host.identity` (ADR 0039) answers only behind the
- * engine's `/ext/*` gate, so an SSO login is proven on `onEngine`.
+ * Signing in and the directory are not here: `host.identity` (ADR 0039)
+ * answers only behind the engine's `/ext/*` gate, so they are proven on
+ * `onEngine`.
  */
 let _engineUsersP: Promise<{ users: any; pool: any; auth: any; restore: () => Promise<void> }> | null = null;
 function engineUsers(): Promise<{ users: any; pool: any; auth: any; restore: () => Promise<void> }> {
@@ -703,23 +697,7 @@ async function makeCtx(
         const { users, pool } = await engineUsers();
         return users.deleteUser(handle, pool, userId, who);
       },
-      revokeUserSessions: async (userId: string) => {
-        const { users, pool } = await engineUsers();
-        return users.revokeUserSessions(pool, userId);
-      },
-    }), (caller: string) => ({
-      // Bound to the caller (`ext:<name>`) by the engine's own `bindsCaller`, as
-      // `buildExtensionInternals` does: the ban records who placed it, and
-      // `liftOwnBan` lifts only that. Unbound, every ban read as 'unknown'.
-      setUserActive: async (handle: any, userId: string, active: boolean) => {
-        const { users, pool } = await engineUsers();
-        return users.setUserActive(handle, pool, userId, active, caller);
-      },
-      liftOwnBan: async (handle: any, userId: string) => {
-        const { users } = await engineUsers();
-        return users.liftOwnBan(handle, userId, caller);
-      },
-    })), capabilities, []),
+    }), () => ({})), capabilities, []),
     registerPublicRoute(spec: any) {
       publicRoutes?.push(spec);
     },
