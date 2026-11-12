@@ -9,6 +9,9 @@
 - The settings it reads as the system are the request tenant's: the tenant
   transaction admits that tenant's row only, so the handler no longer matches
   `tenant_id` itself.
+- fix: the engine refused to load 2.0.x ("manifest job deliveryStatus has no
+  implementation"): `deliveryStatus` declares no egress, so the engine runs it
+  inline from the module, which now exports it.
 
 ## 2.0.1 (2026-11-09)
 
