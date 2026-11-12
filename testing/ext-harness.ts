@@ -280,9 +280,8 @@ async function engineDb(src: string): Promise<any> {
  * sessions and the sign-in block, and a live enforcer.
  * Not a copy — offboarding a user is exactly what a copy would get subtly wrong.
  *
- * `createBetterAuthSession` too, over the engine's real better-auth: the session
- * it writes is the one `engineSession` reads back, so an SSO login is proven by
- * the engine accepting its cookie rather than by a stub returning nothing.
+ * Signing in is not here: `host.identity` (ADR 0039) answers only behind the
+ * engine's `/ext/*` gate, so an SSO login is proven on `onEngine`.
  */
 let _engineUsersP: Promise<{ users: any; pool: any; auth: any; restore: () => Promise<void> }> | null = null;
 function engineUsers(): Promise<{ users: any; pool: any; auth: any; restore: () => Promise<void> }> {
@@ -707,10 +706,6 @@ async function makeCtx(
       revokeUserSessions: async (userId: string) => {
         const { users, pool } = await engineUsers();
         return users.revokeUserSessions(pool, userId);
-      },
-      createBetterAuthSession: async (handle: any, userId: string, o?: any) => {
-        const { users, pool } = await engineUsers();
-        return users.createBetterAuthSession(handle, pool, userId, o);
       },
     }), (caller: string) => ({
       // Bound to the caller (`ext:<name>`) by the engine's own `bindsCaller`, as

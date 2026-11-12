@@ -3,20 +3,32 @@
   "displayName": "LDAP / Active Directory",
   "category": "auth",
   "description": "Authenticate users via LDAP or Active Directory (ldapts)",
-  "version": "2.1.1",
-  "zveltioMinVersion": "3.0.0-beta.103",
+  "version": "3.0.0",
+  "zveltioMinVersion": "3.0.0-beta.113",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-auth-ldap",
   "permissions": [
     "auth:session",
-    "identity:provision",
     "data:system"
   ],
   "i18nPrefixes": [
     "auth.ldap"
   ],
-  "publicRoutes": [
-    "/login"
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/login",
+      "access": "public",
+      "handler": "login"
+    }
+  ],
+  "signInProviders": [
+    {
+      "id": "ldap",
+      "label": "LDAP / Active Directory",
+      "kind": "credentials",
+      "route": "/login"
+    }
   ],
   "peerDependencies": {
     "ldapts": "^7.4.0"
@@ -44,8 +56,8 @@
     "bundlePeers": true
   },
   "integrity": {
-    "engineSha256": "ab258e5ba8d993343ac5d9c43d468d239920454a20e15caaefd7c653839aeeef",
-    "sourceSha256": "2e42248707f19bf7c14101010740ac56c49a391dfe49d401530bde3e71372735",
+    "engineSha256": "097f51642acc980b74b24e2e884812ed0dc571266756e604ffbb4dfc785b9502",
+    "sourceSha256": "f0edad2c55414c61a4a37042aa9548fd481d0db0278dbaac8abee453561465bf",
     "schemaSha256": "9185a9e53b9c55d9af3afffa99e2a2c91f59f6375775e9ab3e73b759ba6061b0"
   },
   "collections": [
