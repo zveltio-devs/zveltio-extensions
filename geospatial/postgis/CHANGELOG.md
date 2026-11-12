@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.2.0 (2026-11-12)
+
+- feat: the maps draw tiles from the server the operator names (`ZVELTIO_MAP_TILES`, ADR 0043) instead of always asking `tile.openstreetmap.org`; with tiles `off` a map shows no tiles
+- requires engine 3.0.0-beta.112
+
 ## 2.1.0 (2026-11-12)
 
 - feat: the Studio page is a `zveltio.view/2` view (ADR 0042): it names its collections and actions instead of URLs, and Studio draws it from the specification
