@@ -23,7 +23,7 @@ d('auth/scim — PUT /Users/:id (RFC 7644 §3.5.1 replace)', () => {
   it('replaces the profile, and absence of `active` means true', async () => {
     const { app, bearer, json } = await scimApp(import.meta.dir);
 
-    const email = `scim-put-${Date.now()}@test.local`;
+    const email = `scim-put-${crypto.randomUUID()}@test.local`;
     const create = await app.request('/scim/v2/Users', {
       method: 'POST',
       headers: json,
@@ -70,7 +70,7 @@ d('auth/scim — PUT /Users/:id (RFC 7644 §3.5.1 replace)', () => {
   it('deactivates when `active: false` is sent explicitly', async () => {
     const { app, json } = await scimApp(import.meta.dir);
 
-    const email = `scim-put-off-${Date.now()}@test.local`;
+    const email = `scim-put-off-${crypto.randomUUID()}@test.local`;
     const create = await app.request('/scim/v2/Users', {
       method: 'POST',
       headers: json,

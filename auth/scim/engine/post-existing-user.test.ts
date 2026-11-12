@@ -57,9 +57,10 @@ d('auth/scim — POST of an existing account is a 409 that changes nothing', () 
     const email = `scim-post-${tag}-${crypto.randomUUID()}@test.local`;
     const res = await post(idp, email, { displayName: `Original ${tag}` });
     expect(res.status).toBe(201);
-    const { id } = (await res.json()) as { id: string };
+    const { id: subject } = (await res.json()) as { id: string };
+    const id = await idp.userIdOf(subject);
     userIds.push(id);
-    return { id, email };
+    return { id, subject, email };
   };
 
   /** Everything a refused POST must leave alone. */
@@ -74,9 +75,11 @@ d('auth/scim — POST of an existing account is a 409 that changes nothing', () 
         SELECT tenant_id::text, valid_to FROM zv_tenant_users WHERE user_id = ${id} ORDER BY tenant_id
       `.execute(db)
     ).rows,
+    // The engine's record of which provider holds the account where (ADR 0039 decision 9).
     scim: (
       await sql<{ tenant_id: string; active: boolean }>`
-        SELECT tenant_id::text, active FROM zvd_scim_users WHERE user_id = ${id} ORDER BY tenant_id
+        SELECT tenant_id::text, active FROM zv_identity_links
+         WHERE user_id = ${id} AND provider = 'auth/scim' ORDER BY tenant_id
       `.execute(db)
     ).rows,
   });
@@ -128,7 +131,7 @@ d('auth/scim — POST of an existing account is a 409 that changes nothing', () 
     const bobState = await snapshot(bob.id);
     expect(bobState.memberships.map((m) => m.tenant_id)).toEqual([tenantB]);
     expect(bobState.scim).toEqual([{ tenant_id: tenantB, active: true }]);
-    const seen = await b.app.request(`/scim/v2/Users/${bob.id}`, { headers: b.json });
+    const seen = await b.app.request(`/scim/v2/Users/${bob.subject}`, { headers: b.json });
     expect(seen.status).toBe(200);
   });
 
@@ -136,12 +139,14 @@ d('auth/scim — POST of an existing account is a 409 that changes nothing', () 
     const a = await idpOf(tenantA);
     const b = await idpOf(tenantB);
 
-    // Carol works for A, and B ended her contract with a date.
+    // Carol works for A, and B ended her contract with a date. B's provider holds
+    // her too (as one 2.x provisioned and engine migration 120 carried over).
     const carol = await provision(a, 'carol');
     await sql`
       INSERT INTO zv_tenant_users (tenant_id, user_id, role, valid_from, valid_to)
       VALUES (${tenantB}::uuid, ${carol.id}, 'member', now() - interval '2 days', now() - interval '1 hour')
     `.execute(db);
+    await b.link(carol.id);
 
     const patch = await b.app.request(`/scim/v2/Users/${carol.id}`, {
       method: 'PATCH',
