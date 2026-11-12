@@ -41,6 +41,12 @@ reference.
   capability is a last resort. Ask for one only when actions, jobs,
   `host.collections`, the data API and validation rules cannot cover the need,
   and treat the request as the owner's decision.
+- **UI is data only (ADR 0042, owner 2026-11-12).** Screens are views
+  (`studio/schemas/*.json`) that name collections, fields and actions; each
+  front end draws them its own way. Add no new `studio/pages/` code page and no
+  Svelte slot widget; no URL, CSS class or expression belongs in a new view.
+  A screen a view cannot express is a request for a view kind or field type.
+  Full rule: `../zveltio/docs/extensions/ui-model.md`.
 
 ## What costs more here than it looks
 
