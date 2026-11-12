@@ -5063,6 +5063,10 @@ var kept;
 function keepContext(ctx) {
   kept = ctx;
 }
+async function tokenHash(raw) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
+}
 function scimError(status, detail, scimType) {
   return Response.json({ schemas: [SCIM_ERROR], status: String(status), scimType, detail }, { status });
 }
@@ -5101,12 +5105,7 @@ async function gate(request, host) {
   const raw = header.startsWith("Bearer ") ? header.slice(7) : "";
   if (!raw)
     return scimError(401, "Bearer token required");
-  let hash;
-  try {
-    hash = await ctx.internals.deriveTokenHash(raw);
-  } catch {
-    return scimError(500, "SCIM is not configured on this server");
-  }
+  const hash = await tokenHash(raw);
   const token = await ctx.internals.asSystem(["scim_tokens"], async () => {
     const { records } = await host.collections.list("scim_tokens", {
       filter: { token_hash: { eq: hash } },
@@ -5178,7 +5177,7 @@ var mintToken = async (request, { host }) => {
   const raw = `zvscim_${randomBytes(24).toString("hex")}`;
   const row = await host.collections.insert("scim_tokens", {
     name: parsed.data.name,
-    token_hash: await kept.internals.deriveTokenHash(raw)
+    token_hash: await tokenHash(raw)
   });
   return json({ id: row.id, token: raw, base_url: "/ext/auth/scim/v2" }, 201);
 };

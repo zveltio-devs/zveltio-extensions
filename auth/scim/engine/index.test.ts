@@ -1,7 +1,7 @@
 // Auto-generated per-extension contract test — shared logic in testing/ext-harness.ts.
 // Runs against the packed engine/index.js + real Postgres (TEST_DATABASE_URL; skips without it).
 import { describe, expect, it } from 'bun:test';
-import { createHmac } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { sql } from 'kysely';
 import { extensionContract, onEngine } from '../../../testing/ext-harness';
 import { scimApp } from '../testing/scim-app';
@@ -103,7 +103,7 @@ d('auth/scim bespoke (SCIM 2.0 lifecycle)', () => {
     expect(res.status, await res.clone().text()).toBe(201);
     const { token, id, base_url } = (await res.json()) as { token: string; id: string; base_url: string };
     expect([token.startsWith('zvscim_'), base_url]).toEqual([true, '/ext/auth/scim/v2']);
-    const hash = createHmac('sha256', process.env.BETTER_AUTH_SECRET ?? '').update(token).digest('hex');
+    const hash = createHash('sha256').update(token).digest('hex');
     const stored = await sql<{ token_hash: string }>`
       SELECT token_hash FROM zvd_scim_tokens WHERE id = ${id}::uuid`.execute(db);
     expect(stored.rows).toEqual([{ token_hash: hash }]);

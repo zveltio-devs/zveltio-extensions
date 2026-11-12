@@ -43,16 +43,25 @@ const SCIM_PATCH = 'urn:ietf:params:scim:api:messages:2.0:PatchOp';
 type Directory = Required<Pick<RouteIdentity, 'provision' | 'update' | 'setActive' | 'remove' | 'list' | 'get'>>;
 
 /**
- * What the handlers keep from `register`: hashing the bearer token
- * (`secrets`: the host computes the HMAC under the instance secret, so the
- * extension never holds it) and reading `scim_tokens` / `scim_users` as the
- * system (`data:system`) — the IdP has no principal for collection
- * permissions to answer.
+ * What the handlers keep from `register`: reading `scim_tokens` / `scim_users`
+ * as the system (`data:system`) — the IdP has no principal for collection
+ * permissions to answer, and a public route reads as the tenant's `public`
+ * role, which holds no grant on them (ADR 0020).
  */
 let kept: Pick<ExtensionContext, 'internals'> | undefined;
 
 export function keepContext(ctx: ExtensionContext): void {
   kept = ctx;
+}
+
+/**
+ * A token's fingerprint: SHA-256, hex. The token is 192 random bits, so a plain
+ * hash is enough to store it — no instance secret is involved, and nothing
+ * here can be turned back into a token.
+ */
+async function tokenHash(raw: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 function scimError(status: number, detail: string, scimType?: string): Response {
@@ -97,12 +106,7 @@ async function gate(request: Request, host: DeclaredRouteHost): Promise<Director
   const header = request.headers.get('authorization') ?? '';
   const raw = header.startsWith('Bearer ') ? header.slice(7) : '';
   if (!raw) return scimError(401, 'Bearer token required');
-  let hash: string;
-  try {
-    hash = await ctx.internals.deriveTokenHash(raw);
-  } catch {
-    return scimError(500, 'SCIM is not configured on this server');
-  }
+  const hash = await tokenHash(raw);
   // In the request's tenant (per-tenant hostname or `x-tenant-slug`), as the
   // system: the IdP has no principal. A token another tenant issued is not
   // found here, and the directory operations act in this same tenant.
@@ -208,7 +212,7 @@ export const mintToken: RouteHandler = async (request, { host }) => {
   // the data API's status.
   const row = await host.collections.insert('scim_tokens', {
     name: parsed.data.name,
-    token_hash: await kept!.internals.deriveTokenHash(raw),
+    token_hash: await tokenHash(raw),
   });
   // Shown exactly once — paste it into the IdP's provisioning config.
   return json({ id: row.id, token: raw, base_url: '/ext/auth/scim/v2' }, 201);

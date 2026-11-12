@@ -14,8 +14,10 @@ https://YOUR-DOMAIN/ext/auth/scim/v2
 
 Every route of an extension is declared in its manifest and served under
 `/ext/<name>` (ADR 0039). **Upgrading from 2.x:** the address moved from
-`/scim/v2` to `/ext/auth/scim/v2` — change the provider's Tenant URL; the token
-and the users it provisioned stay.
+`/scim/v2` to `/ext/auth/scim/v2`, with nothing left at the old address. Every
+identity provider must be reconfigured: change its Tenant URL and give it a new
+token (Step 2) — 3.0.0 stores a token as its SHA-256, so a 2.x token answers
+401. The users it provisioned stay its own.
 
 The full addresses the provider will call:
 
@@ -35,14 +37,9 @@ DELETE /ext/auth/scim/v2/Users/{id}
 
 **This is the step people forget**, and without it nothing works.
 
-The extension asks for `identity:provision`, `secrets`, `data:system` and
-`data:write`. They are **declared** in the manifest but not
-granted automatically — an administrator has to approve them explicitly. That is
+The extension asks for `identity:provision`, `data:system` and `data:write`.
+They are **declared** in the manifest but not granted automatically — an administrator has to approve them explicitly. That is
 by design: an extension asking for more power has to ask visibly.
-
-Without the `secrets` capability the extension cannot validate the token, and the
-provider gets `500 SCIM is not configured on this server` on every call —
-including with a perfectly valid token.
 
 Without `data:system` it cannot look the token up or record provisioning state,
 and every call answers 500: the provider has no user behind it, so the extension
@@ -189,7 +186,7 @@ still get in on Monday with a browser left open.
 ## If something does not work
 
 **500 on every call, with a valid token** — almost certainly the capabilities are
-not approved (`secrets`, `data:system`). Check Step 1. **403
+not approved (`data:system`). Check Step 1. **403
 `capability_required`** on provisioning: `identity:provision` is not approved.
 
 **401 on `ServiceProviderConfig` too** — wrong token, or (multi-tenant) the
@@ -200,11 +197,6 @@ request does not name the token's tenant: use the tenant's hostname.
 
 Every provisioning act — provision, update, (de)activation, removal — leaves an
 `identity.*` audit entry the engine writes, with `ext:auth/scim` as the actor.
-
-**500 "SCIM is not configured on this server"** — the `secrets` capability is not
-approved, or the instance's auth secret (`BETTER_AUTH_SECRET`) is missing from
-its configuration. Tokens are stored as a fingerprint and
-cannot be verified without it.
 
 **Users are created but have no rights** — SCIM makes them members of the tenant;
 roles are granted separately, from Permissions. Provisioning says *who is allowed

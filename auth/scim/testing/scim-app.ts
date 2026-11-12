@@ -1,4 +1,4 @@
-import { createHmac, randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { onEngine } from '../../../testing/ext-harness';
 
 export const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001';
@@ -11,7 +11,7 @@ export const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001';
  *
  * `app.request('/scim/v2/…')` reaches `/ext/auth/scim/v2/…`, so a test reads
  * as the IdP's own URLs. The token is seeded, not minted (`index.test.ts`
- * covers minting); the hash is the host's (`deriveTokenHash`).
+ * covers minting); the hash is SHA-256, as the extension stores it.
  *
  * `userIdOf(subject)` is the engine user id behind a SCIM `id`; `link(userId)` records an account as this provider's, as one provisioned by
  * auth/scim 2.x was carried over (engine migration 120: subject = user id), so
@@ -26,7 +26,7 @@ export async function scimApp(engineDir: string, tenant = DEFAULT_TENANT_ID) {
       : ((await sql`SELECT slug FROM zv_tenants WHERE id = ${tenant}::uuid`.execute(db)).rows[0]?.slug as string);
   const name = `IdP ${crypto.randomUUID()}`;
   const token = `zvscim_${randomBytes(24).toString('hex')}`;
-  const hash = createHmac('sha256', process.env.BETTER_AUTH_SECRET ?? '').update(token).digest('hex');
+  const hash = createHash('sha256').update(token).digest('hex');
   const row = await sql`
     INSERT INTO zvd_scim_tokens (tenant_id, name, token_hash)
     VALUES (${tenant}::uuid, ${name}, ${hash}) RETURNING id::text

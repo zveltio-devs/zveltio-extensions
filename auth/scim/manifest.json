@@ -9,7 +9,6 @@
   "package": "@zveltio/ext-scim",
   "permissions": [
     "identity:provision",
-    "secrets",
     "data:system",
     "data:write"
   ],
@@ -84,8 +83,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "8acdca7fcefed20d6aec041a558013374241a6419a7345b90a37e02007ad6e85",
-    "sourceSha256": "6fb435fac53b52f2ec7c3824af122ac98255c82fb25cf4e19b51165d05af7578",
+    "engineSha256": "4a237dfd7bcb97599a75e5903c5b885547aa65b826c76a7a2e40291ad9661dd2",
+    "sourceSha256": "3163a7e98170e5bc2012976856e248a0c44ebabb5a78e105497391c92d5ffc2e",
     "schemaSha256": "501c280ce551916a2b0f6baf195b8b7ff0e89673b9405543aaef0efc1b46264d"
   },
   "studio": {
