@@ -104,4 +104,37 @@ d('auth/scim — PUT /Users/:id (RFC 7644 §3.5.1 replace)', () => {
     });
     expect(res.status).toBe(404);
   });
+
+  // ADR 0039 decision 9: a provider reaches only the accounts it provisioned.
+  // 2.x listed, renamed, suspended and removed every member of its tenant —
+  // somebody an administrator invited included.
+  it('cannot read, change, suspend or remove a member of its tenant it did not provision', async () => {
+    const { app, json, sql, db } = await scimApp(import.meta.dir);
+    const id = crypto.randomUUID();
+    const email = `scim-local-${id}@test.local`;
+    await sql`INSERT INTO "user" (id, email, name, "emailVerified", "createdAt", "updatedAt")
+              VALUES (${id}, ${email}, 'Invited', true, NOW(), NOW())`.execute(db);
+    await sql`INSERT INTO zv_tenant_users (tenant_id, user_id, role)
+              VALUES ('00000000-0000-0000-0000-000000000001'::uuid, ${id}, 'member')`.execute(db);
+    try {
+      const probe = await app.request(`/scim/v2/Users?filter=${encodeURIComponent(`userName eq "${email}"`)}`, {
+        headers: json,
+      });
+      expect(((await probe.json()) as { totalResults: number }).totalResults).toBe(0);
+      const answers: number[] = [];
+      for (const [method, body] of [
+        ['GET', undefined],
+        ['PUT', JSON.stringify({ schemas: [SCIM_USER], userName: email, displayName: 'Renamed', active: false })],
+        ['PATCH', JSON.stringify({ schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'], Operations: [{ op: 'replace', path: 'active', value: false }] })],
+        ['DELETE', undefined],
+      ] as const) {
+        answers.push((await app.request(`/scim/v2/Users/${id}`, { method, headers: json, body })).status);
+      }
+      expect(answers).toEqual([404, 404, 404, 404]);
+      const after = await sql`SELECT name, banned FROM "user" WHERE id = ${id}`.execute(db);
+      expect(after.rows).toEqual([{ name: 'Invited', banned: null }]);
+    } finally {
+      await sql`DELETE FROM "user" WHERE id = ${id}`.execute(db);
+    }
+  });
 });
