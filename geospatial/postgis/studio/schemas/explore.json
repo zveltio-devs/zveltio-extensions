@@ -1,0 +1,7 @@
+{
+  "spec": "zveltio.view/2",
+  "type": "map",
+  "collection": "geo_location_history",
+  "location": "location",
+  "label": "entity_id"
+}
