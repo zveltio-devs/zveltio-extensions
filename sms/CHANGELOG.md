@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.1.0 (2026-11-12)
+
+- Twilio's status callback (`POST /webhook/twilio`) is a declared route: the
+  manifest's `routes` names it, public, and the engine serves it with the plain
+  handler `twilioStatus` (ADR 0039). Same URL, method and answers. The bundle no
+  longer contains Hono. Needs engine 3.0.0-beta.110.
+- The settings it reads as the system are the request tenant's: the tenant
+  transaction admits that tenant's row only, so the handler no longer matches
+  `tenant_id` itself.
+- fix: the engine refused to load 2.0.x ("manifest job deliveryStatus has no
+  implementation"): `deliveryStatus` declares no egress, so the engine runs it
+  inline from the module, which now exports it.
+
 ## 2.0.1 (2026-11-09)
 
 - build: repacked with hono 4.13.17 and kysely 0.29.8, in lockstep with the engine; no behaviour change
