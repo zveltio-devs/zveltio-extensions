@@ -37,7 +37,6 @@ d('auth/scim — multi-tenant deactivation is per tenant', () => {
   const scim: Record<string, Any> = {};
   const hdr: Record<string, Record<string, string>> = {};
   const people: string[] = [];
-  const tokens: string[] = [];
 
   beforeAll(async () => {
     const harness = (await import(join(ENGINE, 'testing', 'app-harness.js'))) as Any;
@@ -52,7 +51,6 @@ d('auth/scim — multi-tenant deactivation is per tenant', () => {
     // hostname or `x-tenant-slug` in the engine).
     for (const t of [A, B]) {
       const idp = await scimApp(import.meta.dir, t.id);
-      tokens.push(idp.tokenId);
       scim[t.id] = idp.app;
       hdr[t.id] = idp.json;
     }
@@ -60,11 +58,9 @@ d('auth/scim — multi-tenant deactivation is per tenant', () => {
 
   afterAll(async () => {
     for (const id of people) {
-      await sql`DELETE FROM zvd_scim_users WHERE user_id = ${id}`.execute(db);
       await sql`DELETE FROM zv_tenant_users WHERE user_id = ${id}`.execute(db);
       await sql`DELETE FROM "user" WHERE id = ${id}`.execute(db);
     }
-    for (const id of tokens) await sql`DELETE FROM zvd_scim_tokens WHERE id = ${id}::uuid`.execute(db);
     for (const t of [A, B]) await sql`DELETE FROM zv_tenants WHERE id = ${t.id}::uuid`.execute(db);
     await db.destroy();
   });
@@ -85,6 +81,11 @@ d('auth/scim — multi-tenant deactivation is per tenant', () => {
       await sql`INSERT INTO zv_tenant_users (tenant_id, user_id, role, valid_from, valid_to)
                 VALUES (${t.id}::uuid, ${p.userId}, 'member', now() - interval '1 day',
                         ${t.validTo ?? null}::timestamptz)`.execute(db);
+      // Each tenant's IdP provisioned them (as 2.x did, carried over by engine
+      // migration 120: the SCIM id is the user id). The engine reaches only
+      // accounts a provider holds (ADR 0039 decision 9).
+      await sql`INSERT INTO zv_identity_links (tenant_id, provider, subject, user_id)
+                VALUES (${t.id}::uuid, 'auth/scim', ${p.userId}, ${p.userId})`.execute(db);
     }
     return p;
   };

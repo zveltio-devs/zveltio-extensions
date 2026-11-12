@@ -1,602 +1,256 @@
 /**
  * auth/scim — SCIM 2.0 user provisioning.
  *
- * Two surfaces:
- *   • Admin (session-auth'd, mounted at /ext/auth/scim): manage the bearer
- *     tokens an IdP uses. The raw token is returned exactly once.
- *   • SCIM (public route '/scim/v2/*', bearer-auth'd): the endpoints Azure
- *     AD / Entra and Okta drive — ServiceProviderConfig, Users CRUD with
- *     `userName eq` filtering and PatchOp `active` handling.
+ * Every route is declared in the manifest and answered by a plain function
+ * (ADR 0039), as a `caller` route: the endpoints Azure AD / Entra and Okta
+ * drive — ServiceProviderConfig, Users CRUD with `userName eq` filtering and
+ * PatchOp `active` handling.
  *
- * Deactivation: SCIM active=false records the flag. On a multi-tenant instance
- * it ends the membership of the token's tenant only, and blocks sign-in (with
- * instant sign-out) once no tenant is left in force; on a single-tenant one it
- * blocks sign-in outright. active=true undoes what the IdP did — see `setActive`.
+ * The identity provider authenticates with an engine API key (`zvk_…`, ADR
+ * 0045) holding `$ext:auth/scim`, sent as its bearer token: the engine checks
+ * the key (tenant, expiry, revocation, issuer) before this code runs, and a
+ * key acts as the person who issued it (ADR 0028). Who may provision is the
+ * engine's rule too: the directory answers a caller whose author administers
+ * the tenant. This extension holds no token and no authorization logic.
+ *
+ * The directory is the engine's (ADR 0039 decision 9): SCIM maps the protocol
+ * onto `host.identity`'s `provision`, `update`, `setActive`, `remove`, `list`
+ * and `get`. The engine keeps the link between an account and this provider,
+ * reaches only the accounts this provider provisioned in the request's tenant,
+ * enforces `active` (per tenant on a multi-tenant instance, sign-in itself on a
+ * single-tenant one), refuses a membership the business ended, and audits each
+ * act with `ext:auth/scim` as the actor and the key as the caller. This
+ * extension holds no directory internal, writes no table and keeps no state:
+ * `externalId` is not stored (RFC 7643 makes it optional).
+ *
+ * The SCIM `id` of a user is this provider's `subject` for the account: a
+ * random id for one provisioned here, the engine user id for one provisioned
+ * by 2.x (engine migration 120 carried those over).
  */
 
-import { Hono } from 'hono';
-import { zValidator } from '@hono/zod-validator';
-import { z } from 'zod';
-import { sql } from 'kysely';
-import { randomBytes } from 'crypto';
-import type { ExtensionContext, ExtensionInternals } from '@zveltio/sdk/extension';
-
-// biome-ignore lint/suspicious/noExplicitAny: dual-kysely brand guard (see analytics/quality)
-type Db = any;
-// biome-ignore lint/suspicious/noExplicitAny: Hono context
-type Ctx = any;
-/** A user as the engine's `listTenantUsers` returns it. */
-type IdentityMember = Awaited<ReturnType<ExtensionInternals['listTenantUsers']>>[number];
+import type { DirectoryAccount, RouteHandler, RouteIdentity } from '@zveltio/sdk/extension';
 
 const SCIM_USER = 'urn:ietf:params:scim:schemas:core:2.0:User';
 const SCIM_LIST = 'urn:ietf:params:scim:api:messages:2.0:ListResponse';
 const SCIM_ERROR = 'urn:ietf:params:scim:api:messages:2.0:Error';
 const SCIM_PATCH = 'urn:ietf:params:scim:api:messages:2.0:PatchOp';
 
-// Delegated to the host (`secrets` capability). This used to read
-// BETTER_AUTH_SECRET directly — the secret that signs every session cookie on
-// the instance — to compute one token hash. The host computes the same
-// HMAC-SHA256, so bearer tokens already issued keep authenticating, while the
-// extension no longer holds the secret itself.
-function hashToken(internals: ExtensionInternals, raw: string): Promise<string> {
-  return internals.deriveTokenHash(raw);
+/** The directory operations of `host.identity`, as engines from 3.0.0-beta.114 serve them. */
+type Directory = Required<Pick<RouteIdentity, 'provision' | 'update' | 'setActive' | 'remove' | 'list' | 'get'>>;
+
+function scimError(status: number, detail: string, scimType?: string): Response {
+  return Response.json({ schemas: [SCIM_ERROR], status: String(status), scimType, detail }, { status });
 }
 
-function scimError(c: Ctx, status: number, detail: string, scimType?: string) {
-  return c.json({ schemas: [SCIM_ERROR], status: String(status), scimType, detail }, status);
+const json = (body: unknown, status = 200) => Response.json(body, { status });
+
+/**
+ * A refusal the engine's rules answered, said as a SCIM error the IdP can act
+ * on rather than a bare 500 it would retry forever. Anything else is a bug and
+ * propagates.
+ */
+function refusal(err: unknown): Response | null {
+  const { code, status, message } = err as { code?: string; status?: number; message: string };
+  if (typeof status !== 'number' || status < 400 || status >= 500) return null;
+  if (code === 'no_such_user') return scimError(404, 'User not found');
+  if (code === 'account_exists' || code === 'email_taken') return scimError(409, message, 'uniqueness');
+  if (code === 'invalid_input') return scimError(400, message, 'invalidValue');
+  return scimError(status, message);
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: DB row
-function toScimUser(u: any, state: { external_id?: string | null; active?: boolean } = {}): object {
+function toScimUser(a: DirectoryAccount): object {
   return {
     schemas: [SCIM_USER],
-    id: u.id,
-    userName: u.email,
-    externalId: state.external_id ?? undefined,
-    name: { formatted: u.name ?? u.email },
-    displayName: u.name ?? u.email,
-    emails: [{ value: u.email, primary: true }],
-    active: state.active ?? true,
-    meta: { resourceType: 'User', created: u.createdAt, lastModified: u.updatedAt },
+    id: a.subject,
+    userName: a.email,
+    name: { formatted: a.name || a.email },
+    displayName: a.name || a.email,
+    emails: [{ value: a.email, primary: true }],
+    active: a.active,
+    meta: { resourceType: 'User', created: a.createdAt, lastModified: a.updatedAt },
   };
 }
 
-export function scimAdminRoutes(ctx: ExtensionContext): Hono {
-  const app = new Hono();
+type ScimHandler = (
+  request: Request,
+  dir: Directory,
+  params: Record<string, string>,
+  wrote: () => void,
+) => Promise<Response>;
 
-  // Minting is the one thing the data API cannot do: the raw token exists only
-  // here, and only its hash is stored. The row goes in through the data API as
-  // the caller, so who may mint a token is the engine's rule on `scim_tokens`
-  // (no default grants: tenant administrators). Listing and revoking tokens is
-  // `GET`/`DELETE /api/data/scim_tokens`.
-  app.post('/tokens', zValidator('json', z.object({ name: z.string().min(1).max(120) })), async (c) => {
-    const raw = `zvscim_${randomBytes(24).toString('hex')}`;
-    const answer = await ctx.internals.createRecord(c, 'scim_tokens', {
-      name: c.req.valid('json').name,
-      token_hash: await hashToken(ctx.internals, raw),
-    });
-    if (answer.status !== 201) return c.json(answer.body as object, answer.status as 403);
-    // Shown exactly once — paste it into the IdP's provisioning config.
-    return c.json({ id: (answer.body as { id: string }).id, token: raw, base_url: '/scim/v2' }, 201);
-  });
-
-  return app;
-}
-
-/** The public SCIM 2.0 app, served at /scim/v2/* via registerPublicRoute. */
-export function buildScimApp(ctx: ExtensionContext): Hono {
-  const { db, internals } = ctx;
-  const app = new Hono().basePath('/scim/v2');
-
-  // Refusals the IdP can act on, said as SCIM errors rather than a bare 500 it
-  // would retry forever:
-  //   - the host refuses to deactivate or delete the instance owner (god), so an
-  //     IdP sync cannot lock the instance out (`user_protected`);
-  //   - the engine's identity rules (`IdentityRefusedError`) refuse an account
-  //     this tenant does not alone hold, an administrator, an address another
-  //     account has.
-  app.onError((err, c) => {
-    const code = (err as { code?: string }).code;
-    if (code === 'user_protected') return scimError(c, 400, err.message);
-    if (err.name === 'IdentityRefusedError') {
-      if (code === 'no_such_user') return scimError(c, 404, 'User not found');
-      if (code === 'account_exists' || code === 'email_taken') {
-        return scimError(c, 409, err.message, 'uniqueness');
-      }
-      if (code === 'invalid_input') return scimError(c, 400, err.message, 'invalidValue');
-      if (code === 'user_not_owned' || code === 'role_not_allowed') {
-        return scimError(c, 400, err.message);
-      }
-    }
-    console.error(err);
-    return c.text('Internal Server Error', 500);
-  });
-
-  /**
-   * The tenant that issued the bearer token on this request.
-   *
-   * Every user operation below is scoped through it. Read it from the context
-   * rather than resolving the tenant again — the gate has already done the
-   * lookup, and a second, slightly different resolution is how the two halves
-   * of a rule drift apart.
-   */
-  const tenantOf = (c: Ctx): string => c.get('scimTenantId') as string;
-
-  /**
-   * Run `fn` as the token's tenant, in one transaction.
-   *
-   * Users, memberships and the instance's tenants are the engine's: since engine
-   * #858 `ctx.db` refuses `"user"`, `zv_tenant_users` and `zv_tenants`, and the
-   * raw SQL that stood here answered 500 on every provisioning call. The
-   * engine's identity helpers (`identity:provision`) act for the tenant the
-   * work RUNS as, so the work runs as the token's (`tenant:enter`: this route is
-   * public and the request may name no tenant, or another). Membership is what
-   * makes a user visible to an IdP; `listTenantUsers` answers it, and on a
-   * single-tenant instance every user is the one tenant's.
-   */
-  // With `data:system` the transaction is the system's inside the tenant
-  // (marked and audited by the host), which is what lets it write `scim_users`:
-  // the IdP has no principal for collection permissions to answer.
-  const asTokenTenant = <T>(c: Ctx, fn: (trx: Db) => Promise<T>): Promise<T> =>
-    internals.withTenantIsolation(tenantOf(c), fn);
-
-  /** The token tenant's view of a user — lapsed members included — or null. */
-  async function memberOf(trx: Db, userId: string): Promise<IdentityMember | null> {
-    return (await internals.listTenantUsers(trx, { userId, limit: 1 }))[0] ?? null;
-  }
-
-  type ScimRow = {
-    user_id: string;
-    external_id: string | null;
-    active: boolean | null;
-    suspended_at: string | null;
-    held_valid_to: string | null;
-  };
-
-  /**
-   * This tenant's SCIM records for `userIds`. Instants in the engine's spelling
-   * (`IdentityMember`), so a suspension compares equal to the membership end it
-   * wrote.
-   */
-  async function scimRows(trx: Db, tenantId: string, userIds: string[]): Promise<Map<string, ScimRow>> {
-    if (userIds.length === 0) return new Map();
-    const iso = (col: string) =>
-      sql.raw(`to_char(${col} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`);
-    const r = await sql<ScimRow>`
-      SELECT user_id, external_id, active,
-             ${iso('suspended_at')} AS suspended_at, ${iso('held_valid_to')} AS held_valid_to
-        FROM zvd_scim_users
-       WHERE tenant_id = ${tenantId}::uuid AND user_id IN (${sql.join(userIds)})
-    `.execute(trx);
-    return new Map(r.rows.map((row) => [row.user_id, row]));
-  }
-
-  /**
-   * What the IdP is told about a user. `active` is the flag the IdP last wrote
-   * AND a membership in force: an expired or not-yet-started member cannot use
-   * this tenant, and RFC 7643 §4.1.1 leaves `active`'s meaning to us. Reported,
-   * not hidden — a hidden member makes the IdP's `userName eq` probe come back
-   * empty, and its re-POST answers 409 for somebody it cannot find. A
-   * single-tenant instance has no membership to lapse.
-   */
-  const stateOf = (m: IdentityMember, row: ScimRow | undefined, solo: boolean) => ({
-    external_id: row?.external_id ?? null,
-    active: (row?.active ?? true) && (solo || m.membership === null || m.membership.inForce),
-  });
-
-  /**
-   * PUT and PATCH answer 403 for a member whose membership here is not in force.
-   *
-   * A lapsed tenant has no claim on the account: the business ended the
-   * membership with a date (a contract end), and that date wins over the IdP.
-   * The exception is the IdP's own suspension (`setActive`): a `valid_to` still
-   * equal to the `suspended_at` it wrote is the IdP's to lift.
-   * One rule, two consequences:
-   *   • `active: true` does not reopen the membership — there is no reopen path,
-   *     and `stateOf` keeps reporting `active: false` while it is lapsed;
-   *   • `active: false` and profile writes are refused too. Sign-in is
-   *     instance-wide, so a lapsed tenant's IdP could otherwise block — or
-   *     rename — somebody who now works only for another tenant.
-   * Reading (GET) and deprovisioning (DELETE) stay open: the IdP must still see
-   * the user and be able to remove them from this tenant. POST of any existing
-   * account answers 409 and reopens nothing — nor does DELETE then POST.
-   *
-   * A single-tenant instance has no membership to lapse.
-   */
-  async function lapsed(c: Ctx, m: IdentityMember, row: ScimRow | undefined): Promise<Response | null> {
-    const ms = m.membership;
-    if (!ms || ms.inForce || (await internals.isSingleTenantInstance())) return null;
-    const started = Date.parse(ms.validFrom) <= Date.now();
-    if (started && ms.validTo !== null && ms.validTo === row?.suspended_at) return null;
-    return scimError(
-      c,
-      403,
-      "The user's membership in this tenant is not in force (expired or not yet started): " +
-        'it can be read or deprovisioned, not modified.',
-    );
-  }
-
-  /** Rename / re-address only when the IdP's value differs: an unchanged push writes nothing. */
-  async function updateProfile(
-    trx: Db,
-    m: IdentityMember,
-    patch: { name?: string; email?: string },
-  ): Promise<void> {
-    const change: { name?: string; email?: string } = {};
-    if (patch.name !== undefined && patch.name !== m.name) change.name = patch.name;
-    if (patch.email !== undefined && patch.email.trim().toLowerCase() !== m.email.toLowerCase()) {
-      change.email = patch.email;
-    }
-    if (change.name === undefined && change.email === undefined) return;
+/**
+ * A SCIM route. The engine authenticated the caller (an API key, ADR 0045)
+ * and its directory decides what the caller may do. A refusal before anything
+ * was written is answered as a SCIM error (an IdP retries a bare 500 forever);
+ * one after a write is thrown, so the request rolls back and the IdP never sees
+ * half an update (a profile changed while the deactivation it came with was
+ * refused). Call `wrote()` after each directory write.
+ */
+function scim(run: ScimHandler): RouteHandler {
+  return async (request, { host, params }) => {
+    const dir = host.identity;
+    if (!dir?.provision) throw new Error('[scim] needs engine 3.0.0-beta.114 (host.identity directory)');
+    let written = false;
     try {
-      await internals.updateUserProfile(trx, m.id, change);
-    } catch (err) {
-      // An account this tenant does not ALONE hold — a member of another tenant,
-      // an instance admin, god — is not this IdP's to rename or re-address: its
-      // password reset would follow the address. The rest of the request (the
-      // `active` flag above all) still applies; the answer shows the profile as
-      // it stands.
-      if ((err as { code?: string }).code !== 'user_not_owned') throw err;
-      console.warn(`[scim] profile of ${m.id} left unchanged: ${(err as Error).message}`);
-    }
-  }
-
-  // Bearer-token gate for every SCIM call.
-  app.use('*', async (c, next) => {
-    const header = c.req.header('authorization') ?? '';
-    const raw = header.startsWith('Bearer ') ? header.slice(7) : '';
-    if (!raw) return scimError(c, 401, 'Bearer token required');
-    let hash: string;
-    try {
-      hash = await hashToken(internals, raw);
-    } catch {
-      return scimError(c, 500, 'SCIM is not configured on this server');
-    }
-    // The token's tenant comes back with it. This route is public — there is no
-    // session and no tenant middleware — so the token is the only thing that
-    // says which tenant the caller is, and it has to be read here or the
-    // handlers have nothing to scope by.
-    // The lookup runs in the request's tenant (per-tenant hostname or
-    // `x-tenant-slug`), as the system: the IdP has no principal. A token issued
-    // by another tenant is not found here, so the token's tenant is the
-    // request's.
-    const row = await internals.asSystem(
-      ['scim_tokens'],
-      async () => {
-        // The tenant transaction runs as `zveltio_rls`: the row policy keeps
-        // another tenant's tokens out of this lookup.
-        const found = await sql<{ id: string; tenant_id: string }>`
-          SELECT id::text, tenant_id::text FROM zvd_scim_tokens WHERE token_hash = ${hash}
-        `.execute(db);
-        const token = found.rows[0];
-        if (token) {
-          await sql`UPDATE zvd_scim_tokens SET last_used_at = NOW() WHERE id = ${token.id}::uuid`.execute(db);
-        }
-        return token;
-      },
-      // The audit row names the token that called, not only "system".
-      { reason: 'SCIM bearer token', actor: (t) => (t ? `scim:${t.id}` : undefined) },
-    );
-    if (!row) return scimError(c, 401, 'Invalid bearer token');
-    (c as Ctx).set('scimTenantId', row.tenant_id);
-    // Who offboarded somebody: the audit row names the token, not a user.
-    (c as Ctx).set('scimTokenId', row.id);
-    return next();
-  });
-
-  app.get('/ServiceProviderConfig', (c) =>
-    c.json({
-      schemas: ['urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig'],
-      patch: { supported: true },
-      bulk: { supported: false, maxOperations: 0, maxPayloadSize: 0 },
-      filter: { supported: true, maxResults: 200 },
-      changePassword: { supported: false },
-      sort: { supported: false },
-      etag: { supported: false },
-      authenticationSchemes: [
-        { type: 'oauthbearertoken', name: 'Bearer token', description: 'Long-lived bearer token configured in Zveltio Studio' },
-      ],
-    }),
-  );
-
-  // GET /Users — list; supports the `userName eq "email"` probe every IdP does.
-  // Only this tenant's users: the unfiltered list used to page through the whole
-  // instance, which is how one tenant's IdP could enumerate everybody's staff.
-  app.get('/Users', async (c) => {
-    const filter = c.req.query('filter') ?? '';
-    const startIndex = Math.max(1, parseInt(c.req.query('startIndex') ?? '1', 10) || 1);
-    const count = Math.min(200, Math.max(0, parseInt(c.req.query('count') ?? '100', 10) || 100));
-    const m = filter.match(/userName\s+eq\s+"([^"]+)"/i);
-    const resources = await asTokenTenant(c, async (trx) => {
-      const users = m
-        ? await internals.listTenantUsers(trx, { email: m[1]! })
-        : await internals.listTenantUsers(trx, { limit: count, offset: startIndex - 1 });
-      const rows = await scimRows(trx, tenantOf(c), users.map((u) => u.id));
-      const solo = await internals.isSingleTenantInstance();
-      return users.map((u) => toScimUser(u, stateOf(u, rows.get(u.id), solo)));
-    });
-    return c.json({
-      schemas: [SCIM_LIST],
-      totalResults: resources.length,
-      startIndex,
-      itemsPerPage: resources.length,
-      Resources: resources,
-    });
-  });
-
-  // 404, not 403: whether a user id exists on some other tenant is itself
-  // information this caller is not entitled to.
-  app.get('/Users/:id', async (c) => {
-    const id = c.req.param('id');
-    const user = await asTokenTenant(c, async (trx) => {
-      const m = await memberOf(trx, id);
-      if (!m) return null;
-      return toScimUser(
-        m,
-        stateOf(m, (await scimRows(trx, tenantOf(c), [id])).get(id), await internals.isSingleTenantInstance()),
-      );
-    });
-    return user ? c.json(user) : scimError(c, 404, 'User not found');
-  });
-
-  // POST /Users — provision a NEW account into the token's tenant.
-  app.post('/Users', async (c) => {
-    // biome-ignore lint/suspicious/noExplicitAny: SCIM payload
-    const body = (await c.req.json().catch(() => null)) as any;
-    const email: string | undefined = body?.userName ?? body?.emails?.[0]?.value;
-    if (!email) return scimError(c, 400, 'userName (email) is required');
-    const name: string = body?.name?.formatted ?? body?.displayName ?? email;
-    const active = body?.active !== false;
-    const tenantId = tenantOf(c);
-
-    // POST provisions a NEW account. An email that already has one answers 409
-    // `uniqueness` and changes nothing — on every instance, whoever's member the
-    // account is. It used to grant this tenant membership of the existing
-    // account and apply `active`, so any tenant's IdP could claim any account on
-    // the instance by asserting its email — and, with `active: false`, ban its
-    // sign-in instance-wide. Joining an existing account to a tenant is a tenant
-    // administrator's act (invitation), not something an IdP can do by naming an
-    // email. The engine refuses the claim too (`account_exists`), for god, an
-    // instance admin or another tenant's account.
-    //
-    // The account, its membership, the SCIM record and `active` are one act:
-    // split, the IdP is told provisioning failed and retries into a 409, or
-    // deprovisioning later finds nothing to deactivate.
-    const created = await asTokenTenant(c, async (trx) => {
-      // The same 409 whether the account is this tenant's or not: which tenant
-      // holds an address is not this caller's to learn.
-      const found = await internals.provisionUser({ email, name }).catch((err) => {
-        if ((err as { code?: string }).code === 'account_exists') return null;
-        throw err;
+      return await run(request, dir as Directory, params, () => {
+        written = true;
       });
-      if (!found?.created) return null;
-      const { user } = found;
-      // Membership is what provisions the user INTO this tenant: without it the
-      // next `GET /Users` would not return the user SCIM just created.
-      await internals.addTenantMember(trx, user.id, 'member');
-      await sql`
-        INSERT INTO zvd_scim_users (user_id, external_id, active)
-        VALUES (${user.id}, ${body?.externalId ?? null}, ${active})
-        ON CONFLICT (tenant_id, user_id) DO UPDATE SET external_id = EXCLUDED.external_id, active = EXCLUDED.active, updated_at = NOW()
-      `.execute(trx);
-      // Provisioned inactive is what a later `active=false` would make it.
-      await setActive(trx, user.id, tenantId, active);
-      return user;
-    });
-    if (!created) {
-      return scimError(
-        c,
-        409,
-        'A user with this userName already exists on this instance. An existing account is added ' +
-          "to a tenant by that tenant's administrator (invitation), not by provisioning.",
-        'uniqueness',
-      );
+    } catch (err) {
+      const answer = written ? null : refusal(err);
+      if (!answer) throw err;
+      return answer;
     }
-    return c.json(toScimUser(created, { external_id: body?.externalId ?? null, active }), 201);
-  });
-
-  /**
-   * Record the active flag and enforce it, in the caller's transaction.
-   *
-   * Enforcement and flag commit or fail together: a deactivation the IdP is told
-   * succeeded while the person is still signed in is the one outcome that must
-   * not exist, so nothing here swallows an error — the IdP retries instead.
-   * Sessions and the sign-in block are the host's (`auth:users`). The block
-   * stops every method (password, passkey, magic link, SSO) and leaves the
-   * credentials alone, so lifting it gives them all back.
-   *
-   * The engine records whose block it is (`ban_source`, `ext:auth/scim` for
-   * SCIM's) and `liftOwnBan` lifts only that one: an administrator's block, or
-   * one placed before SCIM's and so kept, is never the IdP's to lift.
-   *
-   * Single-tenant: the IdP owns the only tenant, so `active: false` blocks
-   * sign-in and revokes the sessions; `active: true` lifts SCIM's block. Not
-   * any block: IdPs resend `active: true` on every sync, which would undo an
-   * administrator's within one cycle.
-   *
-   * Multi-tenant: sign-in is instance-wide but this IdP speaks for one tenant.
-   * So `active: false` ends the membership HERE (`setTenantMembershipEnd`, only
-   * one in force — a resend must not overwrite the end date it holds), which
-   * the engine's membership gate reads on the next request. The session stays:
-   * it still opens the tenants that have them. Only when no tenant is left in
-   * force is sign-in blocked — nothing is left to sign in to.
-   *
-   * `active: true` puts back the end date the business had set (open-ended if
-   * none), only while the membership still carries the IdP's own end
-   * (`ifValidTo`): a date the business wrote since wins. It lifts SCIM's block
-   * once a tenant is in force again — whichever tenant's IdP that is.
-   */
-  async function setActive(trx: Db, userId: string, tenantId: string, active: boolean): Promise<void> {
-    await sql`
-      INSERT INTO zvd_scim_users (user_id, active)
-      VALUES (${userId}, ${active})
-      ON CONFLICT (tenant_id, user_id) DO UPDATE SET active = EXCLUDED.active, updated_at = NOW()
-    `.execute(trx);
-    if (await internals.isSingleTenantInstance()) {
-      if (active) await internals.liftOwnBan(trx, userId);
-      else await internals.setUserActive(trx, userId, false);
-      return;
-    }
-    const row = (await scimRows(trx, tenantId, [userId])).get(userId);
-    if (active) {
-      let inForceAnywhere = (await memberOf(trx, userId))?.membership?.inForce === true;
-      if (row?.suspended_at) {
-        const back = await internals.setTenantMembershipEnd(trx, userId, row.held_valid_to, {
-          ifValidTo: row.suspended_at,
-        });
-        await sql`
-          UPDATE zvd_scim_users SET suspended_at = NULL, held_valid_to = NULL
-           WHERE tenant_id = ${tenantId}::uuid AND user_id = ${userId}
-        `.execute(trx);
-        inForceAnywhere = back?.inForceAnywhere ?? inForceAnywhere;
-      }
-      if (inForceAnywhere) await internals.liftOwnBan(trx, userId);
-      return;
-    }
-    const ended = await internals.setTenantMembershipEnd(trx, userId, 'now', { ifInForce: true });
-    if (ended?.changed) {
-      await sql`
-        UPDATE zvd_scim_users SET suspended_at = ${ended.validTo}::timestamptz,
-                                 held_valid_to = ${ended.previousValidTo}::timestamptz
-         WHERE tenant_id = ${tenantId}::uuid AND user_id = ${userId}
-      `.execute(trx);
-    }
-    if (ended?.inForceAnywhere) return;
-    // A block already there keeps its source: the engine records the first.
-    await internals.setUserActive(trx, userId, false);
-  }
-
-  /**
-   * PUT /Users/:id — full replace (RFC 7644 §3.5.1).
-   *
-   * Okta's profile push uses PUT, not PATCH: a missing method here was a 404 to
-   * the IdP, which then marked the app out of sync.
-   *
-   * Replace semantics, deliberately: absent `active` means `true`, because in a
-   * PUT the absence of a field is an assertion about its value. That is the
-   * difference from PATCH below, where absence means "not mentioned".
-   */
-  app.put('/Users/:id', async (c) => {
-    const id = c.req.param('id');
-    const tenantId = tenantOf(c);
-    // biome-ignore lint/suspicious/noExplicitAny: SCIM payload
-    const body = (await c.req.json().catch(() => null)) as any;
-    return asTokenTenant(c, async (trx) => {
-      // Membership, not existence: a token from one tenant must not be able to
-      // write another tenant's users.
-      const m = await memberOf(trx, id);
-      if (!m) return scimError(c, 404, 'User not found');
-      const refused = await lapsed(c, m, (await scimRows(trx, tenantId, [id])).get(id));
-      if (refused) return refused;
-      if (!body || (body.schemas && !body.schemas.includes(SCIM_USER))) {
-        return scimError(c, 400, 'Expected a SCIM User payload');
-      }
-      const email: string | undefined = body?.userName ?? body?.emails?.[0]?.value;
-      if (!email) return scimError(c, 400, 'userName (email) is required');
-      const name: string = body?.name?.formatted ?? body?.displayName ?? email;
-      const active = body?.active !== false;
-
-      // The profile, the SCIM record and the enforcement `setActive` performs are
-      // one state: a profile updated without the deactivation taking effect is
-      // the dangerous half.
-      await updateProfile(trx, m, { name, email });
-      await sql`
-        INSERT INTO zvd_scim_users (user_id, external_id, active)
-        VALUES (${id}, ${body?.externalId ?? null}, ${active})
-        ON CONFLICT (tenant_id, user_id)
-        DO UPDATE SET external_id = EXCLUDED.external_id, active = EXCLUDED.active
-      `.execute(trx);
-      await setActive(trx, id, tenantId, active);
-
-      const after = (await memberOf(trx, id))!;
-      const solo = await internals.isSingleTenantInstance();
-      return c.json(toScimUser(after, stateOf(after, (await scimRows(trx, tenantId, [id])).get(id), solo)));
-    });
-  });
-
-  // PATCH /Users/:id — Azure/Okta PatchOp; v1 honors `active` (the operation
-  // that matters for offboarding) and name/displayName replaces.
-  app.patch('/Users/:id', async (c) => {
-    const id = c.req.param('id');
-    const tenantId = tenantOf(c);
-    // biome-ignore lint/suspicious/noExplicitAny: SCIM payload
-    const body = (await c.req.json().catch(() => null)) as any;
-    return asTokenTenant(c, async (trx) => {
-      const m = await memberOf(trx, id);
-      if (!m) return scimError(c, 404, 'User not found');
-      const refused = await lapsed(c, m, (await scimRows(trx, tenantId, [id])).get(id));
-      if (refused) return refused;
-      if (!body?.schemas?.includes(SCIM_PATCH) || !Array.isArray(body.Operations)) {
-        return scimError(c, 400, 'Expected a SCIM PatchOp payload');
-      }
-      // RFC 7644 §3.5.2: a PatchOp's operations are applied as a set — one
-      // transaction, and Azure sends deactivation alongside profile ops.
-      const truthy = (v: unknown) => v === true || v === 'True' || v === 'true';
-      let current = m;
-      const rename = async (value: unknown) => {
-        await updateProfile(trx, current, { name: String(value) });
-        current = (await memberOf(trx, id))!;
-      };
-      for (const op of body.Operations) {
-        const kind = String(op.op ?? '').toLowerCase();
-        if (kind !== 'replace' && kind !== 'add') continue;
-        const path = String(op.path ?? '').toLowerCase();
-        if (path === 'active') {
-          await setActive(trx, id, tenantId, truthy(op.value));
-        } else if (path === 'displayname' || path === 'name.formatted') {
-          await rename(op.value);
-        } else if (!path && op.value && typeof op.value === 'object') {
-          if ('active' in op.value) await setActive(trx, id, tenantId, truthy(op.value.active));
-          if (typeof op.value.displayName === 'string') await rename(op.value.displayName);
-        }
-      }
-      const after = (await memberOf(trx, id))!;
-      const solo = await internals.isSingleTenantInstance();
-      return c.json(toScimUser(after, stateOf(after, (await scimRows(trx, tenantId, [id])).get(id), solo)));
-    });
-  });
-
-  // DELETE /Users/:id — deprovision from THIS tenant.
-  //
-  // Membership is what gets removed. A person can work for two tenants on one
-  // instance, and one of them offboarding must not erase the account they still
-  // use at the other. The account goes only when the engine finds it orphaned:
-  // no tenant holds it and nothing else does (god, an instance admin, a grant
-  // elsewhere). One transaction, so two tenants deprovisioning the same person
-  // at once serialize on the user row and one of them finds it orphaned.
-  //
-  // Sessions and the account go through the host (`auth:users`).
-  app.delete('/Users/:id', async (c) => {
-    const id = c.req.param('id');
-    const tenantId = tenantOf(c);
-    return asTokenTenant(c, async (trx) => {
-      if (!(await memberOf(trx, id))) return scimError(c, 404, 'User not found');
-      const gone = await internals.removeTenantMember(trx, id);
-      await sql`
-        DELETE FROM zvd_scim_users WHERE user_id = ${id} AND tenant_id = ${tenantId}::uuid
-      `.execute(trx);
-      if (gone.orphaned) {
-        // Revokes the sessions too; `account` goes with the row (ON DELETE CASCADE).
-        await internals.deleteUser(trx, id, {
-          actor: `scim:${(c as Ctx).get('scimTokenId')}`,
-          reason: 'scim.deprovision',
-          metadata: { tenant_id: tenantId },
-        });
-      } else if (!gone.inForceAnywhere) {
-        // Only lapsed memberships left: nothing to sign in to, so the sessions go.
-        // While another tenant has them in force the session stays — it is
-        // instance-wide, and the engine's membership gate already refuses this
-        // tenant on the next request.
-        await internals.revokeUserSessions(id);
-      }
-      return c.body(null, 204);
-    });
-  });
-
-  // Groups: not supported in v1 — advertise emptiness instead of erroring.
-  app.get('/Groups', (c) =>
-    c.json({ schemas: [SCIM_LIST], totalResults: 0, startIndex: 1, itemsPerPage: 0, Resources: [] }),
-  );
-
-  return app;
+  };
 }
+
+/**
+ * Rename / re-address. An account this tenant does not ALONE hold — a member of
+ * another tenant, an instance admin — is not this IdP's to rename or
+ * re-address: its password reset would follow the address. The rest of the
+ * request (the `active` flag above all) still applies.
+ */
+async function updateProfile(
+  dir: Directory,
+  subject: string,
+  patch: { name?: string; email?: string },
+  wrote: () => void,
+): Promise<void> {
+  try {
+    await dir.update(subject, patch);
+    wrote();
+  } catch (err) {
+    if ((err as { code?: string }).code !== 'user_not_owned') throw err;
+    console.warn(`[scim] profile of ${subject} left unchanged: ${(err as Error).message}`);
+  }
+}
+
+// The first thing an IdP's "Test Connection" calls: it answers only a caller
+// the directory answers, so a key that cannot provision fails the test.
+export const serviceProviderConfig = scim(async (_request, dir) => {
+  await dir.list({ limit: 0 });
+  return json({
+    schemas: ['urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig'],
+    patch: { supported: true },
+    bulk: { supported: false, maxOperations: 0, maxPayloadSize: 0 },
+    filter: { supported: true, maxResults: 200 },
+    changePassword: { supported: false },
+    sort: { supported: false },
+    etag: { supported: false },
+    authenticationSchemes: [
+      {
+        type: 'oauthbearertoken',
+        name: 'Bearer token',
+        description: 'A Zveltio API key (zvk_…) holding $ext:auth/scim, issued by a tenant administrator',
+      },
+    ],
+  });
+});
+
+// GET /Users — this provider's users in this tenant; supports the
+// `userName eq "email"` probe every IdP does.
+export const listUsers = scim(async (request, dir) => {
+  const q = new URL(request.url).searchParams;
+  const startIndex = Math.max(1, Number.parseInt(q.get('startIndex') ?? '1', 10) || 1);
+  const count = Math.min(200, Math.max(0, Number.parseInt(q.get('count') ?? '100', 10) || 100));
+  const m = (q.get('filter') ?? '').match(/userName\s+eq\s+"([^"]+)"/i);
+  const accounts = m ? await dir.list({ email: m[1]! }) : await dir.list({ limit: count, offset: startIndex - 1 });
+  const resources = accounts.map(toScimUser);
+  return json({
+    schemas: [SCIM_LIST],
+    totalResults: resources.length,
+    startIndex,
+    itemsPerPage: resources.length,
+    Resources: resources,
+  });
+});
+
+// 404 for an account another provider or tenant holds: whether it exists is
+// not this caller's to learn.
+export const getUser = scim(async (_request, dir, params) => {
+  const a = await dir.get(params.id!);
+  return a ? json(toScimUser(a)) : scimError(404, 'User not found');
+});
+
+// POST /Users — provision a NEW account into this tenant. An e-mail that
+// already has an account answers 409 `uniqueness` and changes nothing: joining
+// an existing account to a tenant is a tenant administrator's act (invitation),
+// not something an IdP can do by naming an e-mail.
+export const createUser = scim(async (request, dir, _params, wrote) => {
+  // biome-ignore lint/suspicious/noExplicitAny: SCIM payload
+  const body = (await request.json().catch(() => null)) as any;
+  const email: string | undefined = body?.userName ?? body?.emails?.[0]?.value;
+  if (!email) return scimError(400, 'userName (email) is required');
+  const name: string = body?.name?.formatted ?? body?.displayName ?? email;
+  const a = await dir.provision({ subject: crypto.randomUUID(), email, name, active: body?.active !== false });
+  wrote();
+  return json(toScimUser(a), 201);
+});
+
+/**
+ * PUT /Users/:id — full replace (RFC 7644 §3.5.1). Okta's profile push uses
+ * PUT. Replace semantics: absent `active` means `true`, because in a PUT the
+ * absence of a field is an assertion about its value. A membership the
+ * business ended answers 403 (`not_in_force`): read and remove only.
+ */
+export const replaceUser = scim(async (request, dir, params, wrote) => {
+  const subject = params.id!;
+  // biome-ignore lint/suspicious/noExplicitAny: SCIM payload
+  const body = (await request.json().catch(() => null)) as any;
+  if (!(await dir.get(subject))) return scimError(404, 'User not found');
+  if (!body || (body.schemas && !body.schemas.includes(SCIM_USER))) {
+    return scimError(400, 'Expected a SCIM User payload');
+  }
+  const email: string | undefined = body?.userName ?? body?.emails?.[0]?.value;
+  if (!email) return scimError(400, 'userName (email) is required');
+  const name: string = body?.name?.formatted ?? body?.displayName ?? email;
+  await updateProfile(dir, subject, { name, email }, wrote);
+  const after = await dir.setActive(subject, body?.active !== false);
+  wrote();
+  return json(toScimUser(after));
+});
+
+// PATCH /Users/:id — Azure/Okta PatchOp; honours `active` (the operation that
+// matters for offboarding) and name/displayName replaces. RFC 7644 §3.5.2: the
+// operations are applied as a set — one transaction.
+export const patchUser = scim(async (request, dir, params, wrote) => {
+  const subject = params.id!;
+  // biome-ignore lint/suspicious/noExplicitAny: SCIM payload
+  const body = (await request.json().catch(() => null)) as any;
+  if (!(await dir.get(subject))) return scimError(404, 'User not found');
+  if (!body?.schemas?.includes(SCIM_PATCH) || !Array.isArray(body.Operations)) {
+    return scimError(400, 'Expected a SCIM PatchOp payload');
+  }
+  const truthy = (v: unknown) => v === true || v === 'True' || v === 'true';
+  const setActive = async (v: unknown) => {
+    await dir.setActive(subject, truthy(v));
+    wrote();
+  };
+  const rename = (v: unknown) => updateProfile(dir, subject, { name: String(v) }, wrote);
+  for (const op of body.Operations) {
+    const kind = String(op.op ?? '').toLowerCase();
+    if (kind !== 'replace' && kind !== 'add') continue;
+    const path = String(op.path ?? '').toLowerCase();
+    if (path === 'active') await setActive(op.value);
+    else if (path === 'displayname' || path === 'name.formatted') await rename(op.value);
+    else if (!path && op.value && typeof op.value === 'object') {
+      if ('active' in op.value) await setActive(op.value.active);
+      if (typeof op.value.displayName === 'string') await rename(op.value.displayName);
+    }
+  }
+  const after = await dir.get(subject);
+  if (!after) return scimError(404, 'User not found');
+  return json(toScimUser(after));
+});
+
+// DELETE /Users/:id — deprovision from THIS tenant. The engine removes the
+// membership, ends the sessions when no tenant is left in force, and deletes
+// the account only when nothing else holds it.
+export const deleteUser = scim(async (_request, dir, params) => {
+  await dir.remove(params.id!);
+  return new Response(null, { status: 204 });
+});
+
+// Groups: not supported — advertise emptiness instead of erroring.
+export const listGroups = scim(async () =>
+  json({ schemas: [SCIM_LIST], totalResults: 0, startIndex: 1, itemsPerPage: 0, Resources: [] }),
+);
