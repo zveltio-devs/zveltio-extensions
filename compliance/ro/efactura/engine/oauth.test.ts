@@ -2,7 +2,7 @@
 // engine loads it (manifest, declared collections, the six Deno jobs over the
 // verified `engine/jobs.js`), behind the engine's own `/ext/*` chain — session
 // prefetch, tenant resolution from the request's subdomain, the auth gate that
-// admits only the manifest's `publicRoutes`. A state stored for one tenant is
+// admits only the manifest's public `routes`. A state stored for one tenant is
 // spent once, in that tenant, and queues `connect`; nothing else gets in.
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';

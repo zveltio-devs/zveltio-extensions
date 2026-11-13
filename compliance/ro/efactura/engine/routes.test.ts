@@ -1,5 +1,6 @@
 // The sign-in legs and the downloads, over a fake context: `host(c)` an
-// in-memory data API, `asSystem` and `enqueue` recorded. What the engine's
+// in-memory data API, `asSystem` and `enqueue` recorded; the callback is the
+// declared handler, called with a fake host. What the engine's
 // `/ext` chain does around them (the session, the tenant, the public-route
 // gate) is the contract test's; this proves the state handshake.
 import { describe, expect, it } from 'bun:test';
@@ -42,7 +43,26 @@ function setup(rows: Row[], files: Row[] = []) {
     await next();
   });
   ext.register(app, ctx as never);
-  return { app, queued, asSystem, rows };
+  // The declared callback's host: the request's tenant transaction admits that
+  // tenant's rows only (the engine's RLS), so the fake does the same.
+  const callback = (query: string, init: { headers?: Record<string, string> } = {}) => {
+    const tenant = init.headers?.['x-tenant'] ?? 't1';
+    const host = {
+      collections: {
+        ...collections,
+        list: async (c: string) => ({ records: tables[c]!.filter((r) => r.tenant_id === tenant) }),
+      },
+      enqueue: async (job: string, input: Row) => {
+        queued.push({ job, input });
+        return 'j1';
+      },
+    };
+    return ext.routes.oauthCallback(
+      new Request(`https://erp.example.ro/ext/compliance/ro/efactura/oauth/callback${query}`, init),
+      { params: {}, host },
+    ) as Promise<Response>;
+  };
+  return { app, callback, queued, asSystem, rows };
 }
 
 const own = () => ({
@@ -69,27 +89,36 @@ describe('the ANAF sign-in', () => {
     const t = setup([own()]);
     const state = await started(t);
     expect(state).toMatch(/^[0-9a-f]{48}$/);
-    const back = await t.app.request(`/oauth/callback?code=c0de&state=${state}`, jar(state));
+    const back = await t.callback(`?code=c0de&state=${state}`, jar(state));
     expect(back.status).toBe(200);
     expect(t.queued).toEqual([{ job: 'connect', input: { settings_id: 's1', code: 'c0de' } }]);
     expect(t.asSystem).toEqual([['efactura_settings']]);
     expect(t.rows[0].oauth_state).toBeNull();
     // Replayed: the state is gone.
-    expect((await t.app.request(`/oauth/callback?code=c0de&state=${state}`, jar(state))).status).toBe(400);
+    expect((await t.callback(`?code=c0de&state=${state}`, jar(state))).status).toBe(400);
     expect(t.queued).toHaveLength(1);
+  });
+
+  it('declares the callback public, answered by oauthCallback', async () => {
+    const manifest = await Bun.file(join(import.meta.dir, '..', 'manifest.json')).json();
+    expect(manifest.routes).toEqual([
+      { method: 'GET', path: '/oauth/callback', access: 'public', handler: 'oauthCallback' },
+    ]);
+    expect(manifest.publicRoutes).toBeUndefined();
+    expect(Object.keys(ext.routes)).toEqual(['oauthCallback']);
   });
 
   it('refuses a forged, expired or other-tenant state', async () => {
     const t = setup([own()]);
     const state = await started(t);
     const forged = '0'.repeat(48);
-    expect((await t.app.request(`/oauth/callback?code=x&state=${forged}`, jar(forged))).status).toBe(400);
-    expect((await t.app.request(`/oauth/callback?code=x&state=${state}`, jar(state, { 'x-tenant': 't2' }))).status).toBe(400);
+    expect((await t.callback(`?code=x&state=${forged}`, jar(forged))).status).toBe(400);
+    expect((await t.callback(`?code=x&state=${state}`, jar(state, { 'x-tenant': 't2' }))).status).toBe(400);
     // Another browser (no cookie, or another sign-in's) cannot finish this one: login CSRF.
-    expect((await t.app.request(`/oauth/callback?code=x&state=${state}`)).status).toBe(400);
-    expect((await t.app.request(`/oauth/callback?code=x&state=${state}`, jar(forged))).status).toBe(400);
+    expect((await t.callback(`?code=x&state=${state}`)).status).toBe(400);
+    expect((await t.callback(`?code=x&state=${state}`, jar(forged))).status).toBe(400);
     t.rows[0].oauth_state_expires_at = new Date(Date.now() - 1000).toISOString();
-    expect((await t.app.request(`/oauth/callback?code=x&state=${state}`, jar(state))).status).toBe(400);
+    expect((await t.callback(`?code=x&state=${state}`, jar(state))).status).toBe(400);
     expect(t.queued).toHaveLength(0);
   });
 

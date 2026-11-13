@@ -3,8 +3,8 @@
   "displayName": "e-Factura RO",
   "category": "compliance/ro",
   "description": "Romanian e-Invoice (e-Factura): build the UBL XML (CIUS-RO), submit it to ANAF, follow its state and keep ANAF's signed answer",
-  "version": "2.0.0",
-  "zveltioMinVersion": "3.0.0-beta.103",
+  "version": "2.1.0",
+  "zveltioMinVersion": "3.0.0-beta.111",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-ro-efactura",
   "permissions": [
@@ -50,8 +50,13 @@
     "efactura_messages",
     "efactura_settings"
   ],
-  "publicRoutes": [
-    "/oauth/callback"
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/oauth/callback",
+      "access": "public",
+      "handler": "oauthCallback"
+    }
   ],
   "actions": [
     {
@@ -531,8 +536,8 @@
     }
   ],
   "integrity": {
-    "engineSha256": "1ade83425072b4eec09a529cd61e1714c00ebffbc47ab3715db3446d622c3b02",
-    "sourceSha256": "7be958b65499e54ef2a348c23173fa2fe3ed71ae2aea358d97c6fa19ec09af14",
+    "engineSha256": "844407411fe8635bcfec59907e420030dafe0a3f11b5f1ff92418cc1c109fc6d",
+    "sourceSha256": "d6b1dc7b5fa3dabed400c994fdc928976f5e8b13fcdd0123403cbea85777dc8e",
     "schemaSha256": "0464790281533982881507e76fd72a43966cb12a850991f64eab8d1f3621c180",
     "jobsSha256": "28e4bc4dd91a11d21702cf30820cbc4676b8595853e4f0f41156c386e9561565"
   }
