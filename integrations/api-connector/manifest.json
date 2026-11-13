@@ -3,7 +3,7 @@
   "displayName": "API Connector",
   "category": "integrations",
   "description": "No-code HTTP integrations: call external REST APIs on hosts the operator allows, with retries, OAuth2 and a call log; receive signed incoming webhooks",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "zveltioMinVersion": "3.0.0-beta.111",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-api-connector",
@@ -44,8 +44,13 @@
     "connector_webhooks",
     "connector_webhook_events"
   ],
-  "publicRoutes": [
-    "/webhooks/receive"
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/webhooks/receive",
+      "access": "public",
+      "handler": "receiveWebhook"
+    }
   ],
   "actions": [
     {
@@ -187,8 +192,8 @@
     }
   ],
   "integrity": {
-    "engineSha256": "c6d034cf5ef5c6ff047de71268773cfbc9352fae987ef55955f94a33f648d7a2",
-    "sourceSha256": "fc51d8d913d223a3ebafc6f5bf48f7eb14ee2f945f9cec4c4d5dbb2dfa2ebc03",
+    "engineSha256": "6636e0483d97e068b3896a3bac4bc95f6271c194b06656c688f50a1a99a1355b",
+    "sourceSha256": "fc48666fdc3e780c725769ffecfb8b66c3ad8075a5fc1c5870564890ad466327",
     "schemaSha256": "098ea2183cfaada6aa27816fe29c61f549ec18ea934333a1366cbab7ae55ffc8",
     "jobsSha256": "c0680162cfbb72cbb922a9aeeb4d8740b52e9c36c489886f021f3d5fb69e045e"
   }
