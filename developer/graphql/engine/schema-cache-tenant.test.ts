@@ -4,7 +4,7 @@
 // tenant key — so whichever tenant's request happened to rebuild it (cache
 // miss) decided what EVERY tenant's GraphQL endpoint served for the next
 // minute, not just its own collections. This mounts the same extension
-// instance twice with `c.set('tenant', ...)` set to two different ids
+// instance with the caller's tenant (`ctx.internals.caller`) set to two different ids
 // (simulating two tenants sharing one running engine, as they do in
 // production) and asserts the second tenant's introspection reflects its OWN
 // collections rather than the first tenant's.
@@ -14,6 +14,7 @@
 // a fake that answers with no rows, so `TEST_DATABASE_URL` is not required.
 import { beforeAll, describe, expect, it } from 'bun:test';
 import { join } from 'node:path';
+import { mountDeclared } from './test-utils';
 
 // biome-ignore lint/suspicious/noExplicitAny: test doubles and the packed module
 type Any = any;
@@ -49,7 +50,6 @@ describe('developer/graphql — the schema cache is keyed per tenant', () => {
     const { Hono } = (await import(
       join(import.meta.dir, '..', '..', '..', 'node_modules', 'hono', 'dist', 'index.js')
     )) as Any;
-    const mod = await import(join(import.meta.dir, 'index.js'));
 
     const ctx: Any = {
       db: await fakeDb(),
@@ -63,15 +63,15 @@ describe('developer/graphql — the schema cache is keyed per tenant', () => {
         getTableName: (name: string) => `zvd_test_${name}`,
       },
       // Introspection is for tenant admins; this caller is one.
-      internals: { isTenantAdmin: async () => true },
+      internals: {
+        isTenantAdmin: async () => true,
+        // Who the engine authenticated, in which tenant: the schema cache key.
+        caller: () => ({ user: ADMIN, authType: 'session', tenantId: currentTenant }),
+      },
     };
 
     app = new Hono();
-    app.use('*', async (c: Any, next: Any) => {
-      c.set('tenant', { id: currentTenant });
-      await next();
-    });
-    await mod.default.register(app, ctx);
+    await mountDeclared(app, ctx);
   });
 
   async function queryFieldNames() {

@@ -11,7 +11,7 @@
 // TEST_DATABASE_URL).
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { join } from 'node:path';
-import { openReadScope } from './test-utils';
+import { mountDeclared, openReadScope } from './test-utils';
 
 // biome-ignore lint/suspicious/noExplicitAny: test doubles and the packed module
 type Any = any;
@@ -48,7 +48,6 @@ d('developer/graphql — timestamps serialize as ISO strings, not epoch millis',
     const { Hono } = (await import(
       join(import.meta.dir, '..', '..', '..', 'node_modules', 'hono', 'dist', 'index.js')
     )) as Any;
-    const mod = await import(join(import.meta.dir, 'index.js'));
 
     const ctx: Any = {
       db,
@@ -62,6 +61,8 @@ d('developer/graphql — timestamps serialize as ISO strings, not epoch millis',
         getTableName: (name: string) => `zvd_test_${name}`,
       },
       internals: {
+        // Who the engine authenticated, in which tenant: the schema cache key.
+        caller: () => ({ user: USER, authType: 'session', tenantId: 'test-date-coercion' }),
         checkAccess: async () => true,
         isTenantAdmin: async () => false,
         readScope: openReadScope,
@@ -70,16 +71,7 @@ d('developer/graphql — timestamps serialize as ISO strings, not epoch millis',
     };
 
     app = new Hono();
-    // Distinct tenant id so this file's schema build doesn't collide with
-    // another bespoke test file's `'default'`-keyed cache entry — the schema
-    // cache is a module-global keyed by `c.get('tenant').id` (see
-    // `schema-cache-tenant.test.ts`), shared by every test file in one
-    // `bun test` process.
-    app.use('*', async (c: Any, next: Any) => {
-      c.set('tenant', { id: 'test-date-coercion' });
-      await next();
-    });
-    await mod.default.register(app, ctx);
+    await mountDeclared(app, ctx);
   });
 
   afterAll(async () => {

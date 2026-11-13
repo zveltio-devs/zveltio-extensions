@@ -50,3 +50,19 @@ export const openReadScope = async (): Promise<any> => ({
   shape: <R>(row: R) => row,
   readable: () => true,
 });
+
+/**
+ * The manifest's declared routes on `app`, through the engine's own pairing and
+ * mounting (`mountDeclaredRoutes`), then `register` — what the engine does for
+ * this extension. Each handler gets the request, never `c`.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: a Hono app and a hand-built ctx
+export async function mountDeclared(app: any, ctx: any): Promise<void> {
+  const mod = await import(join(import.meta.dir, 'index.js'));
+  const { mountDeclaredRoutes, pairRouteHandlers } = await import(join(ENGINE, 'lib/declared-routes.js'));
+  const routes = pairRouteHandlers(manifest.routes, mod.default.routes, (why: string) => {
+    throw new Error(why);
+  });
+  mountDeclaredRoutes(app, routes, () => ({}));
+  await mod.default.register(app, ctx);
+}

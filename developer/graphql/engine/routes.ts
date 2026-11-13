@@ -4,16 +4,19 @@
  * Builds a live GraphQL schema from zv_collections + zv_fields (via DDLManager)
  * and resolves relations from zvd_relations.
  *
- * GET  /api/graphql                        — GraphiQL playground
- * POST /api/graphql                        — Execute query/mutation (auth required)
- * POST /api/graphql/refresh-schema         — Invalidate cached schema (admin only)
- * POST /api/graphql/persisted/:name/execute — Execute a stored query by name (auth)
+ * GET  /ext/developer/graphql                         — GraphiQL playground
+ * POST /ext/developer/graphql                         — Execute query/mutation
+ * POST /ext/developer/graphql/refresh-schema          — Invalidate cached schema (admin only)
+ * POST /ext/developer/graphql/persisted/:name/execute — Execute a stored query by name
+ *
+ * Each is declared in the manifest `routes` as a `caller` route (ADR 0039) and
+ * answered by a plain function: the engine authenticates the request, a session
+ * or an API key on the two `apiKeyRoutes`, before the handler runs.
  *
  * Stored queries are the declared collection `graphql_queries`: the engine
  * creates it and serves it through the data API, under the operator's rules.
  */
 
-import { Hono } from 'hono';
 import {
   execute,
   parse,
@@ -31,7 +34,7 @@ import {
   GraphQLID,
 } from 'graphql';
 import { sql } from 'kysely';
-import type { ExtensionContext } from '@zveltio/sdk/extension';
+import type { ExtensionContext, RouteHandler } from '@zveltio/sdk/extension';
 import { checkQueryDepth, checkQueryWidth } from './lib/graphql-dataloader.js';
 
 // The OWN tenant (the `tenant_id` column default's expression). Query names are
@@ -124,14 +127,11 @@ function mapFieldType(fieldType: string): any {
 
 // ── Schema builder ────────────────────────────────────────────────────────────
 //
-// IMPORTANT: every resolver below uses the *request-scoped* context
-//   ({ user, db })
-// instead of the closure-captured ctx.db. That lets us:
-//   - use the tenant-isolated transaction (`tenantTrx`) when the
-//     extension is mounted in a multi-tenant deployment, so RLS
-//     policies see the right `zveltio.current_tenant` GUC;
-//   - call `checkAccess(db, user, collection, action)` so the
-//     GraphQL surface honours the same RBAC and key scopes as `routes/data.ts`.
+// IMPORTANT: every resolver below asks as the operation's caller
+// (`context.user`, the engine's) and reads through `ctx.db`, which resolves the
+// request's tenant transaction, so RLS policies see the right
+// `zveltio.current_tenant`; `checkAccess(db, user, collection, action)` makes
+// the GraphQL surface honour the same RBAC and key scopes as `routes/data.ts`.
 //
 // Without this every authenticated user could `query { list_users { ... } }`
 // and bypass every tenant isolation and RBAC policy the rest of the engine
@@ -208,7 +208,7 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
   //
   // A mutation is the data API's own write — `ctx.internals.createRecord` and
   // friends run `POST`/`PATCH`/`DELETE /api/data` as the caller the engine
-  // authenticated for this request (`context.c`). They used to be Kysely
+  // authenticated for this request (`context.request`, the handler's). They used to be Kysely
   // through `ctx.db`, which applied row policies and nothing else: an update or
   // delete reached rows an alter hides or entity access locks, `created_by`
   // stayed NULL, no revision, webhook, flow or realtime event followed, and
@@ -293,8 +293,7 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
         if ((filter_id || filter_id_in?.length) && !gate.readable('id')) {
           throw new Error(`Forbidden: cannot filter "${col.name}" by id`);
         }
-        const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
-        let q = gate.rows((trx as any).selectFrom(tableName).selectAll());
+        let q = gate.rows((db as any).selectFrom(tableName).selectAll());
         if (filter_id)               q = q.where('id', '=', filter_id);
         if (filter_id_in?.length)    q = q.where('id', 'in', filter_id_in);
         // Clamp limit to 500 so a single GraphQL query can't pull
@@ -312,8 +311,7 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
       resolve: async (_: any, { id }: any, context: any) => {
         const gate = await mustRead(context, col.name);
         if (!gate.readable('id')) throw new Error(`Forbidden: cannot filter "${col.name}" by id`);
-        const trx = context.reqDb ?? context.tenantTrx ?? context.db ?? db;
-        return first(gate, await gate.rows((trx as any).selectFrom(tableName).selectAll())
+        return first(gate, await gate.rows((db as any).selectFrom(tableName).selectAll())
           .where('id', '=', id)
           .executeTakeFirst());
       },
@@ -326,7 +324,7 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
         // Resolved before the write, so a failed lookup refuses the write too
         // instead of committing it and failing on the way out.
         const gate = await readGate(context, col.name);
-        return gate.readBack(answered(await ctx.internals.createRecord(context.c, col.name, args)));
+        return gate.readBack(answered(await ctx.internals.createRecord(context.request, col.name, args)));
       },
     };
 
@@ -335,7 +333,7 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
       args: { id: { type: new GraphQLNonNull(GraphQLID) }, ...inputFields },
       resolve: async (_: any, { id, ...data }: any, context: any) => {
         const gate = await readGate(context, col.name);
-        return gate.readBack(answered(await ctx.internals.updateRecord(context.c, col.name, id, data), null));
+        return gate.readBack(answered(await ctx.internals.updateRecord(context.request, col.name, id, data), null));
       },
     };
 
@@ -343,7 +341,7 @@ async function buildDynamicSchema(ctx: ExtensionContext): Promise<GraphQLSchema>
       type: GraphQLBoolean,
       args: { id: { type: new GraphQLNonNull(GraphQLID) } },
       resolve: async (_: any, { id }: any, context: any) =>
-        answered(await ctx.internals.deleteRecord(context.c, col.name, id), false) !== false,
+        answered(await ctx.internals.deleteRecord(context.request, col.name, id), false) !== false,
     };
 
     const collectionRelations = relations.filter((r) => r.source_collection === col.name);
@@ -492,189 +490,187 @@ const PLAYGROUND_HTML = `<!DOCTYPE html>
   </body>
 </html>`;
 
-// ── Route factory ─────────────────────────────────────────────────────────────
+// ── Routes ────────────────────────────────────────────────────────────────────
 
-export function graphqlRoutes(ctx: ExtensionContext): Hono {
-  const { db, auth } = ctx;
-  // `DataLoaderRegistry`, `checkQueryDepth` and `checkQueryWidth` used to come
-  // from `ctx.internals`: the engine carried the batching and the two query
-  // guards while this extension carried the GraphQL API they protect. They now
-  // live in `./lib/`, with the feature. Nothing else in the engine used them —
-  // `routes/index.ts` has said "moved to extensions/developer/graphql" since
-  // the API itself moved.
+/**
+ * Kept from `register`: a declared handler is handed the request and its `host`
+ * only, and `host.collections` reaches this extension's own collection alone.
+ * GraphQL reads and writes every collection as its caller, through the engine's
+ * read gate and the data API's writes, which `ctx.internals` carries for
+ * first-party code (owner, 2026-11-03).
+ */
+let kept: ExtensionContext | undefined;
 
-  // `db` is `ctx.db`: a proxy the engine hands over that resolves the CURRENT
-  // tenant transaction per query via AsyncLocalStorage (H-12). A plain `db` in
-  // a handler is therefore already RLS-scoped — there is one spelling, so there
-  // is none to forget.
-
-  const app = new Hono();
-
-  // Who the `/ext/*` gate admitted: a session, or an API key on a manifest
-  // `apiKeyRoutes` route — for which `getSession` is null. With the gate off
-  // (`ZVELTIO_EXT_AUTH_GATE=0`) nothing is set, and only a session gets in.
-  async function caller(c: any): Promise<any> {
-    const admitted = c.get('user');
-    if (admitted) return admitted;
-    return (await auth.api.getSession({ headers: c.req.raw.headers }))?.user ?? null;
-  }
-
-  // The engine object `admin` (ADR 0002), asked as the tenant admin. A key is
-  // no admin.
-  async function adminCaller(c: any): Promise<any | Response> {
-    const session = await auth.api.getSession({ headers: c.req.raw.headers });
-    if (!session) return c.json({ error: 'Unauthorized' }, 401);
-    if (!(await ctx.internals.isTenantAdmin(session.user.id))) return c.json({ error: 'Admin required' }, 403);
-    return session.user;
-  }
-
-  // `graphql()`, plus one validation rule for a caller who is not a tenant admin:
-  // no introspection. The schema is cached per tenant, not per caller, so it
-  // names every collection and every column — including the ones this caller's
-  // column permissions hide. The engine serves collection schemas to admins only
-  // (`/api/collections` sits behind `guardAdmin`).
-  async function run(c: any, user: any, schema: GraphQLSchema, source: string, variableValues?: Record<string, any>, operationName?: string): Promise<any> {
-    let document;
-    try {
-      document = parse(source);
-    } catch (err) {
-      return { errors: [err] };
-    }
-    const isAdmin = isApiKey(user) ? Promise.resolve(false) : ctx.internals.isTenantAdmin(user.id);
-    const rules = (await isAdmin) ? specifiedRules : [...specifiedRules, NoSchemaIntrospectionCustomRule];
-    const errors = validate(schema, document, rules);
-    if (errors.length) return { errors };
-    // Route handler is mounted inside the engine's tenantMiddleware →
-    // c.get('tenantTrx') exposes the per-request transaction with
-    // `SET LOCAL "zveltio.current_tenant"` already applied. Resolvers
-    // use this in preference to the raw pool so RLS policies fire.
-    const tenantTrx = (c.get as any)?.('tenantTrx') ?? null;
-    return execute({
-      schema,
-      document,
-      variableValues,
-      operationName,
-      // `c` is what a mutation hands `ctx.internals` to write as this caller.
-      contextValue: { c, user, db, tenantTrx, reqDb: db },
-    });
-  }
-
-  // ── GET / — GraphiQL playground ───────────────────────────────────────────
-  // In production we gate the playground behind admin auth because
-  // (a) it exposes the entire schema via introspection and
-  // (b) it loads scripts from cdnjs that can't satisfy a strict CSP.
-  // In dev/staging it stays open so developers can explore.
-  app.get('/', async (c) => {
-    if (ctx.config?.isProduction) {
-      const admin = await adminCaller(c);
-      if (admin instanceof Response) return admin;
-    }
-    return c.html(PLAYGROUND_HTML);
-  });
-
-  // ── POST / — Execute GraphQL operation ───────────────────────────────────
-  app.post('/', async (c) => {
-    const user = await caller(c);
-    if (!user) return c.json({ errors: [{ message: 'Unauthorized' }] }, 401);
-
-    let body: { query?: string; variables?: Record<string, any>; operationName?: string };
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ errors: [{ message: 'Invalid JSON body' }] }, 400);
-    }
-
-    const { query, variables, operationName } = body;
-    if (!query) return c.json({ errors: [{ message: 'query is required' }] }, 400);
-
-    const depthError = checkQueryDepth(query, 5);
-    if (depthError) return c.json({ errors: [{ message: depthError }] }, 400);
-    // Depth bounds how deep one field goes; this bounds how many there are.
-    // 600 aliases of the same root field returned 200 OK in 0.42 s and up to
-    // 300k rows, all of it one request as far as the rate limiter could tell.
-    const widthError = checkQueryWidth(query, 50);
-    if (widthError) return c.json({ errors: [{ message: widthError }] }, 400);
-
-    let result: any;
-    let errorCount = 0;
-
-    try {
-      const tenantKey = (c.get as any)?.('tenant')?.id ?? 'default';
-      const schema = await getSchema(ctx, tenantKey);
-      result = await run(c, user, schema, query, variables, operationName);
-      errorCount = result.errors?.length ?? 0;
-    } catch (err) {
-      errorCount = 1;
-      result = { errors: [{ message: String(err) }] };
-    }
-
-    if (errorCount > 0 && !result.data) {
-      return c.json(result, 400);
-    }
-    return c.json(result);
-  });
-
-  // ── POST /refresh-schema — admin only ─────────────────────────────────────
-  app.post('/refresh-schema', async (c) => {
-    const admin = await adminCaller(c);
-    if (admin instanceof Response) return admin;
-
-    // Clears every tenant's entry, not just the caller's: the cache is a
-    // shared module-level map (see the comment above `_cachedSchemas`), so an
-    // admin fixing a stale schema for their own tenant has no way to name
-    // just their own entry, and leaving the others would leave the same
-    // staleness the endpoint exists to clear.
-    _cachedSchemas.clear();
-    const tenantKey = (c.get as any)?.('tenant')?.id ?? 'default';
-    await getSchema(ctx, tenantKey);
-    return c.json({ success: true, message: 'Schema refreshed' });
-  });
-
-  // ── POST /persisted/:name/execute — execute persisted query by name ────────
-  app.post('/persisted/:name/execute', async (c) => {
-    const user = await caller(c);
-    if (!user) return c.json({ errors: [{ message: 'Unauthorized' }] }, 401);
-
-    const name = c.req.param('name');
-    // Who may run a stored query is the engine's `read` on `graphql_queries`,
-    // row rules included, as `GET /api/data` asks it. The query then runs as the
-    // caller, under the caller's own permissions, like any query posted to `/`.
-    // The collection has no default grants: whoever may edit a stored query
-    // chooses what its readers execute, mutations included.
-    if ((await ctx.internals.checkAccess(db, user, 'graphql_queries', 'read')) !== true) {
-      return c.json({ errors: [{ message: 'Access denied to this persisted query' }] }, 403);
-    }
-    const scope = await ctx.internals.readScope('graphql_queries', user, isApiKey(user) ? 'api_key' : 'session');
-    const pqRes = await sql<any>`
-      SELECT * FROM zvd_graphql_queries WHERE name = ${name} AND tenant_id = ${OWN_TENANT}
-    `.execute(db);
-
-    const pq = pqRes.rows[0];
-    if (!pq || !(await scope.admits(pq))) {
-      return c.json({ errors: [{ message: 'Persisted query not found' }] }, 404);
-    }
-
-    let variables: Record<string, any> = {};
-    try {
-      const bodyText = await c.req.text();
-      if (bodyText) variables = JSON.parse(bodyText).variables || {};
-    } catch { /* no variables */ }
-
-    const widthErrorPersisted = checkQueryWidth(pq.query, 50);
-    if (widthErrorPersisted)
-      return c.json({ errors: [{ message: widthErrorPersisted }] }, 400);
-    const depthError = checkQueryDepth(pq.query, 5);
-    if (depthError) return c.json({ errors: [{ message: depthError }] }, 400);
-
-    try {
-      const tenantKey = (c.get as any)?.('tenant')?.id ?? 'default';
-      const schema = await getSchema(ctx, tenantKey);
-      const result = await run(c, user, schema, pq.query, variables);
-      return c.json(result);
-    } catch (err) {
-      return c.json({ errors: [{ message: String(err) }] }, 400);
-    }
-  });
-
-  return app;
+export function keepContext(ctx: ExtensionContext): void {
+  kept = ctx;
 }
+
+function context(): ExtensionContext {
+  if (!kept) throw new Error('developer/graphql: register() has not run');
+  return kept;
+}
+
+const answer = (body: unknown, status = 200) => Response.json(body, { status });
+
+type Caller = { user: any; tenantKey: string };
+
+/**
+ * Who the engine authenticated for this request — a session, or an API key on a
+ * manifest `apiKeyRoutes` route — as `ctx.internals.caller` copies it.
+ */
+function callerOf(ctx: ExtensionContext, request: Request): Caller | null {
+  if (!ctx.internals.caller) throw new Error('developer/graphql needs engine 3.0.0-beta.116 or later');
+  const who = ctx.internals.caller(request);
+  return who ? { user: who.user, tenantKey: who.tenantId ?? 'default' } : null;
+}
+
+/** The engine object `admin` (ADR 0002), asked as the tenant admin. A key is no admin. */
+async function adminCaller(ctx: ExtensionContext, request: Request): Promise<Caller | Response> {
+  const who = callerOf(ctx, request);
+  if (!who) return answer({ error: 'Unauthorized' }, 401);
+  if (isApiKey(who.user) || !(await ctx.internals.isTenantAdmin(who.user.id))) {
+    return answer({ error: 'Admin required' }, 403);
+  }
+  return who;
+}
+
+// `graphql()`, plus one validation rule for a caller who is not a tenant admin:
+// no introspection. The schema is cached per tenant, not per caller, so it
+// names every collection and every column — including the ones this caller's
+// column permissions hide. The engine serves collection schemas to admins only
+// (`/api/collections` sits behind `guardAdmin`).
+async function run(
+  ctx: ExtensionContext,
+  request: Request,
+  user: any,
+  schema: GraphQLSchema,
+  source: string,
+  variableValues?: Record<string, any>,
+  operationName?: string,
+): Promise<any> {
+  let document;
+  try {
+    document = parse(source);
+  } catch (err) {
+    return { errors: [err] };
+  }
+  const isAdmin = isApiKey(user) ? Promise.resolve(false) : ctx.internals.isTenantAdmin(user.id);
+  const rules = (await isAdmin) ? specifiedRules : [...specifiedRules, NoSchemaIntrospectionCustomRule];
+  const errors = validate(schema, document, rules);
+  if (errors.length) return { errors };
+  // `ctx.db` resolves the request's tenant transaction itself (H-12), so the
+  // resolvers read through it; `request` is what a mutation hands
+  // `ctx.internals` to write as this caller.
+  return execute({ schema, document, variableValues, operationName, contextValue: { request, user } });
+}
+
+/**
+ * GET / — GraphiQL playground. In production gated behind admin auth because
+ * (a) it exposes the entire schema via introspection and (b) it loads scripts
+ * from cdnjs that can't satisfy a strict CSP. In dev/staging any signed-in
+ * caller explores.
+ */
+export const playground: RouteHandler = async (request) => {
+  const ctx = context();
+  if (ctx.config?.isProduction) {
+    const admin = await adminCaller(ctx, request);
+    if (admin instanceof Response) return admin;
+  }
+  return new Response(PLAYGROUND_HTML, { headers: { 'content-type': 'text/html; charset=UTF-8' } });
+};
+
+/** POST / — execute a GraphQL operation. */
+export const executeQuery: RouteHandler = async (request) => {
+  const ctx = context();
+  const who = callerOf(ctx, request);
+  if (!who) return answer({ errors: [{ message: 'Unauthorized' }] }, 401);
+
+  let body: { query?: string; variables?: Record<string, any>; operationName?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return answer({ errors: [{ message: 'Invalid JSON body' }] }, 400);
+  }
+
+  const { query, variables, operationName } = body ?? {};
+  if (!query) return answer({ errors: [{ message: 'query is required' }] }, 400);
+
+  const depthError = checkQueryDepth(query, 5);
+  if (depthError) return answer({ errors: [{ message: depthError }] }, 400);
+  // Depth bounds how deep one field goes; this bounds how many there are.
+  // 600 aliases of the same root field returned 200 OK in 0.42 s and up to
+  // 300k rows, all of it one request as far as the rate limiter could tell.
+  const widthError = checkQueryWidth(query, 50);
+  if (widthError) return answer({ errors: [{ message: widthError }] }, 400);
+
+  let result: any;
+  try {
+    const schema = await getSchema(ctx, who.tenantKey);
+    result = await run(ctx, request, who.user, schema, query, variables, operationName);
+  } catch (err) {
+    result = { errors: [{ message: String(err) }] };
+  }
+  return answer(result, (result.errors?.length ?? 0) > 0 && !result.data ? 400 : 200);
+};
+
+/** POST /refresh-schema — admin only. */
+export const refreshSchema: RouteHandler = async (request) => {
+  const ctx = context();
+  const admin = await adminCaller(ctx, request);
+  if (admin instanceof Response) return admin;
+
+  // Clears every tenant's entry, not just the caller's: the cache is a
+  // shared module-level map (see the comment above `_cachedSchemas`), so an
+  // admin fixing a stale schema for their own tenant has no way to name
+  // just their own entry, and leaving the others would leave the same
+  // staleness the endpoint exists to clear.
+  _cachedSchemas.clear();
+  await getSchema(ctx, admin.tenantKey);
+  return answer({ success: true, message: 'Schema refreshed' });
+};
+
+/** POST /persisted/:name/execute — execute a stored query by name. */
+export const executePersisted: RouteHandler = async (request, { params }) => {
+  const ctx = context();
+  const { db } = ctx;
+  const who = callerOf(ctx, request);
+  if (!who) return answer({ errors: [{ message: 'Unauthorized' }] }, 401);
+  const { user } = who;
+
+  const name = params.name;
+  // Who may run a stored query is the engine's `read` on `graphql_queries`,
+  // row rules included, as `GET /api/data` asks it. The query then runs as the
+  // caller, under the caller's own permissions, like any query posted to `/`.
+  // The collection has no default grants: whoever may edit a stored query
+  // chooses what its readers execute, mutations included.
+  if ((await ctx.internals.checkAccess(db, user, 'graphql_queries', 'read')) !== true) {
+    return answer({ errors: [{ message: 'Access denied to this persisted query' }] }, 403);
+  }
+  const scope = await ctx.internals.readScope('graphql_queries', user, isApiKey(user) ? 'api_key' : 'session');
+  const pqRes = await sql<any>`
+    SELECT * FROM zvd_graphql_queries WHERE name = ${name} AND tenant_id = ${OWN_TENANT}
+  `.execute(db);
+
+  const pq = pqRes.rows[0];
+  if (!pq || !(await scope.admits(pq))) {
+    return answer({ errors: [{ message: 'Persisted query not found' }] }, 404);
+  }
+
+  let variables: Record<string, any> = {};
+  try {
+    const bodyText = await request.text();
+    if (bodyText) variables = JSON.parse(bodyText).variables || {};
+  } catch { /* no variables */ }
+
+  const widthErrorPersisted = checkQueryWidth(pq.query, 50);
+  if (widthErrorPersisted) return answer({ errors: [{ message: widthErrorPersisted }] }, 400);
+  const depthError = checkQueryDepth(pq.query, 5);
+  if (depthError) return answer({ errors: [{ message: depthError }] }, 400);
+
+  try {
+    const schema = await getSchema(ctx, who.tenantKey);
+    return answer(await run(ctx, request, user, schema, pq.query, variables));
+  } catch (err) {
+    return answer({ errors: [{ message: String(err) }] }, 400);
+  }
+};

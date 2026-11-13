@@ -15,6 +15,7 @@
 // user, because they read engine tables this suite does not own.
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { join } from 'node:path';
+import { mountDeclared } from './test-utils';
 
 // biome-ignore lint/suspicious/noExplicitAny: test doubles and the packed module
 type Any = any;
@@ -158,6 +159,8 @@ d('developer/graphql — resolvers go through the read gate', () => {
         getTableName: (name: string) => `zvd_${name}`,
       },
       internals: {
+        // Who the engine authenticated, in which tenant: the schema cache key.
+        caller: () => ({ user: currentUser, authType: 'session', tenantId: 'test-read-gate' }),
         isTenantAdmin: async (userId: string) => userId === ADMIN.id,
         // The collection-level check the resolvers ask, as the stub above answers it.
         checkAccess: async (_db: unknown, u: Any, resource: string, action: string) =>
@@ -208,14 +211,8 @@ d('developer/graphql — resolvers go through the read gate', () => {
     const { Hono } = (await import(
       join(import.meta.dir, '..', '..', '..', 'node_modules', 'hono', 'dist', 'index.js')
     )) as Any;
-    const mod = await import(join(import.meta.dir, 'index.js'));
     app = new Hono();
-    // Own schema-cache key: the cache is module-global across test files.
-    app.use('*', async (c: Any, next: Any) => {
-      c.set('tenant', { id: 'test-read-gate' });
-      await next();
-    });
-    await mod.default.register(app, ctx);
+    await mountDeclared(app, ctx);
   });
 
   afterAll(async () => {
