@@ -1,52 +1,41 @@
 {
-  "sduiSchema": 1,
-  "kind": "settings",
+  "spec": "zveltio.view/2",
+  "id": "invoicing.company",
   "title": "invoicing.settings.title",
-  "subtitle": "invoicing.settings.subtitle",
-  "dataSource": "/api/data/company_profile?sort=created_at&limit=1",
-  "dataPath": "records.0",
-  "saveEndpoint": "/ext/finance/invoicing/actions/saveCompany",
+  "type": "form",
+  "collection": "company_profile",
+  "record": "singleton",
   "sections": [
     {
       "title": "invoicing.settings.identity",
       "fields": [
         {
-          "name": "name",
-          "label": "invoicing.settings.name",
-          "required": true,
-          "colSpan": 2
+          "field": "name",
+          "label": "invoicing.settings.name"
         },
         {
-          "name": "legal_name",
-          "label": "invoicing.form.legalName",
-          "colSpan": 1
+          "field": "legal_name",
+          "label": "invoicing.form.legalName"
         },
         {
-          "name": "tax_id",
-          "label": "invoicing.form.clientTaxId",
-          "colSpan": 1
+          "field": "tax_id",
+          "label": "invoicing.form.clientTaxId"
         },
         {
-          "name": "reg_no",
-          "label": "invoicing.form.clientRegNo",
-          "colSpan": 1
+          "field": "reg_no",
+          "label": "invoicing.form.clientRegNo"
         },
         {
-          "name": "share_capital",
-          "label": "invoicing.settings.shareCapital",
-          "colSpan": 1
+          "field": "share_capital",
+          "label": "invoicing.settings.shareCapital"
         },
         {
-          "name": "vat_payer",
-          "label": "invoicing.settings.vatPayer",
-          "type": "boolean",
-          "colSpan": 1
+          "field": "vat_payer",
+          "label": "invoicing.settings.vatPayer"
         },
         {
-          "name": "vat_on_collection",
-          "label": "invoicing.vat.onCollection",
-          "type": "boolean",
-          "colSpan": 1
+          "field": "vat_on_collection",
+          "label": "invoicing.vat.onCollection"
         }
       ]
     },
@@ -54,24 +43,20 @@
       "title": "invoicing.settings.address",
       "fields": [
         {
-          "name": "address",
-          "label": "invoicing.form.clientAddress",
-          "colSpan": 2
+          "field": "address",
+          "label": "invoicing.form.clientAddress"
         },
         {
-          "name": "city",
-          "label": "invoicing.settings.city",
-          "colSpan": 1
+          "field": "city",
+          "label": "invoicing.settings.city"
         },
         {
-          "name": "county",
-          "label": "invoicing.settings.county",
-          "colSpan": 1
+          "field": "county",
+          "label": "invoicing.settings.county"
         },
         {
-          "name": "country",
-          "label": "invoicing.settings.country",
-          "colSpan": 1
+          "field": "country",
+          "label": "invoicing.settings.country"
         }
       ]
     },
@@ -79,15 +64,12 @@
       "title": "invoicing.settings.banking",
       "fields": [
         {
-          "name": "iban",
-          "label": "invoicing.settings.iban",
-          "mono": true,
-          "colSpan": 1
+          "field": "iban",
+          "label": "invoicing.settings.iban"
         },
         {
-          "name": "bank",
-          "label": "invoicing.settings.bank",
-          "colSpan": 1
+          "field": "bank",
+          "label": "invoicing.settings.bank"
         }
       ]
     },
@@ -95,25 +77,20 @@
       "title": "invoicing.settings.contact",
       "fields": [
         {
-          "name": "email",
-          "label": "invoicing.form.clientEmail",
-          "type": "email",
-          "colSpan": 1
+          "field": "email",
+          "label": "invoicing.form.clientEmail"
         },
         {
-          "name": "phone",
-          "label": "invoicing.settings.phone",
-          "colSpan": 1
+          "field": "phone",
+          "label": "invoicing.settings.phone"
         },
         {
-          "name": "website",
-          "label": "invoicing.settings.website",
-          "colSpan": 1
+          "field": "website",
+          "label": "invoicing.settings.website"
         },
         {
-          "name": "logo_url",
-          "label": "invoicing.settings.logoUrl",
-          "colSpan": 2
+          "field": "logo_url",
+          "label": "invoicing.settings.logoUrl"
         }
       ]
     }

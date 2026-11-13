@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.6.0 (2026-11-13)
+
+- feat: the company settings page is a `zveltio.view/2` form on the `company_profile` record (`record: "singleton"`, ADR 0042). Studio reads the tenant's one record and saves it through the data API, so saving needs `update` on `company_profile` (or `create` for the first save) instead of `execute`; the `saveCompany` action stays for other callers
+- the conversion drops the page subtitle and the two-column field widths
+
 ## 2.5.0 (2026-11-13)
 
 - feat: the invoice list and the new-invoice form are `zveltio.view/2` views (ADR 0042). The form is an action form on `createInvoice` (page `/admin/finance/invoicing/new`, opened from the list's toolbar); Studio draws its `lines` input as a table of lines
