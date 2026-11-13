@@ -1,0 +1,91 @@
+{
+  "name": "storage/cloud",
+  "displayName": "Cloud Storage",
+  "category": "storage",
+  "description": "Version history, favorites and retention policies over the engine's stored files",
+  "version": "2.0.0",
+  "zveltioMinVersion": "3.0.0-beta.110",
+  "zveltioMaxVersion": "4.0.0",
+  "package": "@zveltio/ext-cloud",
+  "permissions": [
+    "data:write",
+    "files"
+  ],
+  "collections": [
+    "cloud_file_versions",
+    "cloud_favorites",
+    "cloud_retention_policies"
+  ],
+  "i18nPrefixes": [
+    "storage"
+  ],
+  "studio": {
+    "pages": [
+      {
+        "path": "/admin/storage/cloud",
+        "label": "Cloud Storage",
+        "icon": "Cloud",
+        "schema": "schemas/cloud.json"
+      },
+      {
+        "path": "/admin/storage/cloud/drive",
+        "label": "Drive",
+        "icon": "HardDrive"
+      }
+    ],
+    "navGroup": "other"
+  },
+  "contributes": {
+    "engine": true,
+    "studio": true,
+    "studioComponents": [
+      "AttachmentManager",
+      "FilePicker"
+    ],
+    "client": true,
+    "clientComponents": [
+      "FileUpload"
+    ],
+    "fieldTypes": []
+  },
+  "engine": {
+    "entry": "engine/index.js",
+    "format": "esm",
+    "target": "bun",
+    "bundled": true,
+    "bundlePeers": true
+  },
+  "actions": [
+    {
+      "name": "restoreVersion",
+      "permission": {
+        "resource": "cloud_file_versions",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "version_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "version_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "cloud_file_versions"
+      ],
+      "writes": [
+        "cloud_file_versions"
+      ]
+    }
+  ],
+  "integrity": {
+    "engineSha256": "bd35a0930cb2d9f13c0188c5257a15ce05a4d886b3b9761a7a594e9e4a49c874",
+    "sourceSha256": "fc589ad6a08d0143e54962c0883c8eeafe466e755e6128750edee804d5c3ce37",
+    "schemaSha256": "86cdfc2ba774fd5bfd52d3769b63734c4d8b5cbb9abf320d966815e43ce011f9"
+  }
+}
