@@ -1,6 +1,6 @@
 import type { ZveltioExtension } from '@zveltio/sdk/extension';
 import { connectorActions } from './actions.js';
-import { connectorRoutes } from './routes.js';
+import { keepInternals, receiveWebhook } from './routes.js';
 
 // Connections, endpoints, the call log, incoming webhooks and their events are
 // collections this extension declares in `schema/collections/` (manifest
@@ -14,9 +14,10 @@ const extension: ZveltioExtension = {
   mountStrategy: 'subapp',
 
   actions: connectorActions,
+  routes: { receiveWebhook },
 
-  async register(app, ctx) {
-    app.route('/', connectorRoutes(ctx));
+  async register(_app, ctx) {
+    keepInternals(ctx);
   },
 };
 

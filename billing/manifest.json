@@ -3,7 +3,7 @@
   "displayName": "Billing & Usage",
   "category": "billing",
   "description": "Usage metering and Stripe billing integration",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "zveltioMinVersion": "3.0.0-beta.111",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-billing",
@@ -13,8 +13,13 @@
   "i18nPrefixes": [
     "billing"
   ],
-  "publicRoutes": [
-    "/webhook/stripe"
+  "routes": [
+    {
+      "method": "POST",
+      "path": "/webhook/stripe",
+      "access": "public",
+      "handler": "stripeWebhook"
+    }
   ],
   "jobs": [
     {
@@ -98,8 +103,8 @@
     "studio": true
   },
   "integrity": {
-    "engineSha256": "c954c5df8b42d0ce9fab323bb700dcc6e59737d705d456f2127d2b2f2f5351ac",
-    "sourceSha256": "eea102f3b1b0c2890ef3fb32c2d407d04c165d79b1d8ea1fe10d646924bc5ac1",
-    "schemaSha256": "2289edc0c829f3459fd36ec636d12e217bef73ac87e785abdb1c672ba061dadb"
+    "engineSha256": "cb87b1772964a2b59a697d38ffb4d4a92b4e94bd71500bdf63f7af0b60e26d2f",
+    "sourceSha256": "76baa6822eadfa2d21710ff9111209363a62308fb7855973098cb31c26ebac86",
+    "schemaSha256": "a7ed3511c61999f6b42b09f34d9ebc361e76f3b971d0d1bb627b6164260f6993"
   }
 }

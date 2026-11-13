@@ -16,8 +16,7 @@
     },
     {
       "name": "stripe_webhook_secret",
-      "type": "text",
-      "encrypted": true
+      "type": "secret"
     }
   ]
 }

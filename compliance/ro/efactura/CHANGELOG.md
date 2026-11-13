@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.1.0 (2026-11-13)
+
+- The ANAF OAuth callback (`GET /oauth/callback`) is a declared route (ADR 0039): the manifest's `routes` names it, public, and the engine serves it with the plain handler `oauthCallback`. Same URL, state and cookie checks, and answers. The settings are read in the request's tenant transaction, so another tenant's state is not found (same 400 as before). `/oauth/start` and the downloads stay the caller's routes
+- requires engine 3.0.0-beta.111
+
 ## 2.0.0 (2026-11-06)
 
 - feat!: invoices, their files (XML, ANAF's PDF, ANAF's signed answer archive), ANAF's messages and the connection are the collections `efactura_invoices`, `efactura_files`, `efactura_messages` and `efactura_settings`, declared in `schema/collections/` and created and owned by the engine; no SQL migrations

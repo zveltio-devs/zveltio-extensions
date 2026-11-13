@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.2.0 (2026-11-13)
+
+- The incoming-webhook receiver (`POST /webhooks/receive`) is a declared route (ADR 0039): the manifest's `routes` names it, public, and the engine serves it with the plain handler `receiveWebhook`. Same URL, signature check and answers; no Hono. The webhook is read in the request's tenant transaction, so another tenant's webhook is not found (same 401 as before)
+- requires engine 3.0.0-beta.111
+
 ## 2.1.0 (2026-11-12)
 
 - feat: the Studio page is a `zveltio.view/2` view (ADR 0042): it names its collections and actions instead of URLs, and Studio draws it from the specification
