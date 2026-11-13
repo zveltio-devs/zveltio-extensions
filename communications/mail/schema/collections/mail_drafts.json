@@ -39,7 +39,7 @@
     },
     {
       "name": "body_html",
-      "type": "textarea"
+      "type": "richtext"
     },
     {
       "name": "in_reply_to",
@@ -58,7 +58,10 @@
     },
     {
       "name": "attachments",
-      "type": "json"
+      "type": "file",
+      "options": {
+        "multiple": true
+      }
     },
     {
       "name": "priority",

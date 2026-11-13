@@ -10,8 +10,8 @@ import { join } from 'node:path';
 import hoodiecrow from 'hoodiecrow-imap';
 import type { JobTcpStream } from '@zveltio/sdk/extension';
 import { Imap } from './lib/imap.js';
-import { folderType, judge } from './jobs.js';
-import { parseMessage } from './lib/mime.js';
+import { folderType, judge, threadOf } from './jobs.js';
+import { htmlText, parseMessage } from './lib/mime.js';
 
 // biome-ignore lint/suspicious/noExplicitAny: engine modules imported by path
 type Any = any;
@@ -558,5 +558,18 @@ describe('filters and folder types', () => {
     expect(folderType({ path: 'x', name: 'Whatever', flags: ['\\Junk'] })).toBe('spam');
     expect(folderType({ path: 'INBOX.Sent Items', name: 'Sent Items', flags: [] })).toBe('sent');
     expect(folderType({ path: 'Projects', name: 'Projects', flags: [] })).toBe('other');
+  });
+});
+
+describe('threads and text parts (ADR 0042 slice 5)', () => {
+  it('a message joins the thread its References start, else the one it answers, else its own', () => {
+    expect(threadOf({ messageId: '<c@x>', inReplyTo: '<b@x>', references: '<a@x> <b@x>' })).toBe('<a@x>');
+    expect(threadOf({ messageId: '<c@x>', inReplyTo: '<b@x>', references: null })).toBe('<b@x>');
+    expect(threadOf({ messageId: '<c@x>', inReplyTo: ' ', references: '' })).toBe('<c@x>');
+    expect(threadOf({ messageId: null, inReplyTo: null, references: null })).toBeNull();
+  });
+
+  it('a draft written as rich text sends its text as the text part', () => {
+    expect(htmlText('<p>Hi &amp; bye</p><blockquote><p>a&lt;b</p></blockquote><img src=x>')).toBe('Hi & bye\na<b');
   });
 });

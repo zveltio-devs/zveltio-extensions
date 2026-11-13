@@ -3728,7 +3728,7 @@ var require_document = __commonJS(function(exports, module) {
   Document.default = Document;
 });
 
-// /zveltio-extension/node_modules/postcss/node_modules/nanoid/non-secure/index.cjs
+// /zveltio-extension/node_modules/nanoid/non-secure/index.cjs
 var require_non_secure = __commonJS(function(exports, module) {
   var urlAlphabet = "useandom-26T198340PX75pxJACKVERYMINDBUSHWOLF_GQZbfghjklqvwyzrict";
   var customAlphabet = (alphabet, defaultSize = 21) => {
@@ -12595,6 +12595,13 @@ function cleanHtml(html) {
     transformTags: { a: import_sanitize_html.default.simpleTransform("a", { target: "_blank", rel: "noopener noreferrer" }) }
   });
 }
+function htmlText(html) {
+  return html.replace(/<(br|\/p|\/div|\/li|\/tr|\/h[1-6]|\/blockquote)\b[^>]*>/gi, `
+`).replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&").replace(/[ \t]+\n/g, `
+`).replace(/\n{3,}/g, `
+
+`).trim();
+}
 var addrs = (v) => {
   const out = [];
   for (const a of Array.isArray(v) ? v : v ? [v] : []) {
@@ -12992,6 +12999,9 @@ function matches(c, p, size) {
   }
 }
 var has = (m, flag) => m.flags.some((f) => f.toLowerCase() === flag);
+function threadOf(p) {
+  return p.references?.match(/<[^<>\s]+>/)?.[0] || p.inReplyTo?.trim() || p.messageId || null;
+}
 async function insertMessage(run, acct, folder, m, p, parts, v, headerOnly) {
   const date = m.internalDate ? Date.parse(m.internalDate) : Number.NaN;
   let row;
@@ -13003,6 +13013,7 @@ async function insertMessage(run, acct, folder, m, p, parts, v, headerOnly) {
       message_id: p.messageId,
       in_reply_to: p.inReplyTo,
       references_header: p.references,
+      thread_id: threadOf(p),
       from_address: p.from.address || null,
       from_name: p.from.name ?? null,
       to_addresses: p.to,
@@ -13188,13 +13199,14 @@ var send = async (input, host) => {
       throw new Error("This engine cannot hand a job its files; attachments need 3.0.0-beta.109 or later.");
     const attachments = [];
     for (const a of attached) {
-      const name = String(a.filename ?? a.file_id);
-      const f = await files.get(String(a.file_id)).catch((err) => {
+      const id = String(a.id ?? a.file_id);
+      const name = String(a.name ?? a.filename ?? id);
+      const f = await files.get(id).catch((err) => {
         throw new Error(`The attachment ${name} was not handed to this send: ${message(err)}`);
       });
       if (!f)
         throw new Error(`The attachment ${name} is gone, or no longer yours to read.`);
-      attachments.push({ filename: String(a.filename || f.name), mimeType: String(a.mime_type || f.contentType), content: f.bytes });
+      attachments.push({ filename: String(a.name || a.filename || f.name), mimeType: String(a.type || a.mime_type || f.contentType), content: f.bytes });
     }
     ({ raw } = buildMessage({
       from,
@@ -13203,7 +13215,7 @@ var send = async (input, host) => {
       bcc,
       replyTo: ident?.reply_to ?? null,
       subject: String(draft.subject ?? ""),
-      text: String(draft.body_text ?? ""),
+      text: String(draft.body_text || (draft.body_html ? htmlText(String(draft.body_html)) : "")),
       html: draft.body_html ? String(draft.body_html) : null,
       inReplyTo: draft.in_reply_to ?? null,
       references: draft.references_header ?? null,
@@ -13355,5 +13367,6 @@ var jobs_default = { sync, send, apply, fetchAttachment };
 export {
   jobs_default as default,
   folderType,
-  judge
+  judge,
+  threadOf
 };

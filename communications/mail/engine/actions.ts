@@ -101,6 +101,71 @@ const fetchAttachment: ExtensionAction = async (input, host) => {
   return { queued: true, file_id };
 };
 
+/** A stored attachment, opened: the file the caller fetched (`fetchAttachment`). */
+const openAttachment: ExtensionAction = async (input, host) => {
+  const a = (await host.collections.read(ATTACHMENTS, (input as { attachment_id: string }).attachment_id)) as Row | null;
+  if (!a) throw new ActionRefusal(404, 'attachment_not_found', 'No such attachment.');
+  if (!a.file_id) throw new ActionRefusal(409, 'attachment_not_fetched', 'Download the attachment from the server first.');
+  return { file: String(a.file_id) };
+};
+
+/** The compose view of a draft (ADR 0042: an action's result may open a view). */
+const compose = (draft: Row) => ({ view: 'mail.compose', params: { draft_id: String(draft.id) } });
+
+/** A new, empty draft of an account. */
+const newDraft: ExtensionAction = async (input, host) => {
+  const a = await account(host, (input as { account_id: string }).account_id);
+  return compose(await host.collections.insert(DRAFTS, { account_id: a.id }));
+};
+
+const escape = (v: unknown) =>
+  String(v ?? '').replace(/[<>&"']/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' })[c]!);
+const addresses = (v: unknown): { address: string; name?: string }[] =>
+  (Array.isArray(v) ? v : []).filter((a): a is { address: string; name?: string } => !!a && typeof a.address === 'string');
+const who = (m: Row) => (m.from_name ? `${m.from_name} <${m.from_address}>` : String(m.from_address ?? ''));
+
+/**
+ * A reply, a reply to all, or a forward of a message, as a new draft: its
+ * recipients, subject, threading headers and the quoted message; a forward
+ * carries the attachments already downloaded. Answers the draft's compose view.
+ */
+const reply: ExtensionAction = async (input, host) => {
+  const { message_id, mode } = input as { message_id: string; mode: 'reply' | 'reply_all' | 'forward' };
+  const m = (await host.collections.read(MESSAGES, message_id)) as Row | null;
+  if (!m) throw new ActionRefusal(404, 'message_not_found', 'No such message.');
+  const a = await account(host, String(m.account_id));
+  const forward = mode === 'forward';
+  const subject = String(m.subject ?? '');
+  const quoted = m.body_html ? String(m.body_html) : `<pre>${escape(m.body_text)}</pre>`;
+  const draft: Row = {
+    account_id: a.id,
+    original_message_id: m.id,
+    subject: (forward ? /^fwd?:/i : /^re:/i).test(subject) ? subject : `${forward ? 'Fwd' : 'Re'}: ${subject}`,
+    body_html: forward
+      ? `<p></p><p>---------- Forwarded message ----------<br>From: ${escape(who(m))}<br>Date: ${escape(m.received_at)}<br>Subject: ${escape(subject)}</p>${quoted}`
+      : `<p></p><p>${escape(who(m))} wrote:</p><blockquote>${quoted}</blockquote>`,
+  };
+  if (forward) {
+    const { records } = (await host.collections.list(ATTACHMENTS, { filter: { message_id: { eq: m.id } }, limit: 100 })) as { records?: Row[] };
+    const files = (records ?? []).filter((x) => x.file_id && !x.is_inline);
+    if (files.length) draft.attachments = files.map((x) => ({ id: String(x.file_id), name: String(x.filename), size: x.size ?? undefined, type: x.mime_type ?? undefined }));
+  } else {
+    const own = String(a.email_address ?? '').toLowerCase();
+    const to = m.reply_to ? [{ address: String(m.reply_to) }] : m.from_address ? [{ address: String(m.from_address), ...(m.from_name ? { name: String(m.from_name) } : {}) }] : [];
+    draft.to_addresses = to;
+    if (mode === 'reply_all') {
+      const seen = new Set([own, ...to.map((x) => x.address.toLowerCase())]);
+      draft.cc_addresses = [...addresses(m.to_addresses), ...addresses(m.cc_addresses)].filter((x) => {
+        const k = x.address.toLowerCase();
+        return !seen.has(k) && !!seen.add(k);
+      });
+    }
+    draft.in_reply_to = m.message_id ?? null;
+    draft.references_header = [m.references_header, m.message_id].filter(Boolean).join(' ') || null;
+  }
+  return compose(await host.collections.insert(DRAFTS, draft));
+};
+
 const setFlags: ExtensionAction = async (input, host) => {
   const i = input as { message_ids: string[]; is_read?: boolean; is_starred?: boolean };
   const change: Row = {};
@@ -163,4 +228,4 @@ const deleteFolder: ExtensionAction = async (input, host) => {
   return { queued: true };
 };
 
-export const mailActions = { sync, send, fetchAttachment, setFlags, moveMessages, deleteMessages, createFolder, renameFolder, deleteFolder };
+export const mailActions = { sync, send, fetchAttachment, openAttachment, newDraft, reply, setFlags, moveMessages, deleteMessages, createFolder, renameFolder, deleteFolder };

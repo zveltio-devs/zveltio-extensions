@@ -64,6 +64,22 @@ export interface Parsed {
   attachments: ParsedAttachment[];
 }
 
+/** The text of an HTML body, for the text part of a message written as rich text. */
+export function htmlText(html: string): string {
+  return html
+    .replace(/<(br|\/p|\/div|\/li|\/tr|\/h[1-6]|\/blockquote)\b[^>]*>/gi, '\n')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 const addrs = (v: unknown): Address[] => {
   const out: Address[] = [];
   for (const a of (Array.isArray(v) ? v : v ? [v] : []) as Array<{ address?: string; name?: string; group?: unknown[] }>) {

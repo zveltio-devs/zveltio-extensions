@@ -1,0 +1,121 @@
+{
+  "spec": "zveltio.view/2",
+  "id": "mail.thread",
+  "title": "communications.mail.ui.thread",
+  "type": "split",
+  "panes": [
+    {
+      "id": "thread",
+      "type": "list",
+      "present": "feed",
+      "collection": "mail_messages",
+      "filter": [
+        {
+          "field": "thread_id",
+          "op": "eq",
+          "value": {
+            "$param": "thread_id"
+          }
+        }
+      ],
+      "sort": "received_at",
+      "pageSize": 100,
+      "fields": [
+        "from_name",
+        "received_at",
+        "snippet"
+      ],
+      "emphasisWhen": [
+        {
+          "field": "is_read",
+          "op": "eq",
+          "value": false
+        }
+      ]
+    },
+    {
+      "type": "detail",
+      "collection": "mail_messages",
+      "record": {
+        "$selected": "thread"
+      },
+      "onOpen": {
+        "action": "setFlags",
+        "input": {
+          "message_ids": [
+            {
+              "$record": "id"
+            }
+          ],
+          "is_read": true
+        },
+        "when": [
+          {
+            "field": "is_read",
+            "op": "eq",
+            "value": false
+          }
+        ]
+      },
+      "actions": [
+        {
+          "action": "reply",
+          "label": "communications.mail.ui.reply",
+          "input": {
+            "message_id": {
+              "$record": "id"
+            },
+            "mode": "reply"
+          }
+        },
+        {
+          "action": "reply",
+          "label": "communications.mail.ui.replyAll",
+          "input": {
+            "message_id": {
+              "$record": "id"
+            },
+            "mode": "reply_all"
+          }
+        },
+        {
+          "action": "reply",
+          "label": "communications.mail.ui.forward",
+          "input": {
+            "message_id": {
+              "$record": "id"
+            },
+            "mode": "forward"
+          }
+        }
+      ],
+      "fields": [
+        {
+          "field": "subject",
+          "label": "common.col.subject"
+        },
+        {
+          "field": "from_address",
+          "label": "common.col.from"
+        },
+        {
+          "field": "to_addresses",
+          "label": "common.col.to"
+        },
+        {
+          "field": "cc_addresses",
+          "label": "common.col.cc"
+        },
+        {
+          "field": "received_at",
+          "label": "common.col.date"
+        },
+        {
+          "field": "body_html",
+          "label": "communications.mail.ui.body",
+          "fallback": "body_text"
+        }
+      ]
+    }
+  ]
+}
