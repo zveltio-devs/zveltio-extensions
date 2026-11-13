@@ -268,17 +268,16 @@ async function engineDb(src: string): Promise<any> {
 }
 
 /**
- * The engine's own `deleteUser` (`lib/users.ts`), wired the way
- * `buildExtensionInternals` wires it: the caller's handle for the row and the
- * audit, a privileged engine pool for sessions, and a live enforcer.
- * Not a copy — erasing a user is exactly what a copy would get subtly wrong.
+ * The engine's pool and its auth, as the engine's boot sets them up. No
+ * extension deletes an account any more (`deleteUser` left `ctx.internals`,
+ * ADR 0046).
  *
  * Signing in and the directory are not here: `host.identity` (ADR 0039)
  * answers only behind the engine's `/ext/*` gate, so they are proven on
  * `onEngine`.
  */
-let _engineUsersP: Promise<{ users: any; pool: any; auth: any; restore: () => Promise<void> }> | null = null;
-function engineUsers(): Promise<{ users: any; pool: any; auth: any; restore: () => Promise<void> }> {
+let _engineUsersP: Promise<{ pool: any; auth: any; restore: () => Promise<void> }> | null = null;
+function engineUsers(): Promise<{ pool: any; auth: any; restore: () => Promise<void> }> {
   _engineUsersP ??= (async () => {
     const src = join(REPO, '..', 'zveltio', 'packages', 'engine', 'src');
     const { _internalForTests } = (await import(join(src, 'db', 'index.js'))) as any;
@@ -298,7 +297,6 @@ function engineUsers(): Promise<{ users: any; pool: any; auth: any; restore: () 
     const auth = (await import(join(src, 'lib', 'auth.js'))) as any;
     await auth.initAuth(pool);
     return {
-      users: await import(join(src, 'lib', 'users.js')),
       pool,
       auth,
       // Put the booted engine back on its own pool: left on ours, which is
@@ -692,10 +690,6 @@ async function makeCtx(
         const header = keys.map(harnessCsvCell).join(',');
         const rows = records.map((r) => keys.map((k) => harnessCsvCell(r[k])).join(','));
         return [header, ...rows].join('\r\n');
-      },
-      deleteUser: async (handle: any, userId: string, who: any) => {
-        const { users, pool } = await engineUsers();
-        return users.deleteUser(handle, pool, userId, who);
       },
     }), () => ({})), capabilities, []),
     registerPublicRoute(spec: any) {
