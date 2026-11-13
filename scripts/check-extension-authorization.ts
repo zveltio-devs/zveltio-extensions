@@ -50,11 +50,6 @@ const ROOT = process.argv[2] ?? process.cwd();
  * review, which is the only thing that keeps a list like this short.
  */
 const ALLOWLIST: Record<string, string> = {
-  // Its one write route, `DELETE /delete-my-account`, erases the caller's own
-  // account after a password re-check. Art. 17 is the data subject's right, not
-  // a grant, and the subject is the session's user: there is no permission for
-  // the route to ask. Everything else it writes goes through actions.
-  'compliance/gdpr/engine/self-service.ts': 'self-service erasure of the caller’s own account (Art. 17)',
   // Its one write route, `POST /callback`, is the SAML assertion consumer: the
   // caller is a browser carrying an IdP-signed assertion, before any session
   // exists, so there is no principal to ask. The signature is the check

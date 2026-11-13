@@ -1,5 +1,5 @@
 // @bun
-// /zveltio-extension/packages/sdk/src/extension/action-refusal.ts
+// eng/packages/sdk/src/extension/action-refusal.ts
 var ACTION_REFUSAL = Symbol.for("zveltio.extension.action-refusal");
 
 class ActionRefusal extends Error {
@@ -13,7 +13,7 @@ class ActionRefusal extends Error {
     this.name = "ActionRefusal";
   }
 }
-// /zveltio-extension/packages/sdk/src/extension/dates.ts
+// eng/packages/sdk/src/extension/dates.ts
 function todayIn(timeZone, now = new Date) {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone,
@@ -22,7 +22,7 @@ function todayIn(timeZone, now = new Date) {
     day: "2-digit"
   }).format(now);
 }
-// /zveltio-extension/packages/sdk/src/extension/reserved-paths.ts
+// eng/packages/sdk/src/extension/reserved-paths.ts
 var RESERVED_PATH_SEGMENTS = Object.freeze([
   "api",
   "ext",
@@ -124,15 +124,15 @@ var gdprActions = {
   setRequestStatus
 };
 
-// /zveltio-extension/node_modules/hono/dist/request/constants.js
+// ext/node_modules/hono/dist/request/constants.js
 var GET_MATCH_RESULT = Symbol();
 
-// /zveltio-extension/node_modules/hono/dist/utils/buffer.js
+// ext/node_modules/hono/dist/utils/buffer.js
 var bufferToFormData = (arrayBuffer, contentType) => {
   return new Response(arrayBuffer, { headers: { "Content-Type": contentType.replace(/^[^;]+/, (mediaType) => mediaType.toLowerCase()) } }).formData();
 };
 
-// /zveltio-extension/node_modules/hono/dist/utils/body.js
+// ext/node_modules/hono/dist/utils/body.js
 var MAX_NESTED_OBJECTS = 1e4;
 var isRawRequest = (request) => ("headers" in request);
 var parseBody = async (request, options = Object.create(null)) => {
@@ -211,7 +211,7 @@ var throwNestingLimitExceeded = () => {
   throw new Error("Nesting limit exceeded");
 };
 
-// /zveltio-extension/node_modules/hono/dist/utils/url.js
+// ext/node_modules/hono/dist/utils/url.js
 var splitPath = (path) => {
   const paths = path.split("/");
   if (paths[0] === "")
@@ -423,7 +423,7 @@ var getQueryParams = (url, key) => {
 };
 var decodeURIComponent_ = decodeURIComponent;
 
-// /zveltio-extension/node_modules/hono/dist/request.js
+// ext/node_modules/hono/dist/request.js
 var HonoRequest = class {
   raw;
   #validatedData;
@@ -530,7 +530,7 @@ var HonoRequest = class {
   }
 };
 
-// /zveltio-extension/node_modules/hono/dist/utils/html.js
+// ext/node_modules/hono/dist/utils/html.js
 var HtmlEscapedCallbackPhase = {
   Stringify: 1,
   BeforeStream: 2,
@@ -567,7 +567,7 @@ var resolveCallback = async (str, phase, preserveCallbacks, context, buffer) => 
     return resStr;
 };
 
-// /zveltio-extension/node_modules/hono/dist/context.js
+// ext/node_modules/hono/dist/context.js
 var TEXT_PLAIN = "text/plain; charset=UTF-8";
 var setDefaultContentType = (contentType, headers) => {
   return {
@@ -734,7 +734,7 @@ var Context = class {
   };
 };
 
-// /zveltio-extension/node_modules/hono/dist/compose.js
+// ext/node_modules/hono/dist/compose.js
 var compose = (middleware, onError, onNotFound) => {
   return (context, next) => {
     let index = -1;
@@ -771,7 +771,7 @@ var compose = (middleware, onError, onNotFound) => {
   };
 };
 
-// /zveltio-extension/node_modules/hono/dist/router.js
+// ext/node_modules/hono/dist/router.js
 var METHODS = [
   "get",
   "post",
@@ -785,10 +785,10 @@ var MESSAGE_MATCHER_IS_ALREADY_BUILT = "Can not add a route since the matcher is
 var UnsupportedPathError = class extends Error {
 };
 
-// /zveltio-extension/node_modules/hono/dist/utils/constants.js
+// ext/node_modules/hono/dist/utils/constants.js
 var COMPOSED_HANDLER = "__COMPOSED_HANDLER";
 
-// /zveltio-extension/node_modules/hono/dist/utils/mount.js
+// ext/node_modules/hono/dist/utils/mount.js
 var getPathPrefixLength = (c, pathPrefix, routePath) => {
   if (!/[:*]/.test(pathPrefix))
     return pathPrefix.length;
@@ -823,7 +823,7 @@ var createMountedRequest = (c, pathPrefix, routePath) => {
   return new Request(url, c.req.raw);
 };
 
-// /zveltio-extension/node_modules/hono/dist/hono-base.js
+// ext/node_modules/hono/dist/hono-base.js
 var notFoundHandler = (c) => {
   return c.text("404 Not Found", 404);
 };
@@ -1033,10 +1033,10 @@ var Hono = class Hono {
   };
 };
 
-// /zveltio-extension/node_modules/hono/dist/router/utils.js
+// ext/node_modules/hono/dist/router/utils.js
 var createNullObject = () => Object.create(null);
 
-// /zveltio-extension/node_modules/hono/dist/router/reg-exp-router/matcher.js
+// ext/node_modules/hono/dist/router/reg-exp-router/matcher.js
 var emptyParam = [];
 function match(method, path) {
   const matchers = this.buildAllMatchers();
@@ -1055,7 +1055,7 @@ function match(method, path) {
   return match(method, path);
 }
 
-// /zveltio-extension/node_modules/hono/dist/router/reg-exp-router/node.js
+// ext/node_modules/hono/dist/router/reg-exp-router/node.js
 var LABEL_REG_EXP_STR = "[^/]+";
 var ONLY_WILDCARD_REG_EXP_STR = "[^]*";
 var TAIL_WILDCARD_REG_EXP_STR = "(?:|/[^]*)";
@@ -1156,7 +1156,7 @@ var Node = class Node {
   }
 };
 
-// /zveltio-extension/node_modules/hono/dist/router/reg-exp-router/trie.js
+// ext/node_modules/hono/dist/router/reg-exp-router/trie.js
 var Trie = class {
   #context = { varIndex: 0 };
   #root = new Node;
@@ -1234,7 +1234,7 @@ var Trie = class {
   }
 };
 
-// /zveltio-extension/node_modules/hono/dist/router/reg-exp-router/router.js
+// ext/node_modules/hono/dist/router/reg-exp-router/router.js
 function endsWithWildcard(keys) {
   const tail = keys[keys.length - 1];
   return tail === "[^]*" || tail === "(?:|/[^]*)";
@@ -1327,7 +1327,7 @@ var RegExpRouter = class {
   }
 };
 
-// /zveltio-extension/node_modules/hono/dist/router/smart-router/router.js
+// ext/node_modules/hono/dist/router/smart-router/router.js
 var SmartRouter = class {
   name = "SmartRouter";
   #routers = [];
@@ -1380,7 +1380,7 @@ var SmartRouter = class {
   }
 };
 
-// /zveltio-extension/node_modules/hono/dist/router/trie-router/node.js
+// ext/node_modules/hono/dist/router/trie-router/node.js
 var emptyParams = createNullObject();
 var order = 0;
 var Node2 = class Node {
@@ -1519,7 +1519,7 @@ var Node2 = class Node {
   }
 };
 
-// /zveltio-extension/node_modules/hono/dist/router/trie-router/router.js
+// ext/node_modules/hono/dist/router/trie-router/router.js
 var TrieRouter = class {
   name = "TrieRouter";
   #node = new Node2;
@@ -1532,7 +1532,7 @@ var TrieRouter = class {
   }
 };
 
-// /zveltio-extension/node_modules/hono/dist/hono.js
+// ext/node_modules/hono/dist/hono.js
 var Hono2 = class extends Hono {
   constructor(options = {}) {
     super(options);
@@ -1567,57 +1567,6 @@ function selfServiceRoutes(ctx) {
         "Content-Disposition": `attachment; filename="my-data-export-${new Date().toISOString().split("T")[0]}.json"`
       }
     });
-  });
-  app.delete("/delete-my-account", async (c) => {
-    const user = await sessionUser(c);
-    if (!user)
-      return c.json({ error: "Unauthorized" }, 401);
-    const body = await c.req.json().catch(() => ({}));
-    if (body.confirm !== "DELETE MY ACCOUNT") {
-      return c.json({ error: 'Please confirm with: { "confirm": "DELETE MY ACCOUNT" }' }, 400);
-    }
-    if (!body.password) {
-      return c.json({ error: 'Current password required for account deletion. Include "password" in request body.' }, 400);
-    }
-    try {
-      const verifyResult = await auth.api.signInEmail({
-        body: { email: user.email, password: body.password }
-      });
-      if (!verifyResult)
-        throw new Error("Invalid password");
-    } catch {
-      return c.json({ error: "Invalid password. Account deletion cancelled." }, 403);
-    }
-    const userId = user.id;
-    const erasureId = crypto.randomUUID();
-    let deleted = false;
-    try {
-      await ctx.db.transaction().execute(async (trx) => {
-        deleted = await ctx.internals.deleteUser(trx, userId, {
-          actor: "self",
-          reason: "gdpr.erasure",
-          metadata: { erasure_id: erasureId }
-        });
-      });
-    } catch (err) {
-      console.error("[gdpr] erasure failed for", userId, "| cause:", err instanceof Error ? err.message : String(err));
-      const status = err?.code === "user_protected" ? 409 : 500;
-      return c.json({
-        error: "Account deletion failed. The erasure did NOT complete \u2014 see the server log for the cause.",
-        detail: err instanceof Error ? err.message : String(err)
-      }, status);
-    }
-    if (!deleted)
-      return c.json({ error: "Account not found. Nothing was erased." }, 404);
-    await ctx.internals.audit({
-      type: "gdpr.account_deleted",
-      resourceId: userId,
-      resourceType: "user",
-      metadata: { gdpr: true, erasure_id: erasureId, requested_at: new Date().toISOString() }
-    }).catch((err) => {
-      console.error("[gdpr] erasure", erasureId, "audit write failed:", err.message);
-    });
-    return c.json({ success: true, complete: true, message: "Account and all associated data has been deleted" });
   });
   return app;
 }

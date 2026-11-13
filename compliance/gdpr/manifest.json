@@ -3,8 +3,8 @@
   "displayName": "GDPR Compliance",
   "category": "compliance",
   "description": "Data export and right to erasure (GDPR Art. 15, 17)",
-  "version": "2.1.0",
-  "zveltioMinVersion": "3.0.0-beta.111",
+  "version": "3.0.0",
+  "zveltioMinVersion": "3.0.0-beta.115",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-gdpr",
   "permissions": [
@@ -190,8 +190,8 @@
     }
   ],
   "integrity": {
-    "engineSha256": "2c358f7b2aabbe076a4375f9c647d5d722aa3b3ff991153b22beeaaef41f7db2",
-    "sourceSha256": "09476ba55089ef4b4e8f89aaae801f87fb2308f51793e216f336edfe4581d8a2",
+    "engineSha256": "f1513a041cd16ed88b31fd6bfaae3d145a95b37b84c18e5f0679a0ce62f66acb",
+    "sourceSha256": "e0c60706af2fe9d177490c941d73614c71d5736d605c9a5410295b2d548c55f6",
     "schemaSha256": "3d88c2eb0febb4f4dc523ae1146216ab094a87111b59ec4e51950e488ce2c085"
   }
 }
