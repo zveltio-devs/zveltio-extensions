@@ -1,141 +1,53 @@
 {
-  "sduiSchema": 1,
+  "spec": "zveltio.view/2",
+  "id": "etransport.list",
   "title": "compliance.ro.etransport.title",
-  "subtitle": "compliance.ro.etransport.subtitle",
-  "newLabel": "compliance.ro.etransport.btn.newDeclaration",
-  "resources": [
+  "type": "list",
+  "collection": "etransport_declarations",
+  "fields": [
+    { "field": "uit", "label": "compliance.ro.etransport.col.uit", "display": "mono" },
+    { "field": "transport_date", "label": "common.col.date" },
+    { "field": "vehicle_plate", "label": "compliance.ro.etransport.col.vehicle", "display": "mono" },
+    { "field": "driver_name", "label": "compliance.ro.etransport.col.driver" },
+    { "field": "destination_county", "label": "compliance.ro.etransport.col.route" },
+    { "field": "total_weight_kg", "label": "compliance.ro.etransport.col.weightKg", "display": "mono" },
     {
-      "id": "declarations",
-      "dataSource": "/api/data/etransport_declarations?sort=transport_date&order=desc&limit=500",
-      "dataPath": "records",
-      "filters": [
-        {
-          "param": "status[eq]",
-          "options": [
-            { "value": "all", "label": "common.filter.all" },
-            { "value": "draft", "label": "compliance.ro.etransport.status.draft" },
-            { "value": "declared", "label": "compliance.ro.etransport.status.declared" },
-            { "value": "in_transit", "label": "compliance.ro.etransport.status.inTransit" },
-            { "value": "completed", "label": "compliance.ro.etransport.status.completed" },
-            { "value": "cancelled", "label": "compliance.ro.etransport.status.cancelled" }
-          ]
-        }
-      ],
-      "columns": [
-        { "key": "uit", "label": "compliance.ro.etransport.col.uit", "type": "mono" },
-        { "key": "transport_date", "label": "common.col.date", "type": "date" },
-        { "key": "vehicle_plate", "label": "compliance.ro.etransport.col.vehicle", "type": "mono" },
-        { "key": "driver_name", "label": "compliance.ro.etransport.col.driver" },
-        {
-          "key": "departure_county",
-          "label": "compliance.ro.etransport.col.route",
-          "join": { "keys": ["departure_county", "destination_county"], "sep": " → " }
-        },
-        { "key": "total_weight_kg", "label": "compliance.ro.etransport.col.weightKg", "type": "mono" },
-        {
-          "key": "status",
-          "label": "common.col.status",
-          "type": "badge",
-          "badge": {
-            "colors": {
-              "draft": "badge-warning",
-              "declared": "badge-primary",
-              "in_transit": "badge-info",
-              "completed": "badge-success",
-              "cancelled": "badge-error"
-            },
-            "labels": {
-              "draft": "compliance.ro.etransport.status.draft",
-              "declared": "compliance.ro.etransport.status.declared",
-              "in_transit": "compliance.ro.etransport.status.inTransit",
-              "completed": "compliance.ro.etransport.status.completed",
-              "cancelled": "compliance.ro.etransport.status.cancelled"
-            }
-          }
-        }
-      ],
-      "rowActions": [
-        {
-          "id": "delete",
-          "icon": "Trash2",
-          "variant": "text-error",
-          "method": "DELETE",
-          "endpoint": "/api/data/etransport_declarations/{id}",
-          "visibleWhen": { "field": "status", "equals": "draft" },
-          "confirm": "compliance.ro.etransport.confirmDelete"
-        },
-        {
-          "id": "complete",
-          "label": "compliance.ro.etransport.action.complete",
-          "icon": "CheckCircle",
-          "variant": "text-success",
-          "method": "POST",
-          "endpoint": "/ext/compliance/ro/etransport/actions/complete",
-          "body": { "id": "{id}" },
-          "visibleWhen": { "field": "status", "in": ["declared", "in_transit"] }
-        },
-        {
-          "id": "cancel",
-          "label": "compliance.ro.etransport.action.cancel",
-          "icon": "XCircle",
-          "variant": "text-error",
-          "method": "POST",
-          "endpoint": "/ext/compliance/ro/etransport/actions/cancel",
-          "body": { "id": "{id}" },
-          "visibleWhen": { "field": "status", "in": ["declared", "in_transit"] },
-          "confirm": "compliance.ro.etransport.confirmCancel"
-        }
-      ],
-      "form": {
-        "endpoint": "/api/data/etransport_declarations",
-        "fields": [
-          { "name": "transport_date", "label": "compliance.ro.etransport.ui.transport_date", "type": "date", "colSpan": 1, "default": "today" },
-          {
-            "name": "purpose", "label": "compliance.ro.etransport.ui.purpose", "type": "select", "colSpan": 1, "default": "commercial",
-            "options": [
-              { "value": "commercial", "label": "compliance.ro.etransport.ui.commercial" },
-              { "value": "personal", "label": "compliance.ro.etransport.ui.personal" },
-              { "value": "return", "label": "compliance.ro.etransport.ui.return" }
-            ]
-          },
-          { "name": "vehicle_plate", "label": "compliance.ro.etransport.ui.vehicle_plate", "colSpan": 1, "mono": true, "required": true },
-          { "name": "driver_name", "label": "compliance.ro.etransport.ui.driver_name", "colSpan": 1, "required": true }
-        ],
-        "sections": [
-          {
-            "title": "compliance.ro.etransport.section.departure",
-            "fields": [
-              { "name": "departure_address", "label": "common.col.address", "colSpan": 2 },
-              { "name": "departure_county", "label": "compliance.ro.etransport.ui.county", "colSpan": 1 },
-              { "name": "departure_country", "label": "compliance.ro.etransport.ui.country", "colSpan": 1, "default": "RO", "mono": true }
-            ]
-          },
-          {
-            "title": "compliance.ro.etransport.section.destination",
-            "fields": [
-              { "name": "destination_address", "label": "common.col.address", "colSpan": 2 },
-              { "name": "destination_county", "label": "compliance.ro.etransport.ui.county", "colSpan": 1 },
-              { "name": "destination_country", "label": "compliance.ro.etransport.ui.country", "colSpan": 1, "default": "RO", "mono": true }
-            ]
-          }
-        ],
-        "repeatable": {
-          "name": "goods",
-          "label": "compliance.ro.etransport.section.goods",
-          "addLabel": "compliance.ro.etransport.ui.add_good",
-          "min": 1,
-          "columns": [
-            { "name": "tariff_code", "label": "compliance.ro.etransport.col.tariffCode", "mono": true },
-            { "name": "description", "label": "common.col.description" },
-            { "name": "quantity", "label": "common.col.quantity", "type": "number" },
-            { "name": "unit", "label": "common.col.unit" },
-            { "name": "weight_kg", "label": "compliance.ro.etransport.col.weightKg", "type": "number" }
-          ]
-        },
-        "computed": [
-          { "name": "total_weight_kg", "label": "compliance.ro.etransport.totals.weight", "sumOf": { "group": "goods", "field": "weight_kg" } }
-        ]
+      "field": "status",
+      "label": "common.col.status",
+      "display": "badge",
+      "tones": {
+        "draft": "warning",
+        "declared": "info",
+        "in_transit": "info",
+        "completed": "success",
+        "cancelled": "danger"
       }
+    }
+  ],
+  "sort": "-transport_date",
+  "actions": [{ "navigate": "etransport.new", "label": "compliance.ro.etransport.btn.newDeclaration" }],
+  "rowActions": [
+    {
+      "action": "recordUit",
+      "label": "compliance.ro.etransport.col.uit",
+      "input": { "id": { "$record": "id" } },
+      "prompt": ["uit", "note"],
+      "when": [{ "field": "status", "op": "eq", "value": "draft" }]
+    },
+    {
+      "action": "complete",
+      "label": "compliance.ro.etransport.action.complete",
+      "tone": "success",
+      "input": { "id": { "$record": "id" } },
+      "when": [{ "field": "status", "op": "in", "value": ["declared", "in_transit"] }]
+    },
+    {
+      "action": "cancel",
+      "label": "compliance.ro.etransport.action.cancel",
+      "tone": "danger",
+      "input": { "id": { "$record": "id" } },
+      "confirm": "compliance.ro.etransport.confirmCancel",
+      "when": [{ "field": "status", "op": "in", "value": ["draft", "declared", "in_transit"] }]
     }
   ]
 }

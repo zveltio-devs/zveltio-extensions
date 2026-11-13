@@ -3,8 +3,8 @@
   "displayName": "e-Transport RO",
   "category": "compliance/ro",
   "description": "Romanian e-Transport monitoring system — declare and track road transport of goods via ANAF",
-  "version": "2.0.0",
-  "zveltioMinVersion": "3.0.0-beta.92",
+  "version": "2.1.0",
+  "zveltioMinVersion": "3.0.0-beta.118",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-ro-etransport",
   "permissions": [
@@ -20,6 +20,12 @@
         "label": "e-Transport RO",
         "icon": "Truck",
         "schema": "schemas/etransport.json"
+      },
+      {
+        "path": "/admin/compliance/ro/etransport/new",
+        "label": "compliance.ro.etransport.btn.newDeclaration",
+        "icon": "FilePlus",
+        "schema": "schemas/declaration-new.json"
       }
     ],
     "navGroup": "compliance"
@@ -37,14 +43,122 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "45578d1d9b58a7a497faf4705f2eda8f820133e15ebc0adc441c765a90c66643",
-    "sourceSha256": "f054fadfa4cf58da5dc6759ad38d96eaa72560fcd54399b4a1a009d2dd71c788",
+    "engineSha256": "cf60a5d1cb2494ac8f25c9c411934f3cb0d0a52546e4b1d25e09259d8bae02e8",
+    "sourceSha256": "ca7f122af40f2bcd35bb663b2f388407db0df405b549123f7d4459d3cbc069eb",
     "schemaSha256": "5ede95e6e2616d2e30c063f66086931551587158f892751a87fb7e18c1e13cb6"
   },
   "collections": [
     "etransport_declarations"
   ],
   "actions": [
+    {
+      "name": "create",
+      "permission": {
+        "resource": "etransport_declarations",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "transport_date",
+          "vehicle_plate",
+          "driver_name",
+          "departure_address",
+          "departure_county",
+          "destination_address",
+          "destination_county",
+          "goods"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "transport_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "purpose": {
+            "enum": [
+              "commercial",
+              "personal",
+              "return"
+            ]
+          },
+          "vehicle_plate": {
+            "type": "string",
+            "minLength": 1
+          },
+          "driver_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "driver_cnp": {
+            "type": "string"
+          },
+          "departure_address": {
+            "type": "string",
+            "minLength": 1
+          },
+          "departure_county": {
+            "type": "string",
+            "minLength": 1
+          },
+          "departure_country": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2
+          },
+          "destination_address": {
+            "type": "string",
+            "minLength": 1
+          },
+          "destination_county": {
+            "type": "string",
+            "minLength": 1
+          },
+          "destination_country": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2
+          },
+          "goods": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": [
+                "description"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "tariff_code": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "quantity": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "unit": {
+                  "type": "string"
+                },
+                "weight_kg": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        }
+      },
+      "reads": [
+        "etransport_declarations"
+      ],
+      "writes": [
+        "etransport_declarations"
+      ]
+    },
     {
       "name": "recordUit",
       "permission": {
