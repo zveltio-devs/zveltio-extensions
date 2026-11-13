@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.0.0 (2026-11-13)
+
+- feat!: `DELETE /delete-my-account` is gone. Erasing one's own account is the engine's `DELETE /api/me` (ADR 0046), re-authenticated there by the account's own sign-in method (a step-up when it has a passkey or TOTP, else its password, else a fresh OAuth sign-in); the extension no longer calls `ctx.internals.deleteUser`, which the engine withdrew because it let an extension delete any account id it named
+- the subject records the erasure with `submitRequest` (`request_type: "erasure"`) and passes that request's id to `DELETE /api/me` as `erasure_id`; the engine's `user.deleted` row (`actor: "self"`, `reason: "self.erasure"`) carries it. The `gdpr.account_deleted` audit row is no longer written: the engine's row is the record
+- `GET /export-my-data` is unchanged (`auth:users` now covers only `exportUserData`)
+- requires engine 3.0.0-beta.115
+
 ## 2.1.0 (2026-11-12)
 
 - feat: the Studio page is a `zveltio.view/2` view (ADR 0042): it names its collections and actions instead of URLs, and Studio draws it from the specification
