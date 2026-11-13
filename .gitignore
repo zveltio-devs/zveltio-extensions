@@ -27,3 +27,4 @@ docs/private/
 
 # Deno the job tests download into the cwd (engine ensureDeno cache)
 **/extensions/.deno/
+/storage/
