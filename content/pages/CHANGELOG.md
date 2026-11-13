@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.3.0 (2026-11-13)
+
+- The page builder is no longer extension code (ADR 0042 decision 9). Its canvas is a Studio front-end package that Studio draws for the view `pages.builder`; the extension ships that view, a form over `pages` (title, slug, `blocks` as JSON, Save, Publish), which any other front end draws, and which Studio draws when it has no canvas. Same page path, `/admin/pages/builder/:id`. Removed: `studio/pages/builder`, the builder components and their `studio/src/lib` helpers, the `content.pages.b.*` messages (now Studio's `pageBuilder.*`). The block-vocabulary and breakpoint checks against the canvas moved with it into Studio
+- requires engine 3.0.0-beta.111 (unchanged); the canvas needs a Studio from the release after this one
+
 ## 2.2.0 (2026-11-13)
 
 - `GET /sitemap.xml` and `GET /robots.txt` are declared routes (ADR 0039): the manifest's `routes` names them, public, and the engine serves them with the plain handlers `sitemap` and `robots`. Same URLs and output. The sitemap reads through `host.collections` as the `public` role (ADR 0020); when `public` may not read, the answer is the data API's refusal as a problem document, where it was an empty body with that status

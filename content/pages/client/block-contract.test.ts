@@ -8,37 +8,21 @@
  * the defect: `hero`, `richtext` and `collection_list` were addable from the
  * block picker and rendered as "Unsupported block" to every visitor.
  *
- * Source text rather than a rendered component on purpose: this file lives in
- * the extension, where all three sources are on disk, and it needs no Svelte
- * toolchain to run in the extension repo's `bun test`.
+ * Source text rather than a rendered component on purpose: it needs no Svelte
+ * toolchain to run in the extension repo's `bun test`. The builder's library
+ * and canvas are Studio's page-builder package now (ADR 0042 decision 9); its
+ * own test holds them to this list.
  */
 
 import { describe, expect, test } from 'bun:test';
 import { join } from 'node:path';
-import { ALL_BLOCK_TYPES, BLOCK_TYPES } from './block-types.js';
+import { ALL_BLOCK_TYPES } from './block-types.js';
 import { HTML_KEYS, URL_KEYS } from './bind.js';
 
 const HERE = import.meta.dir;
 const read = (p: string) => Bun.file(join(HERE, p)).text();
 
 describe('block vocabulary', () => {
-  test('every type the builder offers is in the canonical list', async () => {
-    const src = await read('../studio/src/lib/builder-types.ts');
-    const offered = [...src.matchAll(/^\s*type:\s*'([a-z_]+)'/gm)].map((m) => m[1]);
-
-    expect(offered.length).toBeGreaterThan(0);
-    const unknown = offered.filter((t) => !(BLOCK_TYPES as readonly string[]).includes(t));
-    expect(unknown).toEqual([]);
-  });
-
-  test('the canonical list offers nothing the builder cannot add', async () => {
-    const src = await read('../studio/src/lib/builder-types.ts');
-    const offered = new Set([...src.matchAll(/^\s*type:\s*'([a-z_]+)'/gm)].map((m) => m[1]));
-
-    const unbuildable = BLOCK_TYPES.filter((t) => !offered.has(t));
-    expect(unbuildable).toEqual([]);
-  });
-
   test('the renderer draws every type, legacy included', async () => {
     const src = await read('./BlockRenderer.svelte');
     // `block.type === 'x'` — the only way this renderer dispatches.
@@ -48,30 +32,6 @@ describe('block vocabulary', () => {
 
     const undrawn = ALL_BLOCK_TYPES.filter((t) => !handled.has(t));
     expect(undrawn).toEqual([]);
-  });
-
-  /**
-   * The Studio canvas is a fifth place the vocabulary lives, and it was the one
-   * nobody checked.
-   *
-   * `BlockRenderer.svelte` drew eighteen types; `BlockPreview.svelte` drew
-   * thirteen. The five it missed included `button` and `icon` — both OFFERED by
-   * the block library — so an author could add a button, set its label and link
-   * in the properties panel, and see a grey box with the word "button" on the
-   * canvas while the public page rendered it correctly. The other three were
-   * `heading`, `text` and `html`, which every page authored before this builder
-   * is made of.
-   *
-   * A placeholder is not a harmless fallback here: it looks exactly like a block
-   * that is broken, on the one screen whose whole job is showing what the
-   * visitor will see.
-   */
-  test('the Studio canvas previews every type the public renderer draws', async () => {
-    const src = await read('../studio/src/components/builder/BlockPreview.svelte');
-    const handled = new Set([...src.matchAll(/block\.type === '([a-z_]+)'/g)].map((m) => m[1]));
-
-    const unpreviewed = ALL_BLOCK_TYPES.filter((t) => !handled.has(t));
-    expect(unpreviewed).toEqual([]);
   });
 });
 
