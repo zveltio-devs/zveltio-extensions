@@ -1,0 +1,34 @@
+{
+  "spec": "zveltio.view/2",
+  "id": "etransport.new",
+  "title": "compliance.ro.etransport.btn.newDeclaration",
+  "type": "form",
+  "action": "create",
+  "sections": [
+    {
+      "fields": [
+        { "field": "transport_date", "label": "compliance.ro.etransport.ui.transport_date" },
+        { "field": "purpose", "label": "compliance.ro.etransport.ui.purpose" },
+        { "field": "vehicle_plate", "label": "compliance.ro.etransport.ui.vehicle_plate" },
+        { "field": "driver_name", "label": "compliance.ro.etransport.ui.driver_name" }
+      ]
+    },
+    {
+      "title": "compliance.ro.etransport.section.departure",
+      "fields": [
+        { "field": "departure_address", "label": "common.col.address" },
+        { "field": "departure_county", "label": "compliance.ro.etransport.ui.county" },
+        { "field": "departure_country", "label": "compliance.ro.etransport.ui.country" }
+      ]
+    },
+    {
+      "title": "compliance.ro.etransport.section.destination",
+      "fields": [
+        { "field": "destination_address", "label": "common.col.address" },
+        { "field": "destination_county", "label": "compliance.ro.etransport.ui.county" },
+        { "field": "destination_country", "label": "compliance.ro.etransport.ui.country" }
+      ]
+    },
+    { "title": "compliance.ro.etransport.section.goods", "fields": [{ "field": "goods", "label": "compliance.ro.etransport.section.goods" }] }
+  ]
+}

@@ -18,6 +18,30 @@ async function load(host: Parameters<ExtensionAction>[1], id: string) {
   return row;
 }
 
+interface Good {
+  tariff_code?: string;
+  description: string;
+  quantity?: number;
+  unit?: string;
+  weight_kg?: number;
+}
+
+/**
+ * Open a draft declaration with its goods. The goods are a list in the
+ * input, so a form draws them as lines; the total weight is their sum, the
+ * figure the declaration carries.
+ */
+const create: ExtensionAction = async (input, host) => {
+  const { goods, ...rest } = input as Record<string, unknown> & { goods: Good[] };
+  const total = goods.reduce((sum, g) => sum + (g.weight_kg ?? 0), 0);
+  return host.collections.insert(C, {
+    ...rest,
+    goods,
+    total_weight_kg: Math.round(total * 1000) / 1000,
+    status: 'draft',
+  });
+};
+
 /**
  * Record a UIT obtained in SPV. This extension does not talk to ANAF: it has
  * no e-Transport XML generator and no SPV client, so it never issues a UIT.
@@ -66,4 +90,4 @@ const cancel: ExtensionAction = async (input, host) => {
   );
 };
 
-export const etransportActions = { recordUit, complete, cancel };
+export const etransportActions = { create, recordUit, complete, cancel };

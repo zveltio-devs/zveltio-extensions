@@ -34,6 +34,16 @@ async function load(host, id) {
     throw new ActionRefusal(404, "declaration_not_found", "No such declaration.");
   return row;
 }
+var create = async (input, host) => {
+  const { goods, ...rest } = input;
+  const total = goods.reduce((sum, g) => sum + (g.weight_kg ?? 0), 0);
+  return host.collections.insert(C, {
+    ...rest,
+    goods,
+    total_weight_kg: Math.round(total * 1000) / 1000,
+    status: "draft"
+  });
+};
 var recordUit = async (input, host) => {
   const { id, uit, note } = input;
   const row = await load(host, id);
@@ -62,7 +72,7 @@ var cancel = async (input, host) => {
   }
   return host.collections.update(C, id, { status: "cancelled" }, { expect: { status: ["draft", "declared", "in_transit"] } });
 };
-var etransportActions = { recordUit, complete, cancel };
+var etransportActions = { create, recordUit, complete, cancel };
 
 // engine/index.ts
 var extension = {

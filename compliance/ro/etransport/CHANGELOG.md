@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.1.0 (2026-11-13)
+
+- feat: the `create` action opens a draft declaration with its goods as a list input; the total weight is the sum of the goods' weights, written by the action
+- feat: the declaration list and the new-declaration form are `zveltio.view/2` views (ADR 0042). The form is an action form on `create` (page `/admin/compliance/ro/etransport/new`, opened from the list's toolbar); Studio draws `goods` as a table of lines. A draft records its UIT from the list (`recordUit`) and is cancelled, not deleted
+- the conversion drops: the status quick filter (search stays), the route column joining departure and destination county (destination shown), the form's defaults (today's date, `commercial`, `RO`; the collection keeps its own for purpose and country) and the running weight total while typing
+- requires engine 3.0.0-beta.118 (lines on an action form)
+
 ## 2.0.0 (2026-10-30)
 
 - feat!: declarations are the `etransport_declarations` collection, declared in `schema/collections/` and created and owned by the engine; no SQL migrations
