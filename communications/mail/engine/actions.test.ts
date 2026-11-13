@@ -12,11 +12,21 @@ type Row = Record<string, any>;
 function host(rows: Row[], handed = false) {
   const updates: { id: string; data: Row; expect?: Row }[] = [];
   const queued: { job: string; input: Row; options?: Row }[] = [];
+  const inserted: { collection: string; data: Row }[] = [];
   return {
     updates,
     queued,
+    inserted,
     collections: {
       read: async (_c: string, id: string) => rows.find((r) => r.id === id) ?? null,
+      // The data API's `{ field: { eq } }` filter, which is all these actions ask.
+      list: async (_c: string, q: { filter?: Record<string, { eq: unknown }> }) => ({
+        records: rows.filter((r) => Object.entries(q.filter ?? {}).every(([k, v]) => r[k] === v.eq)),
+      }),
+      insert: async (collection: string, data: Row) => {
+        inserted.push({ collection, data });
+        return { id: `new${inserted.length}`, ...data };
+      },
       update: async (_c: string, id: string, data: Row, o?: { expect?: Row }) => {
         updates.push({ id, data, expect: o?.expect });
         return { id, ...data };
@@ -148,5 +158,80 @@ describe('folders', () => {
     ]);
     await expect(run('renameFolder', { folder_id: 'f1', name: 'x' }, h)).rejects.toMatchObject({ status: 409 });
     await expect(run('deleteFolder', { folder_id: 'f1' }, h)).rejects.toMatchObject({ status: 409 });
+  });
+});
+
+describe('compose (ADR 0042 slice 5: an action answers a view)', () => {
+  const mailAcct = { ...acct, email_address: 'me@x.test' };
+  const msg = {
+    id: 'm1',
+    account_id: 'a1',
+    subject: 'Plan',
+    from_address: 'ana@x.test',
+    from_name: 'Ana',
+    to_addresses: [{ address: 'me@x.test' }, { address: 'bob@x.test', name: 'Bob' }],
+    cc_addresses: [{ address: 'ANA@x.test' }, { address: 'cy@x.test' }],
+    message_id: '<m1@x.test>',
+    references_header: '<root@x.test>',
+    body_html: '<p>Hello</p>',
+    received_at: '2026-11-13T10:00:00Z',
+  };
+  const compose = (id: string) => ({ view: 'mail.compose', params: { draft_id: id } });
+
+  it('newDraft opens an empty draft of the account', async () => {
+    const h = host([mailAcct]);
+    expect(await run('newDraft', { account_id: 'a1' }, h)).toEqual(compose('new1'));
+    expect(h.inserted).toEqual([{ collection: 'mail_drafts', data: { account_id: 'a1' } }]);
+    await expect(run('newDraft', { account_id: 'zz' }, host([]))).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('reply answers the sender, threads the draft and quotes the message', async () => {
+    const h = host([mailAcct, msg]);
+    expect(await run('reply', { message_id: 'm1', mode: 'reply' }, h)).toEqual(compose('new1'));
+    const d = h.inserted[0]!.data;
+    expect(d).toMatchObject({
+      account_id: 'a1',
+      original_message_id: 'm1',
+      subject: 'Re: Plan',
+      to_addresses: [{ address: 'ana@x.test', name: 'Ana' }],
+      in_reply_to: '<m1@x.test>',
+      references_header: '<root@x.test> <m1@x.test>',
+    });
+    expect(d.body_html).toContain('<blockquote><p>Hello</p></blockquote>');
+    expect(d.cc_addresses).toBeUndefined();
+  });
+
+  it('reply to all copies everyone else once, never the account itself', async () => {
+    const h = host([mailAcct, msg]);
+    await run('reply', { message_id: 'm1', mode: 'reply_all' }, h);
+    expect(h.inserted[0]!.data.cc_addresses).toEqual([{ address: 'bob@x.test', name: 'Bob' }, { address: 'cy@x.test' }]);
+    // An existing prefix is not doubled; a reply-to wins over the sender.
+    const again = host([mailAcct, { ...msg, subject: 'RE: Plan', reply_to: 'list@x.test' }]);
+    await run('reply', { message_id: 'm1', mode: 'reply' }, again);
+    expect(again.inserted[0]!.data).toMatchObject({ subject: 'RE: Plan', to_addresses: [{ address: 'list@x.test' }] });
+  });
+
+  it('forward carries the downloaded attachments and escapes the headers it quotes', async () => {
+    const h = host([
+      mailAcct,
+      { ...msg, from_name: '<b>Ana</b>' },
+      { id: 't1', message_id: 'm1', file_id: 'f1', filename: 'a.pdf', size: 3, mime_type: 'application/pdf', is_inline: false },
+      { id: 't2', message_id: 'm1', file_id: null, filename: 'b.pdf', is_inline: false },
+      { id: 't3', message_id: 'm1', file_id: 'f3', filename: 'logo.png', is_inline: true },
+    ]);
+    await run('reply', { message_id: 'm1', mode: 'forward' }, h);
+    const d = h.inserted[0]!.data;
+    expect(d.subject).toBe('Fwd: Plan');
+    expect(d.attachments).toEqual([{ id: 'f1', name: 'a.pdf', size: 3, type: 'application/pdf' }]);
+    expect(d.body_html).toContain('&lt;b&gt;Ana&lt;/b&gt;');
+    expect(d.to_addresses).toBeUndefined();
+    await expect(run('reply', { message_id: 'zz', mode: 'reply' }, h)).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('openAttachment answers the stored file, and refuses one not downloaded yet', async () => {
+    const h = host([{ id: 't1', file_id: 'f1' }, { id: 't2', file_id: null }]);
+    expect(await run('openAttachment', { attachment_id: 't1' }, h)).toEqual({ file: 'f1' });
+    await expect(run('openAttachment', { attachment_id: 't2' }, h)).rejects.toMatchObject({ status: 409 });
+    await expect(run('openAttachment', { attachment_id: 'zz' }, h)).rejects.toMatchObject({ status: 404 });
   });
 });

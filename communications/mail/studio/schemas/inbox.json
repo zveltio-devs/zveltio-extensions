@@ -1,0 +1,414 @@
+{
+  "spec": "zveltio.view/2",
+  "id": "mail.inbox",
+  "title": "communications.mail.inbox",
+  "type": "split",
+  "panes": [
+    {
+      "id": "account",
+      "type": "list",
+      "collection": "mail_accounts",
+      "fields": [
+        {
+          "field": "email_address",
+          "label": "common.col.email"
+        }
+      ],
+      "sort": "email_address",
+      "pageSize": 50,
+      "rowActions": [
+        {
+          "action": "sync",
+          "label": "communications.mail.ui.sync",
+          "input": {
+            "account_id": {
+              "$record": "id"
+            }
+          },
+          "busyWhen": [
+            {
+              "field": "sync_status",
+              "op": "in",
+              "value": [
+                "queued",
+                "syncing"
+              ]
+            }
+          ]
+        },
+        {
+          "action": "newDraft",
+          "label": "communications.mail.ui.newMessage",
+          "input": {
+            "account_id": {
+              "$record": "id"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "folders",
+      "type": "list",
+      "collection": "mail_folders",
+      "filter": [
+        {
+          "field": "account_id",
+          "op": "eq",
+          "value": {
+            "$selected": "account"
+          }
+        }
+      ],
+      "sort": "name",
+      "pageSize": 100,
+      "fields": [
+        "name",
+        {
+          "field": "unread_count",
+          "display": "badge"
+        }
+      ],
+      "actions": [
+        {
+          "action": "createFolder",
+          "label": "communications.mail.ui.newFolder",
+          "input": {
+            "account_id": {
+              "$selected": "account"
+            }
+          },
+          "prompt": [
+            "name"
+          ]
+        }
+      ],
+      "rowActions": [
+        {
+          "action": "renameFolder",
+          "label": "common.rename",
+          "input": {
+            "folder_id": {
+              "$record": "id"
+            }
+          },
+          "prompt": [
+            "name"
+          ],
+          "when": [
+            {
+              "field": "type",
+              "op": "neq",
+              "value": "inbox"
+            }
+          ]
+        },
+        {
+          "action": "deleteFolder",
+          "label": "common.delete",
+          "tone": "danger",
+          "input": {
+            "folder_id": {
+              "$record": "id"
+            }
+          },
+          "confirm": "communications.mail.confirm.deleteFolder",
+          "when": [
+            {
+              "field": "type",
+              "op": "neq",
+              "value": "inbox"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "messages",
+      "type": "list",
+      "collection": "mail_messages",
+      "filter": [
+        {
+          "field": "folder_id",
+          "op": "eq",
+          "value": {
+            "$selected": "folders"
+          }
+        }
+      ],
+      "sort": "-received_at",
+      "search": true,
+      "selectable": true,
+      "fields": [
+        "from_name",
+        "subject",
+        "received_at",
+        {
+          "field": "has_attachments",
+          "display": "flag"
+        },
+        {
+          "field": "is_starred",
+          "display": "flag"
+        }
+      ],
+      "emphasisWhen": [
+        {
+          "field": "is_read",
+          "op": "eq",
+          "value": false
+        }
+      ],
+      "rowActions": [
+        {
+          "action": "setFlags",
+          "label": "communications.mail.ui.star",
+          "when": [
+            {
+              "field": "is_starred",
+              "op": "eq",
+              "value": false
+            }
+          ],
+          "input": {
+            "message_ids": [
+              {
+                "$record": "id"
+              }
+            ],
+            "is_starred": true
+          }
+        },
+        {
+          "action": "setFlags",
+          "label": "communications.mail.ui.unstar",
+          "when": [
+            {
+              "field": "is_starred",
+              "op": "eq",
+              "value": true
+            }
+          ],
+          "input": {
+            "message_ids": [
+              {
+                "$record": "id"
+              }
+            ],
+            "is_starred": false
+          }
+        }
+      ],
+      "bulkActions": [
+        {
+          "action": "setFlags",
+          "label": "communications.mail.ui.markRead",
+          "input": {
+            "message_ids": {
+              "$selection": "id"
+            },
+            "is_read": true
+          }
+        },
+        {
+          "action": "setFlags",
+          "label": "communications.mail.ui.markUnread",
+          "input": {
+            "message_ids": {
+              "$selection": "id"
+            },
+            "is_read": false
+          }
+        },
+        {
+          "action": "deleteMessages",
+          "label": "common.delete",
+          "tone": "danger",
+          "input": {
+            "message_ids": {
+              "$selection": "id"
+            }
+          },
+          "confirm": "communications.mail.confirmDeleteMessage"
+        }
+      ]
+    },
+    {
+      "type": "detail",
+      "collection": "mail_messages",
+      "record": {
+        "$selected": "messages"
+      },
+      "onOpen": {
+        "action": "setFlags",
+        "input": {
+          "message_ids": [
+            {
+              "$record": "id"
+            }
+          ],
+          "is_read": true
+        },
+        "when": [
+          {
+            "field": "is_read",
+            "op": "eq",
+            "value": false
+          }
+        ]
+      },
+      "actions": [
+        {
+          "action": "reply",
+          "label": "communications.mail.ui.reply",
+          "input": {
+            "message_id": {
+              "$record": "id"
+            },
+            "mode": "reply"
+          }
+        },
+        {
+          "action": "reply",
+          "label": "communications.mail.ui.replyAll",
+          "input": {
+            "message_id": {
+              "$record": "id"
+            },
+            "mode": "reply_all"
+          }
+        },
+        {
+          "action": "reply",
+          "label": "communications.mail.ui.forward",
+          "input": {
+            "message_id": {
+              "$record": "id"
+            },
+            "mode": "forward"
+          }
+        },
+        {
+          "navigate": "mail.thread",
+          "label": "communications.mail.ui.thread",
+          "params": {
+            "thread_id": {
+              "$record": "thread_id"
+            }
+          },
+          "when": [
+            {
+              "field": "thread_id",
+              "op": "not_null"
+            }
+          ]
+        }
+      ],
+      "fields": [
+        {
+          "field": "subject",
+          "label": "common.col.subject"
+        },
+        {
+          "field": "from_address",
+          "label": "common.col.from"
+        },
+        {
+          "field": "to_addresses",
+          "label": "common.col.to"
+        },
+        {
+          "field": "cc_addresses",
+          "label": "common.col.cc"
+        },
+        {
+          "field": "received_at",
+          "label": "common.col.date"
+        },
+        {
+          "field": "body_html",
+          "label": "communications.mail.ui.body",
+          "fallback": "body_text"
+        }
+      ],
+      "panels": [
+        {
+          "type": "list",
+          "collection": "mail_attachments",
+          "title": "communications.mail.ui.attachments",
+          "filter": [
+            {
+              "field": "message_id",
+              "op": "eq",
+              "value": {
+                "$record": "id"
+              }
+            },
+            {
+              "field": "is_inline",
+              "op": "eq",
+              "value": false
+            }
+          ],
+          "fields": [
+            {
+              "field": "filename",
+              "label": "common.col.file"
+            },
+            "mime_type",
+            "size"
+          ],
+          "rowActions": [
+            {
+              "action": "openAttachment",
+              "label": "common.open",
+              "input": {
+                "attachment_id": {
+                  "$record": "id"
+                }
+              },
+              "when": [
+                {
+                  "field": "file_id",
+                  "op": "not_null"
+                }
+              ]
+            },
+            {
+              "action": "fetchAttachment",
+              "label": "common.download",
+              "input": {
+                "attachment_id": {
+                  "$record": "id"
+                }
+              },
+              "when": [
+                {
+                  "field": "file_id",
+                  "op": "null"
+                }
+              ],
+              "busyWhen": [
+                {
+                  "field": "fetch_status",
+                  "op": "eq",
+                  "value": "queued"
+                }
+              ],
+              "files": {
+                "write": {
+                  "name": {
+                    "$record": "filename"
+                  },
+                  "maxBytes": {
+                    "$record": "size"
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

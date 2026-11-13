@@ -1,0 +1,77 @@
+{
+  "spec": "zveltio.view/2",
+  "id": "mail.compose",
+  "title": "communications.mail.ui.newMessage",
+  "type": "form",
+  "collection": "mail_drafts",
+  "record": {
+    "$param": "draft_id"
+  },
+  "fields": [
+    "identity_id",
+    {
+      "field": "to_addresses",
+      "label": "common.col.to"
+    },
+    {
+      "field": "cc_addresses",
+      "label": "common.col.cc"
+    },
+    {
+      "field": "bcc_addresses",
+      "label": "common.col.bcc"
+    },
+    {
+      "field": "subject",
+      "label": "common.col.subject"
+    },
+    {
+      "field": "body_html",
+      "label": "communications.mail.ui.body"
+    },
+    {
+      "field": "attachments",
+      "label": "communications.mail.ui.attachments"
+    },
+    {
+      "field": "send_status",
+      "display": "badge",
+      "tones": {
+        "failed": "danger",
+        "queued": "info",
+        "sending": "info"
+      }
+    },
+    "send_error"
+  ],
+  "submit": [
+    {
+      "save": true,
+      "label": "communications.mail.ui.saveDraft"
+    },
+    {
+      "action": "send",
+      "label": "communications.mail.ui.send",
+      "input": {
+        "draft_id": {
+          "$record": "id"
+        }
+      },
+      "files": {
+        "read": {
+          "$record": "attachments"
+        }
+      },
+      "busyWhen": [
+        {
+          "field": "send_status",
+          "op": "in",
+          "value": [
+            "queued",
+            "sending"
+          ]
+        }
+      ]
+    }
+  ]
+}

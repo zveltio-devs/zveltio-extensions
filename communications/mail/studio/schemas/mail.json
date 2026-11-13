@@ -46,7 +46,17 @@
             "account_id": {
               "$record": "id"
             }
-          }
+          },
+          "busyWhen": [
+            {
+              "field": "sync_status",
+              "op": "in",
+              "value": [
+                "queued",
+                "syncing"
+              ]
+            }
+          ]
         }
       ],
       "create": true

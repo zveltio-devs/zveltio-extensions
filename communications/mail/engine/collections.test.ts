@@ -19,12 +19,16 @@ d(`${NAME}: declared collections`, () => {
   let db: any;
   let sql: any;
 
-  afterAll(async () => {
-    if (!db) return;
+  /** Its collections gone, as on a fresh instance (another file, the contract test, may have applied them). */
+  const dropAll = async () => {
     const { dropTestCollection } = await import(join(ENGINE, 'testing/app-harness.js'));
     await sql`DELETE FROM zvd_relations WHERE source_collection IN (${sql.join(COLLECTIONS)})`.execute(db);
     await sql`DELETE FROM zv_validation_rules WHERE collection IN (${sql.join(COLLECTIONS)})`.execute(db);
     for (const c of [...COLLECTIONS].reverse()) await dropTestCollection(db, c);
+  };
+
+  afterAll(async () => {
+    if (db) await dropAll();
   });
 
   it('apply, are owned, and leave nothing owed', async () => {
@@ -36,7 +40,28 @@ d(`${NAME}: declared collections`, () => {
     );
     ({ db } = await getTestApp());
     const files = await readDeclaredCollections(NAME, EXT_DIR, COLLECTIONS, manifest.integrity?.schemaSha256);
+    // An install of 2.1.0 first: `body_html` a textarea, draft `attachments` json,
+    // no `thread_id`. 2.2.0 retypes both within their columns (ADR 0042 slice 5).
+    const before = Object.fromEntries(
+      Object.entries(files).map(([path, text]) => {
+        const c = JSON.parse(text);
+        c.fields = c.fields
+          .filter((f: { name: string }) => f.name !== 'thread_id')
+          .map((f: { name: string; type: string; options?: unknown }) =>
+            f.type === 'richtext' ? { ...f, type: 'textarea' } : f.type === 'file' ? { name: f.name, type: 'json' } : f,
+          );
+        return [path, JSON.stringify(c)];
+      }),
+    );
+    await dropAll();
+    await applyDeclaredCollections(db, NAME, before, true);
+    await sql`INSERT INTO zvd_mail_accounts (name, email_address, imap_host, imap_user, smtp_host) VALUES ('a', 'a@x.test', 'h', 'u', 'h')`.execute(db);
+    await sql`
+      INSERT INTO zvd_mail_drafts (account_id, body_html, attachments)
+      SELECT id, '<p>kept</p>', '[{"file_id":"f1","filename":"a.pdf"}]'::jsonb FROM zvd_mail_accounts`.execute(db);
     await applyDeclaredCollections(db, NAME, files, true);
+    const kept = await sql`SELECT body_html, attachments FROM zvd_mail_drafts`.execute(db);
+    expect(kept.rows).toEqual([{ body_html: '<p>kept</p>', attachments: [{ file_id: 'f1', filename: 'a.pdf' }] }]);
     // `false` is the boot / firm-activation path: it throws while any step is owed.
     await applyDeclaredCollections(db, NAME, files, false);
 

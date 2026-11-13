@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.2.0 (2026-11-13)
+
+- feat: the Inbox is three `zveltio.view/2` views (ADR 0042 slice 5) instead of Svelte code: `mail.inbox` (accounts, folders, messages, the message), `mail.compose` (a draft) and `mail.thread` (a conversation). The extension ships no Studio code any more; `MailInbox.svelte` and its sanitizer are gone, and Studio draws the message body inert itself (sanitised, in a sandboxed frame, remote images blocked)
+- feat: `mail_messages.body_html` and `mail_drafts.body_html` are `richtext`, `mail_drafts.attachments` is a `file` field with several values (`{ id, name, size, type }`); the update retypes them in place and keeps every value
+- feat: `mail_messages.thread_id`: the conversation a message belongs to (the first message its References name, else the one it answers, else itself), set by the sync; messages synced before 2.2.0 have none until they are synced again
+- feat: the actions `reply` (`mode` `reply`, `reply_all` or `forward`) and `newDraft` create a draft and answer its compose view; `openAttachment` answers a downloaded attachment as a file
+- feat: `send` reads attachments as a `file` field's value (a 2.1.0 draft's `{ file_id, filename, mime_type }` still works) and, for a draft written as rich text, sends the text of its HTML as the text part
+- the 2.1.0 inbox's "show remote images" switch and its folder picker for "move" are not in the views: remote images stay blocked (ADR 0042 decision 10), and `moveMessages` is run through the action
+- requires engine 3.0.0-beta.117 (`busyWhen`, `onOpen`, `files`, `fallback`, the `richtext` and `file` editors, and the in-place retype)
+
 ## 2.1.0 (2026-11-12)
 
 - feat: the Studio page is a `zveltio.view/2` view (ADR 0042): it names its collections and actions instead of URLs, and Studio draws it from the specification

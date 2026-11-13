@@ -39,6 +39,11 @@
       "type": "textarea"
     },
     {
+      "name": "thread_id",
+      "type": "text",
+      "indexed": true
+    },
+    {
       "name": "from_address",
       "type": "text"
     },
@@ -68,7 +73,7 @@
     },
     {
       "name": "body_html",
-      "type": "textarea"
+      "type": "richtext"
     },
     {
       "name": "snippet",

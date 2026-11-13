@@ -3,8 +3,8 @@
   "displayName": "Mail Client",
   "category": "communications",
   "description": "IMAP/SMTP mail client: accounts, folders, messages, drafts, identities, signatures, filters and contacts as collections; syncing and sending run as jobs that reach only the mail servers an operator binds to the \"mail\" slot.",
-  "version": "2.1.0",
-  "zveltioMinVersion": "3.0.0-beta.111",
+  "version": "2.2.0",
+  "zveltioMinVersion": "3.0.0-beta.117",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-mail",
   "permissions": [
@@ -25,7 +25,20 @@
       {
         "path": "/admin/mail/inbox",
         "label": "Inbox",
-        "icon": "Inbox"
+        "icon": "Inbox",
+        "schema": "schemas/inbox.json"
+      },
+      {
+        "path": "/admin/mail/compose",
+        "label": "Compose",
+        "icon": "PenLine",
+        "schema": "schemas/compose.json"
+      },
+      {
+        "path": "/admin/mail/thread",
+        "label": "Conversation",
+        "icon": "MessagesSquare",
+        "schema": "schemas/thread.json"
       }
     ],
     "navGroup": "communications"
@@ -142,6 +155,93 @@
       ],
       "enqueues": [
         "fetchAttachment"
+      ]
+    },
+    {
+      "name": "openAttachment",
+      "permission": {
+        "resource": "mail_attachments",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "attachment_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "attachment_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "mail_attachments"
+      ],
+      "writes": []
+    },
+    {
+      "name": "newDraft",
+      "permission": {
+        "resource": "mail_accounts",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "account_id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "mail_accounts"
+      ],
+      "writes": [
+        "mail_drafts"
+      ]
+    },
+    {
+      "name": "reply",
+      "permission": {
+        "resource": "mail_messages",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "message_id",
+          "mode"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "message_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "reply",
+              "reply_all",
+              "forward"
+            ]
+          }
+        }
+      },
+      "reads": [
+        "mail_messages",
+        "mail_accounts",
+        "mail_attachments"
+      ],
+      "writes": [
+        "mail_drafts"
       ]
     },
     {
@@ -545,9 +645,9 @@
     }
   ],
   "integrity": {
-    "engineSha256": "0bec0eafe46fc51bfe1b320335be21d340320fce6376f5cb422c30103d44a22b",
-    "sourceSha256": "976bb691a12290047bdf58bc31e0e9286789a2387e7c48a6d78bef8549cc16b9",
-    "schemaSha256": "c12f0b664bd925ba007df14456d2c60685194363034a4448a244f5b5d91238e6",
-    "jobsSha256": "9f0e274f796b63027712b1a60b7695239635b0e88049fac8e948688f5fc1c82c"
+    "engineSha256": "1b87dc060570e0894b9068981583a72f5c93f9486f6aeb99bf0cce6dd7db7efb",
+    "sourceSha256": "da3723d2ccc694a66a5c2d834ddc9507cbaaa21d08fed38fc69df82df7bee6cc",
+    "schemaSha256": "58d078d6236c4e595df2571633470c5b0891baaa36277fece90513206b911aff",
+    "jobsSha256": "40d939a2b5eed29667a297f12d4babe775fcd4a573b549da85fcc575b5b0c2ae"
   }
 }

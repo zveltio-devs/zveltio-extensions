@@ -8,7 +8,7 @@
 import type { ExtensionJob, JobHost, JobTcpStream } from '@zveltio/sdk/extension';
 import { Imap, encodeMailbox, type Fetched, type Folder } from './lib/imap.js';
 import { sendMail, SmtpError } from './lib/smtp.js';
-import { buildMessage, decodeTransfer, parseListed, partText, splitParts, type Address, type Parsed, type PartRef } from './lib/mime.js';
+import { buildMessage, decodeTransfer, htmlText, parseListed, partText, splitParts, type Address, type Parsed, type PartRef } from './lib/mime.js';
 import { ACCOUNTS, ATTACHMENTS, CONTACTS, DRAFTS, FILTERS, FOLDERS, IDENTITIES, MESSAGES, SLOT } from './mail.js';
 
 type Row = Record<string, any>;
@@ -187,6 +187,15 @@ function matches(c: Row, p: Parsed, size: number): boolean {
 
 const has = (m: Fetched, flag: string) => m.flags.some((f) => f.toLowerCase() === flag);
 
+/**
+ * The conversation a message belongs to: the first message its References
+ * name (the thread's root), else the one it answers, else itself. Every reply
+ * that keeps its References therefore lands on the root's Message-ID.
+ */
+export function threadOf(p: Pick<Parsed, 'messageId' | 'inReplyTo' | 'references'>): string | null {
+  return p.references?.match(/<[^<>\s]+>/)?.[0] || p.inReplyTo?.trim() || p.messageId || null;
+}
+
 async function insertMessage(run: Run, acct: Row, folder: Row, m: Fetched, p: Parsed, parts: PartRef[], v: Verdict, headerOnly: boolean) {
   const date = m.internalDate ? Date.parse(m.internalDate) : Number.NaN;
   let row: Row;
@@ -198,6 +207,7 @@ async function insertMessage(run: Run, acct: Row, folder: Row, m: Fetched, p: Pa
       message_id: p.messageId,
       in_reply_to: p.inReplyTo,
       references_header: p.references,
+      thread_id: threadOf(p),
       from_address: p.from.address || null,
       from_name: p.from.name ?? null,
       to_addresses: p.to,
@@ -396,12 +406,15 @@ const send: ExtensionJob = async (input, host) => {
     if (attached.length && !files) throw new Error('This engine cannot hand a job its files; attachments need 3.0.0-beta.109 or later.');
     const attachments = [];
     for (const a of attached) {
-      const name = String(a.filename ?? a.file_id);
-      const f = await files!.get(String(a.file_id)).catch((err) => {
+      // A `file` field's value is `{ id, name, size, type }`; a draft from 2.1.0
+      // holds `{ file_id, filename, mime_type }`.
+      const id = String(a.id ?? a.file_id);
+      const name = String(a.name ?? a.filename ?? id);
+      const f = await files!.get(id).catch((err) => {
         throw new Error(`The attachment ${name} was not handed to this send: ${message(err)}`);
       });
       if (!f) throw new Error(`The attachment ${name} is gone, or no longer yours to read.`);
-      attachments.push({ filename: String(a.filename || f.name), mimeType: String(a.mime_type || f.contentType), content: f.bytes });
+      attachments.push({ filename: String(a.name || a.filename || f.name), mimeType: String(a.type || a.mime_type || f.contentType), content: f.bytes });
     }
 
     ({ raw } = buildMessage({
@@ -411,7 +424,8 @@ const send: ExtensionJob = async (input, host) => {
       bcc,
       replyTo: ident?.reply_to ?? null,
       subject: String(draft.subject ?? ''),
-      text: String(draft.body_text ?? ''),
+      // Written in the rich text editor, a draft has no text part of its own.
+      text: String(draft.body_text || (draft.body_html ? htmlText(String(draft.body_html)) : '')),
       html: draft.body_html ? String(draft.body_html) : null,
       inReplyTo: draft.in_reply_to ?? null,
       references: draft.references_header ?? null,
