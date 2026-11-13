@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.3.0 (2026-11-13)
+
+- Stripe's webhook (`POST /webhook/stripe`) is a declared route (ADR 0039): the manifest's `routes` names it, public, and the engine serves it with the plain handler `stripeWebhook`. Same URL, same answers. The handler no longer uses Hono, raw SQL or `ctx.db`: the settings and the event claim go through `host.collections` as the system, the job through `host.enqueue`
+- feat: `billing_settings.stripe_webhook_secret` is a `secret` field (ADR 0024): encrypted at rest as before, served to no one on any read path, and read back decrypted by this extension alone. The engine retypes the stored values in place
+- requires engine 3.0.0-beta.111
+
 ## 2.2.0 (2026-11-12)
 
 - feat: the Studio page is a `zveltio.view/2` view (ADR 0042): it names its collections and actions instead of URLs, and Studio draws it from the specification
