@@ -9,7 +9,7 @@
 // EVERY collection — a key granted that scope and `read` on A listed B.
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { join } from 'node:path';
-import { applyOwnCollections, dropOwnCollections } from './test-utils';
+import { applyOwnCollections, dropOwnCollections, mountDeclared } from './test-utils';
 
 // biome-ignore lint/suspicious/noExplicitAny: engine modules imported by path, and the packed bundle
 type Any = any;
@@ -125,14 +125,13 @@ d('developer/graphql — API keys get the data API key semantics', () => {
       internals: gateInternals(NAME, buildExtensionInternals(), manifest.permissions ?? []),
     };
     const { Hono } = (await import(join(import.meta.dir, '..', '..', '..', 'node_modules', 'hono', 'dist', 'index.js'))) as Any;
-    const mod = await import(join(import.meta.dir, 'index.js'));
     app = new Hono();
     app.use('/ext/*', sessionPrefetch(getAuth(), db));
     app.use('/ext/*', tenantMiddleware);
     app.use('/ext/*', gate.extensionAuthGate(getAuth(), db));
     gate.registerExtensionPublicRoutes(NAME, manifest.publicRoutes ?? [], manifest.apiKeyRoutes ?? []);
     const sub = new Hono();
-    await mod.default.register(sub, ctx);
+    await mountDeclared(sub, ctx);
     app.route(`/ext/${NAME}`, sub);
     // The schema is cached per tenant across test files; this one adds collections.
     expect((await post('/refresh-schema', {}, { cookie })).status).toBe(200);

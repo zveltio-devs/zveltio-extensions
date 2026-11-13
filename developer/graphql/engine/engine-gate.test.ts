@@ -10,7 +10,7 @@
 // denies, while `GET /api/data` for the same user returned neither.
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { join } from 'node:path';
-import { applyOwnCollections, dropOwnCollections } from './test-utils';
+import { applyOwnCollections, dropOwnCollections, mountDeclared } from './test-utils';
 import { seatHarnessGod } from '../../../testing/ext-harness';
 
 // biome-ignore lint/suspicious/noExplicitAny: engine modules imported by path, and the packed bundle
@@ -120,7 +120,6 @@ d('developer/graphql — the engine read gate, not a copy of half of it', () => 
       internals: gateInternals('developer/graphql', buildExtensionInternals(), manifest.permissions ?? []),
     };
     const { Hono } = (await import(join(import.meta.dir, '..', '..', '..', 'node_modules', 'hono', 'dist', 'index.js'))) as Any;
-    const mod = await import(join(import.meta.dir, 'index.js'));
     // The engine's own `/ext/*` chain in front of the sub-app, as `index.ts` mounts it.
     app = new Hono();
     app.use('/ext/*', sessionPrefetch(getAuth(), db));
@@ -128,7 +127,7 @@ d('developer/graphql — the engine read gate, not a copy of half of it', () => 
     app.use('/ext/*', gate.extensionAuthGate(getAuth(), db));
     gate.registerExtensionPublicRoutes('developer/graphql', []);
     const sub = new Hono();
-    await mod.default.register(sub, ctx);
+    await mountDeclared(sub, ctx);
     app.route('/ext/developer/graphql', sub);
     // The bundle's schema cache is per tenant and shared by every file in this
     // process; one built before C and P existed does not name them.

@@ -411,6 +411,8 @@ async function makeCtx(
     admin: boolean;
     user?: { id: string; email: string };
     grants?: ReadonlyArray<{ resource: string; action: string }>;
+    /** The tenant requests run as (`mountForTest`'s); the default tenant when absent. */
+    tenant?: string;
   },
   publicRoutes?: any[],
   wiring?: {
@@ -652,6 +654,12 @@ async function makeCtx(
       // genuinely different (whole-instance power), and a test that needs it
       // should say so rather than inherit a tenant-level answer.
       isTenantAdmin: async () => opts.admin,
+      // Who the engine authenticated: the harness session, as `getSession`
+      // answers it (no gate runs here), in the tenant requests run as.
+      caller: () =>
+        session
+          ? { user: { ...session.user }, authType: 'session', tenantId: opts.tenant ?? '00000000-0000-0000-0000-000000000001' }
+          : null,
       assertNonMetadataUrl: (url: string, label?: string) =>
         engineAssertNonMetadataUrl(url, label),
       assertPublicUrl: (url: string) => engineAssertPublicUrl(url),
@@ -934,7 +942,7 @@ export async function mountForTest(
   const manifest = existsSync(manifestPath) ? JSON.parse(readFileSync(manifestPath, 'utf8')) : null;
   if (manifest) await applyDeclared(relative(REPO, extDir), extDir, manifest);
   const wiring = await productionWiring(extDir, relative(REPO, extDir), mod.default);
-  const ctx = await makeCtx(db, { authed, admin, user, grants }, publicRoutes, wiring);
+  const ctx = await makeCtx(db, { authed, admin, user, grants, tenant: opts.tenant }, publicRoutes, wiring);
   // The manifest's declared routes (ADR 0039), mounted before `register` as the
   // engine mounts them (`mountDeclaredRoutes`): the handler gets the request,
   // the path parameters and the route host. Without this a test reached them

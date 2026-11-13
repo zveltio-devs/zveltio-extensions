@@ -1,14 +1,22 @@
 import type { ZveltioExtension } from '@zveltio/sdk/extension';
-import { graphqlRoutes } from './routes.js';
+import {
+  executePersisted,
+  executeQuery,
+  keepContext,
+  playground,
+  refreshSchema,
+} from './routes.js';
 
+// The four routes are declared in the manifest `routes` and answered by plain
+// functions (ADR 0039); `register` only keeps the context they read through.
 const extension: ZveltioExtension = {
   name: 'developer/graphql',
   category: 'developer',
-  // S3-01: sub-app mounted at /ext/developer/graphql by the engine.
   mountStrategy: 'subapp',
+  routes: { playground, executeQuery, refreshSchema, executePersisted },
 
-  async register(app, ctx) {
-    app.route('/', graphqlRoutes(ctx));
+  async register(_app, ctx) {
+    keepContext(ctx);
   },
 };
 
