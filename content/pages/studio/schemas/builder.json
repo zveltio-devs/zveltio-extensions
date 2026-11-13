@@ -1,0 +1,39 @@
+{
+  "spec": "zveltio.view/2",
+  "id": "pages.builder",
+  "title": "content.pages.builder",
+  "type": "form",
+  "collection": "pages",
+  "record": {
+    "$param": "id"
+  },
+  "fields": [
+    {
+      "field": "title",
+      "label": "content.pages.col.title"
+    },
+    {
+      "field": "slug",
+      "label": "content.pages.col.slug"
+    },
+    {
+      "field": "blocks",
+      "label": "content.pages.field.blocks"
+    }
+  ],
+  "submit": [
+    {
+      "save": true,
+      "label": "common.save"
+    },
+    {
+      "action": "publish",
+      "label": "common.publish",
+      "input": {
+        "id": {
+          "$record": "id"
+        }
+      }
+    }
+  ]
+}
