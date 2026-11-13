@@ -1,31 +1,36 @@
-// The routes over a fake `listRecords`. What `public` may read (grants, row
-// rules) is the engine's, tested there (ADR 0020); this proves what is listed.
+// The declared handlers over a fake `host.collections.list`. What `public` may
+// read (grants, row rules) is the engine's, tested there (ADR 0020); this proves
+// what is listed.
 import { describe, expect, it } from 'bun:test';
-// tsconfig maps `hono` to the engine's type declarations, and bun follows that
-// mapping at runtime; this repository's own install is the runtime module.
-import { Hono } from '../../../node_modules/hono/dist/index.js';
-import { sitemapRoutes } from './sitemap';
+import { robots, sitemap } from './sitemap';
 
 type Row = Record<string, unknown>;
 
+/** A refusal as the engine's `host.collections` throws it: an error with its status. */
+const refused = (status: number) => Object.assign(new Error('refused'), { status });
+
 function app(db: Record<string, Row[] | number>) {
   const calls: { collection: string; query: Row }[] = [];
-  const ctx = {
-    internals: {
-      listRecords: async (_c: unknown, collection: string, query: Row) => {
+  const host = {
+    collections: {
+      list: async (collection: string, query: Row) => {
         calls.push({ collection, query });
         const rows = db[collection];
-        if (typeof rows === 'number') return { status: rows, body: {} };
+        if (typeof rows === 'number') throw refused(rows);
         const filter = query.filter as Row;
         const page = Number(query.page);
         const hit = (rows ?? []).filter((r) => Object.entries(filter).every(([k, v]) => r[k] === v));
-        return { status: 200, body: { records: hit.slice((page - 1) * 500, page * 500) } };
+        return { records: hit.slice((page - 1) * 500, page * 500) };
       },
     },
   };
-  const a = new Hono();
-  sitemapRoutes(a, ctx as never);
-  return { a: new Hono().route('/ext/content/pages', a), calls };
+  const a = {
+    request: async (url: string, init: RequestInit = {}) => {
+      const handler = new URL(url).pathname.endsWith('/robots.txt') ? robots : sitemap;
+      return handler(new Request(url, init), { params: {}, host: host as never });
+    },
+  };
+  return { a, calls };
 }
 
 const sites = [
@@ -41,7 +46,7 @@ const pubs = [
   { site_id: 's2', kind: 'page', is_noindex: false, slug: 'intro', is_homepage: false },
   { site_id: 's3', kind: 'page', is_noindex: false, slug: 'gone', is_homepage: false },
 ];
-const get = (a: Hono, path: string) => a.request(`http://cms.test/ext/content/pages${path}`);
+const get = (a: ReturnType<typeof app>['a'], path: string) => a.request(`http://cms.test/ext/content/pages${path}`);
 
 describe('sitemap.xml', () => {
   it('lists the indexable pages of the active sites, escaped', async () => {
@@ -64,8 +69,9 @@ describe('sitemap.xml', () => {
   });
 
   it('answers the refusal, never pages, when public may not read', async () => {
-    expect((await get(app({ page_sites: 403, page_publications: pubs }).a, '/sitemap.xml')).status).toBe(403);
-    expect((await get(app({ page_sites: sites, page_publications: 403 }).a, '/sitemap.xml')).status).toBe(403);
+    // The refusal propagates; the engine answers its status.
+    await expect(get(app({ page_sites: 403, page_publications: pubs }).a, '/sitemap.xml')).rejects.toMatchObject({ status: 403 });
+    await expect(get(app({ page_sites: sites, page_publications: 403 }).a, '/sitemap.xml')).rejects.toMatchObject({ status: 403 });
   });
 
   it('pages through more than one data API page', async () => {

@@ -4062,7 +4062,7 @@ var require_document = __commonJS(function(exports, module) {
   Document.default = Document;
 });
 
-// /zveltio-extension/node_modules/nanoid/non-secure/index.cjs
+// /zveltio-extension/node_modules/postcss/node_modules/nanoid/non-secure/index.cjs
 var require_non_secure = __commonJS(function(exports, module) {
   var urlAlphabet = "useandom-26T198340PX75pxJACKVERYMINDBUSHWOLF_GQZbfghjklqvwyzrict";
   var customAlphabet = (alphabet, defaultSize = 21) => {
@@ -10473,12 +10473,10 @@ var MAX_URLS = 50000;
 function escapeXml(value) {
   return String(value).replace(/[<>&'"]/g, (ch) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '"': "&quot;" })[ch]);
 }
-async function all(list, c, collection, filter) {
+async function all(list, collection, filter) {
   const out = [];
   for (let page = 1;out.length < MAX_URLS; page++) {
-    const { status, body } = await list(c, collection, { filter, limit: PAGE, page, sort: "id", order: "asc", count: "none" });
-    if (status !== 200)
-      return status;
+    const body = await list(collection, { filter, limit: PAGE, page, sort: "id", order: "asc", count: "none" });
     const records = Array.isArray(body.records) ? body.records : [];
     out.push(...records);
     if (records.length < PAGE)
@@ -10486,50 +10484,44 @@ async function all(list, c, collection, filter) {
   }
   return out;
 }
-function origin(c) {
-  const url = new URL(c.req.url);
-  const proto = c.req.header("x-forwarded-proto");
+function origin(request) {
+  const url = new URL(request.url);
+  const proto = request.headers.get("x-forwarded-proto");
   return `${proto === "https" || proto === "http" ? proto : url.protocol.slice(0, -1)}://${url.host}`;
 }
-function sitemapRoutes(app, ctx) {
-  const list = (c, collection, query) => ctx.internals.listRecords(c, collection, query);
-  app.get("/sitemap.xml", async (c) => {
-    const slug = c.req.query("site");
-    const sites = await all(list, c, "page_sites", slug ? { slug, is_active: true } : { is_active: true });
-    if (typeof sites === "number")
-      return c.body(null, sites);
-    const base = origin(c);
-    const urls = new Set;
-    for (const site of sites) {
-      const pubs = await all(list, c, "page_publications", { site_id: site.id, kind: "page", is_noindex: false });
-      if (typeof pubs === "number")
-        return c.body(null, pubs);
-      const path = String(site.base_path ?? "/").replace(/^\/*/, "/").replace(/\/+$/, "");
-      const root = `${base}${path}/`;
-      for (const p of pubs) {
-        const at = new Date(String(p.published_at));
-        const lastmod = Number.isNaN(at.getTime()) ? "" : `<lastmod>${at.toISOString().slice(0, 10)}</lastmod>`;
-        urls.add(`  <url><loc>${escapeXml(p.is_homepage ? root : root + encodeURI(String(p.slug)))}</loc>${lastmod}</url>`);
-      }
+var sitemap = async (request, { host }) => {
+  const list = (collection, query) => host.collections.list(collection, query);
+  const slug = new URL(request.url).searchParams.get("site");
+  const sites = await all(list, "page_sites", slug ? { slug, is_active: true } : { is_active: true });
+  const base = origin(request);
+  const urls = new Set;
+  for (const site of sites) {
+    const pubs = await all(list, "page_publications", { site_id: site.id, kind: "page", is_noindex: false });
+    const path = String(site.base_path ?? "/").replace(/^\/*/, "/").replace(/\/+$/, "");
+    const root = `${base}${path}/`;
+    for (const p of pubs) {
+      const at = new Date(String(p.published_at));
+      const lastmod = Number.isNaN(at.getTime()) ? "" : `<lastmod>${at.toISOString().slice(0, 10)}</lastmod>`;
+      urls.add(`  <url><loc>${escapeXml(p.is_homepage ? root : root + encodeURI(String(p.slug)))}</loc>${lastmod}</url>`);
     }
-    c.header("Content-Type", "application/xml; charset=utf-8");
-    return c.body(`<?xml version="1.0" encoding="UTF-8"?>
+  }
+  return new Response(`<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${[...urls].slice(0, MAX_URLS).join(`
 `)}
 </urlset>
-`);
-  });
-  app.get("/robots.txt", (c) => {
-    const sitemap = new URL(c.req.url);
-    sitemap.pathname = sitemap.pathname.replace(/robots\.txt$/, "sitemap.xml");
-    c.header("Content-Type", "text/plain; charset=utf-8");
-    return c.body(`User-agent: *
+`, { headers: { "Content-Type": "application/xml; charset=utf-8" } });
+};
+var robots = (request) => {
+  const at = new URL(request.url);
+  at.pathname = at.pathname.replace(/robots\.txt$/, "sitemap.xml");
+  return new Response(`User-agent: *
 Allow: /
-Sitemap: ${origin(c)}${sitemap.pathname}
-`);
+Sitemap: ${origin(request)}${at.pathname}
+`, {
+    headers: { "Content-Type": "text/plain; charset=utf-8" }
   });
-}
+};
 
 // engine/index.ts
 var extension = {
@@ -10537,9 +10529,9 @@ var extension = {
   category: "content",
   mountStrategy: "subapp",
   actions: pagesActions,
-  async register(app, ctx) {
+  routes: { sitemap, robots },
+  async register(app) {
     app.get("/vocabulary", (c) => c.json({ icons: ICON_NAMES, motion: MOTION_TYPES }));
-    sitemapRoutes(app, ctx);
   }
 };
 var engine_default = extension;

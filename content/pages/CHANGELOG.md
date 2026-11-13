@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.2.0 (2026-11-13)
+
+- `GET /sitemap.xml` and `GET /robots.txt` are declared routes (ADR 0039): the manifest's `routes` names them, public, and the engine serves them with the plain handlers `sitemap` and `robots`. Same URLs and output. The sitemap reads through `host.collections` as the `public` role (ADR 0020); when `public` may not read, the answer is the data API's refusal as a problem document, where it was an empty body with that status
+- requires engine 3.0.0-beta.111
+
 ## 2.1.1 (2026-11-03)
 
 - fix: the builder's image picker reads the engine's storage (`/api/storage`) and links a file by its `url` or `/files/<storage_path>`; it called `/ext/content/media/files`, which content/media 2.0.0 no longer serves
