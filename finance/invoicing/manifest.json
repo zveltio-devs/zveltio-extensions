@@ -3,7 +3,7 @@
   "displayName": "Invoicing",
   "category": "finance",
   "description": "Recurring invoices, payment tracking and overdue management",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "zveltioMinVersion": "3.0.0-beta.118",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-invoicing",
