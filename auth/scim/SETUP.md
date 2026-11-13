@@ -62,9 +62,9 @@ one with a single scope:
 |---|---|
 | `$ext:auth/scim` | `read`, `create`, `update`, `delete` |
 
-**Studio → API keys → new key** (instance administrators), or `POST
-/api/me/api-keys` for a tenant administrator when the instance lets members
-issue their own keys. The key begins with `zvk_` and is **shown only once**;
+**Studio → API keys → new key**, as an administrator of the tenant the
+provider provisions into (engine 3.0.0-beta.115 and later; ADR 0046). The key
+is bound to that tenant. The key begins with `zvk_` and is **shown only once**;
 revoke it from the same page.
 
 **A key acts as the person who issued it.** The directory answers only a caller
