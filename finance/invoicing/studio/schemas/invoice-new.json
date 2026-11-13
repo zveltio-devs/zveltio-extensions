@@ -1,0 +1,30 @@
+{
+  "spec": "zveltio.view/2",
+  "id": "invoicing.new",
+  "title": "invoicing.newInvoice",
+  "type": "form",
+  "action": "createInvoice",
+  "fields": [
+    { "field": "doc_type", "label": "invoicing.form.docType" },
+    { "field": "client_type", "label": "invoicing.form.clientType" },
+    { "field": "client_name", "label": "invoicing.form.clientName" },
+    { "field": "client_tax_id", "label": "invoicing.form.clientTaxId" },
+    { "field": "client_reg_no", "label": "invoicing.form.clientRegNo" },
+    { "field": "client_email", "label": "invoicing.form.clientEmail" },
+    { "field": "client_address", "label": "invoicing.form.clientAddress" },
+    { "field": "series", "label": "invoicing.form.series" },
+    { "field": "currency", "label": "invoicing.form.currency" },
+    { "field": "due_days", "label": "invoicing.form.dueDays" },
+    { "field": "po_number", "label": "invoicing.form.poNumber" },
+    { "field": "delivery_date", "label": "invoicing.form.deliveryDate" },
+    { "field": "vat_regime", "label": "invoicing.form.vatRegime" },
+    { "field": "vat_exemption_reason", "label": "invoicing.form.exemptionReason" },
+    { "field": "exchange_rate", "label": "invoicing.form.exchangeRate" },
+    { "field": "exchange_date", "label": "invoicing.form.exchangeDate" },
+    { "field": "delegate_name", "label": "invoicing.form.delegateName" },
+    { "field": "delegate_id_card", "label": "invoicing.form.delegateIdCard" },
+    { "field": "delegate_vehicle", "label": "invoicing.form.delegateVehicle" },
+    { "field": "notes", "label": "invoicing.form.notes" },
+    { "field": "lines", "label": "invoicing.form.lines" }
+  ]
+}

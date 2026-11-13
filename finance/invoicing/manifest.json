@@ -3,8 +3,8 @@
   "displayName": "Invoicing",
   "category": "finance",
   "description": "Recurring invoices, payment tracking and overdue management",
-  "version": "2.4.0",
-  "zveltioMinVersion": "3.0.0-beta.111",
+  "version": "2.5.0",
+  "zveltioMinVersion": "3.0.0-beta.118",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-invoicing",
   "permissions": [
@@ -21,6 +21,12 @@
         "label": "Invoicing",
         "icon": "DollarSign",
         "schema": "schemas/invoicing.json"
+      },
+      {
+        "path": "/admin/finance/invoicing/new",
+        "label": "invoicing.newInvoice",
+        "icon": "FilePlus",
+        "schema": "schemas/invoice-new.json"
       },
       {
         "path": "/admin/finance/invoicing/company",

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.5.0 (2026-11-13)
+
+- feat: the invoice list and the new-invoice form are `zveltio.view/2` views (ADR 0042). The form is an action form on `createInvoice` (page `/admin/finance/invoicing/new`, opened from the list's toolbar); Studio draws its `lines` input as a table of lines
+- the conversion drops: fields shown only for a document type, client type, VAT regime or currency (all are drawn), the catalogue picker that filled a line, the series picker, the form's client-side defaults (the action keeps its own: invoice, RON, standard VAT, 30 days), currency formatting of totals, the client's e-mail under the name and the red due date of an overdue invoice
+- requires engine 3.0.0-beta.118 (lines on an action form)
+
 ## 2.4.0 (2026-11-12)
 
 - feat: the Studio page is a `zveltio.view/2` view (ADR 0042): it names its collections and actions instead of URLs, and Studio draws it from the specification

@@ -1,516 +1,74 @@
 {
-  "sduiSchema": 1,
+  "spec": "zveltio.view/2",
+  "id": "invoicing.invoices",
   "title": "invoicing.title",
-  "subtitle": "invoicing.subtitle",
-  "newLabel": "invoicing.newInvoice",
-  "resources": [
+  "type": "list",
+  "collection": "invoices",
+  "fields": [
+    { "field": "number", "label": "invoicing.col.number", "display": "mono" },
     {
-      "id": "invoices",
-      "dataSource": "/api/data/invoices?sort=created_at&order=desc&limit=500",
-      "dataPath": "records",
-      "columns": [
-        {
-          "key": "number",
-          "label": "invoicing.col.number",
-          "type": "mono"
-        },
-        {
-          "key": "doc_type",
-          "label": "invoicing.form.docType",
-          "type": "badge",
-          "badge": {
-            "colors": {
-              "invoice": "badge-primary",
-              "proforma": "badge-ghost",
-              "delivery_note": "badge-info"
-            },
-            "labels": {
-              "invoice": "invoicing.doc.invoice",
-              "proforma": "invoicing.doc.proforma",
-              "delivery_note": "invoicing.doc.deliveryNote"
-            }
-          }
-        },
-        {
-          "key": "client_name",
-          "label": "invoicing.col.client",
-          "secondary": "client_email"
-        },
-        {
-          "key": "total",
-          "label": "invoicing.col.total",
-          "type": "currency",
-          "currency": {
-            "codeKey": "currency"
-          }
-        },
-        {
-          "key": "amount_paid",
-          "label": "invoicing.col.paid",
-          "type": "currency",
-          "currency": {
-            "codeKey": "currency"
-          }
-        },
-        {
-          "key": "status",
-          "label": "invoicing.col.status",
-          "type": "badge",
-          "badge": {
-            "colors": {
-              "draft": "badge-ghost",
-              "sent": "badge-info",
-              "partially_paid": "badge-warning",
-              "paid": "badge-success",
-              "overdue": "badge-error",
-              "cancelled": "badge-ghost"
-            },
-            "labels": {
-              "draft": "invoicing.status.draft",
-              "sent": "invoicing.status.sent",
-              "partially_paid": "invoicing.status.partial",
-              "paid": "invoicing.status.paid",
-              "overdue": "invoicing.status.overdue",
-              "cancelled": "common.status.cancelled"
-            }
-          }
-        },
-        {
-          "key": "due_date",
-          "label": "invoicing.col.dueDate",
-          "type": "date",
-          "classWhen": [
-            {
-              "field": "status",
-              "equals": "overdue",
-              "class": "text-error font-medium"
-            }
-          ]
-        }
-      ],
-      "rowActions": [
-        {
-          "id": "send",
-          "icon": "Send",
-          "label": "invoicing.action.send",
-          "method": "POST",
-          "endpoint": "/ext/finance/invoicing/actions/sendInvoice",
-          "visibleWhen": {
-            "field": "status",
-            "equals": "draft"
-          },
-          "body": {
-            "id": "{id}"
-          }
-        },
-        {
-          "id": "recordPayment",
-          "icon": "DollarSign",
-          "label": "invoicing.action.recordPayment",
-          "method": "POST",
-          "endpoint": "/ext/finance/invoicing/actions/recordPayment",
-          "visibleWhen": {
-            "field": "status",
-            "in": [
-              "sent",
-              "partially_paid",
-              "overdue"
-            ]
-          },
-          "prompt": {
-            "title": "invoicing.payment.title",
-            "submitLabel": "invoicing.payment.submit",
-            "fields": [
-              {
-                "name": "amount",
-                "label": "invoicing.payment.amount",
-                "type": "number",
-                "required": true,
-                "default": "{total-amount_paid}"
-              },
-              {
-                "name": "payment_date",
-                "label": "invoicing.payment.date",
-                "type": "date",
-                "required": true,
-                "default": "today"
-              },
-              {
-                "name": "payment_method",
-                "label": "invoicing.payment.method",
-                "type": "select",
-                "default": "transfer",
-                "options": [
-                  {
-                    "value": "transfer",
-                    "label": "invoicing.payment.transfer"
-                  },
-                  {
-                    "value": "cash",
-                    "label": "invoicing.payment.cash"
-                  },
-                  {
-                    "value": "card",
-                    "label": "invoicing.payment.card"
-                  },
-                  {
-                    "value": "check",
-                    "label": "invoicing.payment.check"
-                  },
-                  {
-                    "value": "other",
-                    "label": "invoicing.payment.other"
-                  }
-                ]
-              },
-              {
-                "name": "reference",
-                "label": "invoicing.payment.reference",
-                "type": "text"
-              }
-            ]
-          },
-          "body": {
-            "id": "{id}"
-          }
-        },
-        {
-          "id": "convert",
-          "icon": "FileCheck",
-          "label": "invoicing.action.convert",
-          "method": "POST",
-          "endpoint": "/ext/finance/invoicing/actions/convertProforma",
-          "visibleWhen": {
-            "field": "doc_type",
-            "equals": "proforma"
-          },
-          "body": {
-            "id": "{id}"
-          }
-        },
-        {
-          "id": "cancel",
-          "icon": "Ban",
-          "label": "invoicing.action.cancel",
-          "variant": "text-warning",
-          "method": "POST",
-          "endpoint": "/ext/finance/invoicing/actions/cancelInvoice",
-          "confirm": "invoicing.cancelConfirm",
-          "visibleWhen": {
-            "field": "status",
-            "in": [
-              "draft",
-              "sent",
-              "overdue",
-              "partially_paid"
-            ]
-          },
-          "body": {
-            "id": "{id}"
-          }
-        },
-        {
-          "id": "delete",
-          "icon": "Trash2",
-          "variant": "text-error",
-          "label": "common.delete",
-          "method": "POST",
-          "endpoint": "/ext/finance/invoicing/actions/deleteDraft",
-          "confirm": "invoicing.deleteConfirm",
-          "visibleWhen": {
-            "field": "status",
-            "equals": "draft"
-          },
-          "body": {
-            "id": "{id}"
-          }
-        }
-      ],
-      "form": {
-        "endpoint": "/ext/finance/invoicing/actions/createInvoice",
-        "fields": [
-          {
-            "name": "doc_type",
-            "label": "invoicing.form.docType",
-            "type": "select",
-            "colSpan": 1,
-            "default": "invoice",
-            "options": [
-              {
-                "value": "invoice",
-                "label": "invoicing.doc.invoice"
-              },
-              {
-                "value": "proforma",
-                "label": "invoicing.doc.proforma"
-              },
-              {
-                "value": "delivery_note",
-                "label": "invoicing.doc.deliveryNote"
-              }
-            ]
-          },
-          {
-            "name": "client_type",
-            "label": "invoicing.form.clientType",
-            "type": "select",
-            "colSpan": 1,
-            "default": "organization",
-            "options": [
-              {
-                "value": "organization",
-                "label": "invoicing.clientType.organization"
-              },
-              {
-                "value": "contact",
-                "label": "invoicing.clientType.individual"
-              }
-            ]
-          },
-          {
-            "name": "client_name",
-            "label": "invoicing.form.clientName",
-            "required": true,
-            "colSpan": 1
-          },
-          {
-            "name": "client_tax_id",
-            "label": "invoicing.form.clientTaxId",
-            "colSpan": 1,
-            "required": true,
-            "visibleWhen": {
-              "field": "client_type",
-              "equals": "organization"
-            }
-          },
-          {
-            "name": "client_reg_no",
-            "label": "invoicing.form.clientRegNo",
-            "colSpan": 1,
-            "visibleWhen": {
-              "field": "client_type",
-              "equals": "organization"
-            }
-          },
-          {
-            "name": "client_email",
-            "label": "invoicing.form.clientEmail",
-            "type": "email",
-            "colSpan": 1
-          },
-          {
-            "name": "client_address",
-            "label": "invoicing.form.clientAddress",
-            "colSpan": 1
-          },
-          {
-            "name": "series",
-            "label": "invoicing.form.series",
-            "type": "relation",
-            "colSpan": 1,
-            "relation": {
-              "dataSource": "/api/data/document_series?sort=series&order=asc&limit=500",
-              "dataPath": "records",
-              "valueKey": "series",
-              "labelKey": "series"
-            },
-            "placeholder": "invoicing.series.useDefault"
-          },
-          {
-            "name": "currency",
-            "label": "invoicing.form.currency",
-            "type": "select",
-            "colSpan": 1,
-            "default": "RON",
-            "options": [
-              {
-                "value": "RON",
-                "label": "RON"
-              },
-              {
-                "value": "EUR",
-                "label": "EUR"
-              },
-              {
-                "value": "USD",
-                "label": "USD"
-              }
-            ]
-          },
-          {
-            "name": "due_days",
-            "label": "invoicing.form.dueDays",
-            "type": "number",
-            "colSpan": 1,
-            "default": 30
-          },
-          {
-            "name": "po_number",
-            "label": "invoicing.form.poNumber",
-            "colSpan": 1
-          },
-          {
-            "name": "delivery_date",
-            "label": "invoicing.form.deliveryDate",
-            "type": "date",
-            "colSpan": 1
-          },
-          {
-            "name": "vat_regime",
-            "label": "invoicing.form.vatRegime",
-            "type": "select",
-            "colSpan": 1,
-            "default": "standard",
-            "options": [
-              {
-                "value": "standard",
-                "label": "invoicing.vat.standard"
-              },
-              {
-                "value": "reverse_charge",
-                "label": "invoicing.vat.reverseCharge"
-              },
-              {
-                "value": "vat_on_collection",
-                "label": "invoicing.vat.onCollection"
-              },
-              {
-                "value": "exempt",
-                "label": "invoicing.vat.exempt"
-              },
-              {
-                "value": "non_taxable",
-                "label": "invoicing.vat.nonTaxable"
-              }
-            ]
-          },
-          {
-            "name": "vat_exemption_reason",
-            "label": "invoicing.form.exemptionReason",
-            "colSpan": 2,
-            "required": true,
-            "visibleWhen": {
-              "field": "vat_regime",
-              "equals": "exempt"
-            }
-          },
-          {
-            "name": "exchange_rate",
-            "label": "invoicing.form.exchangeRate",
-            "type": "number",
-            "colSpan": 1,
-            "required": true,
-            "visibleWhen": {
-              "field": "currency",
-              "in": [
-                "EUR",
-                "USD"
-              ]
-            }
-          },
-          {
-            "name": "exchange_date",
-            "label": "invoicing.form.exchangeDate",
-            "type": "date",
-            "colSpan": 1,
-            "default": "today",
-            "visibleWhen": {
-              "field": "currency",
-              "in": [
-                "EUR",
-                "USD"
-              ]
-            }
-          },
-          {
-            "name": "delegate_name",
-            "label": "invoicing.form.delegateName",
-            "colSpan": 1,
-            "required": true,
-            "visibleWhen": {
-              "field": "doc_type",
-              "equals": "delivery_note"
-            }
-          },
-          {
-            "name": "delegate_id_card",
-            "label": "invoicing.form.delegateIdCard",
-            "colSpan": 1,
-            "visibleWhen": {
-              "field": "doc_type",
-              "equals": "delivery_note"
-            }
-          },
-          {
-            "name": "delegate_vehicle",
-            "label": "invoicing.form.delegateVehicle",
-            "colSpan": 1,
-            "visibleWhen": {
-              "field": "doc_type",
-              "equals": "delivery_note"
-            }
-          },
-          {
-            "name": "notes",
-            "label": "invoicing.form.notes",
-            "type": "textarea",
-            "rows": 2,
-            "colSpan": 2
-          }
-        ],
-        "repeatable": {
-          "name": "lines",
-          "label": "invoicing.form.lines",
-          "addLabel": "invoicing.form.addLine",
-          "min": 1,
-          "columns": [
-            {
-              "name": "catalogue_item",
-              "label": "invoicing.line.fromCatalogue",
-              "type": "relation",
-              "relation": {
-                "dataSource": "/api/data/catalogue_items?is_active[eq]=true&sort=name&order=asc&limit=500",
-                "dataPath": "records",
-                "valueKey": "id",
-                "labelKey": "name",
-                "autofill": {
-                  "description": "name",
-                  "unit": "unit",
-                  "unit_price": "unit_price",
-                  "tax_rate": "tax_rate"
-                }
-              },
-              "placeholder": "invoicing.line.typeManually"
-            },
-            {
-              "name": "description",
-              "label": "invoicing.form.description"
-            },
-            {
-              "name": "quantity",
-              "label": "invoicing.form.qty",
-              "type": "number",
-              "default": 1
-            },
-            {
-              "name": "unit",
-              "label": "invoicing.line.unit"
-            },
-            {
-              "name": "unit_price",
-              "label": "invoicing.form.unitPrice",
-              "type": "number",
-              "default": 0
-            },
-            {
-              "name": "tax_rate",
-              "label": "invoicing.form.taxPercent",
-              "type": "number",
-              "default": 19
-            }
-          ]
-        }
+      "field": "doc_type",
+      "label": "invoicing.form.docType",
+      "display": "badge",
+      "tones": { "invoice": "info", "proforma": "muted", "delivery_note": "info" }
+    },
+    { "field": "client_name", "label": "invoicing.col.client" },
+    { "field": "total", "label": "invoicing.col.total" },
+    { "field": "amount_paid", "label": "invoicing.col.paid" },
+    {
+      "field": "status",
+      "label": "invoicing.col.status",
+      "display": "badge",
+      "tones": {
+        "draft": "muted",
+        "sent": "info",
+        "partially_paid": "warning",
+        "paid": "success",
+        "overdue": "danger",
+        "cancelled": "muted"
       }
+    },
+    { "field": "due_date", "label": "invoicing.col.dueDate" }
+  ],
+  "sort": "-created_at",
+  "actions": [{ "navigate": "invoicing.new", "label": "invoicing.newInvoice" }],
+  "rowActions": [
+    {
+      "action": "sendInvoice",
+      "label": "invoicing.action.send",
+      "input": { "id": { "$record": "id" } },
+      "when": [{ "field": "status", "op": "eq", "value": "draft" }]
+    },
+    {
+      "action": "recordPayment",
+      "label": "invoicing.action.recordPayment",
+      "input": { "id": { "$record": "id" } },
+      "prompt": ["amount", "payment_date", "payment_method", "reference"],
+      "when": [{ "field": "status", "op": "in", "value": ["sent", "partially_paid", "overdue"] }]
+    },
+    {
+      "action": "convertProforma",
+      "label": "invoicing.action.convert",
+      "input": { "id": { "$record": "id" } },
+      "when": [{ "field": "doc_type", "op": "eq", "value": "proforma" }]
+    },
+    {
+      "action": "cancelInvoice",
+      "label": "invoicing.action.cancel",
+      "tone": "warning",
+      "input": { "id": { "$record": "id" } },
+      "confirm": "invoicing.cancelConfirm",
+      "when": [
+        { "field": "status", "op": "in", "value": ["draft", "sent", "overdue", "partially_paid"] }
+      ]
+    },
+    {
+      "action": "deleteDraft",
+      "label": "common.delete",
+      "tone": "danger",
+      "input": { "id": { "$record": "id" } },
+      "confirm": "invoicing.deleteConfirm",
+      "when": [{ "field": "status", "op": "eq", "value": "draft" }]
     }
   ]
 }

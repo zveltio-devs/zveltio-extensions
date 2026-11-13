@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.0 (2026-11-13)
+
+- feat: the register and the new-document form are `zveltio.view/2` views (ADR 0042). The form is an action form on `create` (page `/admin/compliance/ro/documents/new`, opened from the list's toolbar); Studio draws its `parties` input as a table of lines
+- the conversion drops: the type quick filter (search stays), the form's defaults (type `contract`, today's date) and the type labels written in Romanian in the schema (the badge shows the stored value)
+- requires engine 3.0.0-beta.118 (lines on an action form)
+
 ## 2.0.0 (2026-11-02)
 
 - feat!: the register is the `ro_documents`, `ro_document_versions`, `ro_document_series` and `ro_document_signatures` collections, declared in `schema/collections/` and created and owned by the engine; no SQL migrations

@@ -1,235 +1,45 @@
 {
-  "sduiSchema": 1,
+  "spec": "zveltio.view/2",
+  "id": "ro-documents.list",
   "title": "compliance.ro.documents.title",
-  "subtitle": "compliance.ro.documents.subtitle",
-  "newLabel": "compliance.ro.documents.btn.new",
-  "resources": [
+  "type": "list",
+  "collection": "ro_documents",
+  "fields": [
+    { "field": "type", "label": "compliance.ro.documents.col.type", "display": "badge" },
+    { "field": "number", "label": "compliance.ro.documents.ui.num_r", "display": "mono" },
+    { "field": "date", "label": "compliance.ro.documents.col.data" },
+    { "field": "title", "label": "compliance.ro.documents.col.title" },
     {
-      "id": "documents",
-      "dataSource": "/api/data/ro_documents?sort=date&order=desc&limit=500",
-      "dataPath": "records",
-      "filters": [
-        {
-          "param": "type[eq]",
-          "options": [
-            {
-              "value": "all",
-              "label": "common.filter.all"
-            },
-            {
-              "value": "contract",
-              "label": "compliance.ro.documents.type.contract"
-            },
-            {
-              "value": "pv",
-              "label": "compliance.ro.documents.type.procesVerbal"
-            },
-            {
-              "value": "nir",
-              "label": "NIR"
-            },
-            {
-              "value": "dispozitie_plata",
-              "label": "compliance.ro.documents.type.dispozitiePlata"
-            },
-            {
-              "value": "proces_verbal",
-              "label": "compliance.ro.documents.type.procesVerbal"
-            },
-            {
-              "value": "notificare",
-              "label": "compliance.ro.documents.type.notificare"
-            },
-            {
-              "value": "other",
-              "label": "common.other"
-            }
-          ]
-        }
-      ],
-      "columns": [
-        {
-          "key": "type",
-          "label": "compliance.ro.documents.col.type",
-          "type": "badge",
-          "badge": {
-            "colors": {
-              "contract": "badge-outline",
-              "pv": "badge-outline",
-              "nir": "badge-outline",
-              "dispozitie_plata": "badge-outline",
-              "proces_verbal": "badge-outline",
-              "notificare": "badge-outline",
-              "other": "badge-outline"
-            },
-            "labels": {
-              "contract": "Contract",
-              "pv": "Proces Verbal",
-              "nir": "NIR",
-              "dispozitie_plata": "Dispozitie Plata",
-              "proces_verbal": "Proces Verbal",
-              "notificare": "Notificare",
-              "other": "Altele"
-            }
-          }
-        },
-        {
-          "key": "number",
-          "label": "compliance.ro.documents.ui.num_r",
-          "type": "mono"
-        },
-        {
-          "key": "date",
-          "label": "compliance.ro.documents.col.data",
-          "type": "date"
-        },
-        {
-          "key": "title",
-          "label": "compliance.ro.documents.col.title"
-        },
-        {
-          "key": "status",
-          "label": "common.col.status",
-          "type": "badge",
-          "badge": {
-            "colors": {
-              "draft": "badge-warning",
-              "signed": "badge-success",
-              "archived": "badge-ghost"
-            }
-          }
-        }
-      ],
-      "rowActions": [
-        {
-          "id": "sign",
-          "label": "compliance.ro.documents.col.signed",
-          "icon": "CheckCircle",
-          "method": "POST",
-          "endpoint": "/ext/compliance/ro/documents/actions/sign",
-          "body": {
-            "id": "{id}"
-          },
-          "visibleWhen": {
-            "field": "status",
-            "equals": "draft"
-          },
-          "confirm": "compliance.ro.documents.confirmSign"
-        },
-        {
-          "id": "archive",
-          "label": "compliance.ro.documents.btn.archive",
-          "icon": "Archive",
-          "method": "POST",
-          "endpoint": "/ext/compliance/ro/documents/actions/archive",
-          "body": {
-            "id": "{id}"
-          },
-          "visibleWhen": {
-            "field": "status",
-            "equals": "signed"
-          },
-          "confirm": "compliance.ro.documents.confirmArchive"
-        },
-        {
-          "id": "delete",
-          "icon": "Trash2",
-          "variant": "text-error",
-          "label": "common.delete",
-          "method": "POST",
-          "endpoint": "/ext/compliance/ro/documents/actions/remove",
-          "body": {
-            "id": "{id}"
-          },
-          "visibleWhen": {
-            "field": "status",
-            "equals": "draft"
-          },
-          "confirm": "compliance.ro.documents.confirmDelete"
-        }
-      ],
-      "form": {
-        "endpoint": "/ext/compliance/ro/documents/actions/create",
-        "fields": [
-          {
-            "name": "type",
-            "label": "compliance.ro.documents.ui.tip_document",
-            "type": "select",
-            "colSpan": 1,
-            "default": "contract",
-            "options": [
-              {
-                "value": "contract",
-                "label": "compliance.ro.documents.type.contract"
-              },
-              {
-                "value": "pv",
-                "label": "compliance.ro.documents.type.procesVerbal"
-              },
-              {
-                "value": "nir",
-                "label": "NIR"
-              },
-              {
-                "value": "dispozitie_plata",
-                "label": "compliance.ro.documents.type.dispozitiePlata"
-              },
-              {
-                "value": "proces_verbal",
-                "label": "compliance.ro.documents.type.procesVerbal"
-              },
-              {
-                "value": "notificare",
-                "label": "compliance.ro.documents.type.notificare"
-              },
-              {
-                "value": "other",
-                "label": "common.other"
-              }
-            ]
-          },
-          {
-            "name": "number",
-            "label": "compliance.ro.documents.ui.num_auto",
-            "colSpan": 1,
-            "mono": true
-          },
-          {
-            "name": "date",
-            "label": "compliance.ro.documents.ui.data",
-            "type": "date",
-            "colSpan": 1,
-            "default": "today"
-          },
-          {
-            "name": "title",
-            "label": "compliance.ro.documents.ui.titlu",
-            "colSpan": 2,
-            "required": true
-          }
-        ],
-        "repeatable": {
-          "name": "parties",
-          "label": "compliance.ro.documents.ui.parties",
-          "addLabel": "compliance.ro.documents.ui.denumire",
-          "min": 1,
-          "columns": [
-            {
-              "name": "name",
-              "label": "compliance.ro.documents.ui.denumire"
-            },
-            {
-              "name": "cui",
-              "label": "compliance.ro.documents.ui.cui",
-              "mono": true
-            },
-            {
-              "name": "role",
-              "label": "compliance.ro.documents.ui.rol"
-            }
-          ]
-        }
-      }
+      "field": "status",
+      "label": "common.col.status",
+      "display": "badge",
+      "tones": { "draft": "warning", "signed": "success", "archived": "muted" }
+    }
+  ],
+  "sort": "-date",
+  "actions": [{ "navigate": "ro-documents.new", "label": "compliance.ro.documents.btn.new" }],
+  "rowActions": [
+    {
+      "action": "sign",
+      "label": "compliance.ro.documents.col.signed",
+      "input": { "id": { "$record": "id" } },
+      "confirm": "compliance.ro.documents.confirmSign",
+      "when": [{ "field": "status", "op": "eq", "value": "draft" }]
+    },
+    {
+      "action": "archive",
+      "label": "compliance.ro.documents.btn.archive",
+      "input": { "id": { "$record": "id" } },
+      "confirm": "compliance.ro.documents.confirmArchive",
+      "when": [{ "field": "status", "op": "eq", "value": "signed" }]
+    },
+    {
+      "action": "remove",
+      "label": "common.delete",
+      "tone": "danger",
+      "input": { "id": { "$record": "id" } },
+      "confirm": "compliance.ro.documents.confirmDelete",
+      "when": [{ "field": "status", "op": "eq", "value": "draft" }]
     }
   ]
 }

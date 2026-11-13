@@ -1,0 +1,14 @@
+{
+  "spec": "zveltio.view/2",
+  "id": "ro-documents.new",
+  "title": "compliance.ro.documents.btn.new",
+  "type": "form",
+  "action": "create",
+  "fields": [
+    { "field": "type", "label": "compliance.ro.documents.ui.tip_document" },
+    { "field": "number", "label": "compliance.ro.documents.ui.num_auto" },
+    { "field": "date", "label": "compliance.ro.documents.ui.data" },
+    { "field": "title", "label": "compliance.ro.documents.ui.titlu" },
+    { "field": "parties", "label": "compliance.ro.documents.ui.parties" }
+  ]
+}
