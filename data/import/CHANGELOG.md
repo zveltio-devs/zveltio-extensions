@@ -1,5 +1,15 @@
 # Changelog
 
+## 3.0.0 (2026-11-14)
+
+- feat!: the routes are actions (ADR 0039, ADR 0047): `POST /:collection` is `POST /ext/data/import/actions/importRows` and `POST /jobs/:id/rollback` is `rollbackImport` (`{ id }`). Both need `execute` on `data_import_jobs`, granted to `tenant_member` at install, and answer `{ result }` with 200 (the import answered 201): `importRows` `{ job, imported_rows }`, `rollbackImport` `{ deleted_records }` (no `success` key any more). Both list `"*"` in `writes`, because the target is the collection the caller names: they reach it only as the caller, under their grants, row rules and column rules, as the routes did through `ctx.internals`; install consent shows it as `collections:any:write`, and an engine from 3.0.0-beta.121 is required
+- feat!: the input is JSON, not a file: `importRows` takes `{ collection, rows }` (1 to 10,000 objects) or `{ collection, text, format?, delimiter? }` (the file's content as a string, at most 100 MB, `format` `csv` by default, `delimiter` one character), with optional `mapping`, `profile_id` and `filename` (recorded on the job). The multipart upload and the raw CSV / NDJSON body are gone: an action cannot read an uploaded file (stored files reach only an action's job, ADR 0032, and a job cannot write into a collection the caller names). Unknown keys are refused with 400
+- feat!: an import is still all or nothing: an action is the request's transaction, and a refusal throws and rolls back every row the call wrote. Refusals are the engine's problem answers with a `code`: invalid rows 422 `invalid_rows`, naming each (up to 100) with the data API's errors in `detail` (was `{ error, errors: [{ row, status, error }] }`; `detail` is cut at 500 characters); any other refused row answers the data API's status and `code` with `Row <n>: …` in `detail` (was `{ error: "Import refused", errors }`); a malformed input 400 `invalid_import`; an unknown profile 404 `profile_not_found`
+- feat!: `?dry_run=true` is dropped: an action that rolls back cannot answer success. `POST /:collection/preview` is dropped: the caller holds its rows
+- feat!: `rollbackImport` refuses an unknown import with 404 `import_not_found`, a second rollback with 409 `already_rolled_back` (also when two run at once) and an old one with 409 `rollback_window_expired`
+- feat!: no Hono route and no `ctx.internals` left; the bundle carries neither hono nor zod
+- feat: the page is a `view/2` list of the imports, newest first, with an import that takes the collection and a JSON array of rows, and a roll back per import not yet rolled back. Its unused message keys are dropped
+
 ## 2.0.2 (2026-11-09)
 
 - build: repacked with hono 4.13.17 and kysely 0.29.8, in lockstep with the engine; no behaviour change
