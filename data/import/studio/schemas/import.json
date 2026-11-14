@@ -1,112 +1,33 @@
 {
-  "sduiSchema": 1,
+  "spec": "zveltio.view/2",
+  "type": "list",
   "title": "data.import.title",
-  "subtitle": "data.import.subtitle",
-  "newLabel": "data.import.action.import",
-  "resources": [
+  "collection": "data_import_jobs",
+  "fields": [
+    { "field": "created_at", "label": "data.import.col.time" },
+    { "field": "target_collection", "label": "common.col.collection", "display": "badge" },
+    { "field": "format", "label": "data.import.col.format", "display": "badge" },
+    { "field": "imported_rows", "label": "data.import.col.rows" },
+    { "field": "filename", "label": "common.col.file" },
+    { "field": "rolled_back_at", "label": "data.import.col.rolledBack" }
+  ],
+  "sort": "-created_at",
+  "actions": [
     {
-      "id": "logs",
-      "dataSource": "/api/data/data_import_jobs?sort=created_at&order=desc&limit=500",
-      "dataPath": "records",
-      "columns": [
-        {
-          "key": "created_at",
-          "label": "data.import.col.time",
-          "type": "date"
-        },
-        {
-          "key": "target_collection",
-          "label": "common.col.collection"
-        },
-        {
-          "key": "format",
-          "label": "data.import.col.format",
-          "type": "badge",
-          "badge": {
-            "colors": {}
-          }
-        },
-        {
-          "key": "imported_rows",
-          "label": "data.import.col.rows"
-        },
-        {
-          "key": "filename",
-          "label": "common.col.file"
-        },
-        {
-          "key": "rolled_back_at",
-          "label": "data.import.col.rolledBack",
-          "type": "date"
-        }
-      ],
-      "form": {
-        "endpoint": "/ext/data/import/{collection}",
-        "submit": {
-          "kind": "upload"
-        },
-        "fields": [
-          {
-            "name": "collection",
-            "label": "data.import.form.collection",
-            "type": "relation",
-            "required": true,
-            "colSpan": 2,
-            "relation": {
-              "dataSource": "/api/collections",
-              "dataPath": "collections",
-              "valueKey": "name",
-              "labelKey": "name"
-            }
-          },
-          {
-            "name": "file",
-            "label": "common.col.file",
-            "type": "file",
-            "accept": ".csv,.json,.ndjson,.jsonl",
-            "required": true,
-            "colSpan": 2
-          },
-          {
-            "name": "format",
-            "label": "data.import.label.format",
-            "type": "select",
-            "default": "csv",
-            "colSpan": 1,
-            "options": [
-              {
-                "value": "csv",
-                "label": "CSV"
-              },
-              {
-                "value": "json",
-                "label": "JSON"
-              },
-              {
-                "value": "ndjson",
-                "label": "NDJSON"
-              }
-            ]
-          },
-          {
-            "name": "delimiter",
-            "label": "data.import.label.delimiter",
-            "default": ",",
-            "mono": true,
-            "colSpan": 1
-          }
-        ]
-      },
-      "rowActions": [
-        {
-          "id": "rollback",
-          "label": "data.import.action.rollback",
-          "icon": "Undo2",
-          "method": "POST",
-          "endpoint": "/ext/data/import/jobs/{id}/rollback",
-          "confirm": "data.import.confirm.rollback"
-        }
-      ]
+      "action": "importRows",
+      "label": "data.import.action.import",
+      "input": { "format": "json" },
+      "prompt": ["collection", "text"]
+    }
+  ],
+  "rowActions": [
+    {
+      "action": "rollbackImport",
+      "label": "data.import.action.rollback",
+      "tone": "danger",
+      "input": { "id": { "$record": "id" } },
+      "when": [{ "field": "rolled_back_at", "op": "null" }],
+      "confirm": "data.import.confirm.rollback"
     }
   ]
 }

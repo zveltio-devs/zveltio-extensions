@@ -6,15 +6,5 @@
   "data.import.col.rows": "Filas",
   "data.import.col.time": "Tiempo",
   "data.import.confirm.rollback": "¿Eliminar todos los registros creados por esta importación?",
-  "data.import.dropHint": "Drag a CSV / JSON / NDJSON file, or click to browse",
-  "data.import.empty": "Aún no hay importaciones.",
-  "data.import.form.collection": "Colección de destino",
-  "data.import.form.title": "Importar datos",
-  "data.import.label.delimiter": "Delimitador CSV",
-  "data.import.label.format": "Formato",
-  "data.import.new": "Nueva importación",
-  "data.import.selectPlaceholder": "— Select —",
-  "data.import.subtitle": "Import collection data from CSV or JSON files with column mapping and background processing",
-  "data.import.title": "Importación de datos",
-  "data.import.toast.imported": "Se importaron {n} filas"
+  "data.import.title": "Importación de datos"
 }

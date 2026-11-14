@@ -6,15 +6,5 @@
   "data.import.col.rows": "Zeilen",
   "data.import.col.time": "Zeit",
   "data.import.confirm.rollback": "Alle von diesem Import erstellten Datensätze löschen?",
-  "data.import.dropHint": "CSV-/JSON-/NDJSON-Datei ziehen oder zum Durchsuchen klicken",
-  "data.import.empty": "Noch keine Importe.",
-  "data.import.form.collection": "Zielsammlung",
-  "data.import.form.title": "Daten importieren",
-  "data.import.label.delimiter": "CSV-Trennzeichen",
-  "data.import.label.format": "Format",
-  "data.import.new": "Neuer Import",
-  "data.import.selectPlaceholder": "— Auswählen —",
-  "data.import.subtitle": "Importieren Sie Sammlungsdaten aus CSV- oder JSON-Dateien mit Spaltenzuordnung und Hintergrundverarbeitung",
-  "data.import.title": "Datenimport",
-  "data.import.toast.imported": "{n} Zeilen importiert"
+  "data.import.title": "Datenimport"
 }

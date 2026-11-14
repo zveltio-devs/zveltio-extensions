@@ -2,9 +2,9 @@
   "name": "data/import",
   "displayName": "Data Import",
   "category": "data",
-  "description": "Import collection data from CSV, JSON or NDJSON files through the data API, as the importing user",
-  "version": "2.0.2",
-  "zveltioMinVersion": "3.0.0-beta.99",
+  "description": "Import collection data as rows, CSV, JSON or NDJSON text through the data API, as the importing user",
+  "version": "3.0.0",
+  "zveltioMinVersion": "3.0.0-beta.121",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-import",
   "permissions": [
@@ -40,8 +40,103 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "b66b279ab55b70a0af14d767b182cfc379d2e375f287369ad2ac92ade3639d25",
-    "sourceSha256": "c9a96d23a56a40314cf275106d97f7b3f3ceacff746dfffee164f336276ea6c9",
+    "engineSha256": "521aa60125d5331986c96b1424c4427ffe606ac214a6897e99967eabe58343f7",
+    "sourceSha256": "3be076e6e5b45c548aa509aadc25299212f3c87f81b316d3504ead9a5b8c8ce5",
     "schemaSha256": "0060c4c59b859f1e6599f9ab40060e0f682f642c50b9c8e736e6924792327fb8"
-  }
+  },
+  "actions": [
+    {
+      "name": "importRows",
+      "permission": {
+        "resource": "data_import_jobs",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "collection"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "collection": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "rows": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 10000,
+            "items": {}
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 104857600
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "csv",
+              "json",
+              "ndjson"
+            ]
+          },
+          "delimiter": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1
+          },
+          "filename": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "mapping": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "profile_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "data_import_profiles"
+      ],
+      "writes": [
+        "data_import_jobs",
+        "*"
+      ]
+    },
+    {
+      "name": "rollbackImport",
+      "permission": {
+        "resource": "data_import_jobs",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "data_import_jobs"
+      ],
+      "writes": [
+        "data_import_jobs",
+        "*"
+      ]
+    }
+  ]
 }
