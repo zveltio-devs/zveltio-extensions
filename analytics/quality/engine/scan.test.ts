@@ -111,7 +111,7 @@ d('analytics/quality — a scan sees what the caller sees', () => {
     expect((await res.json()).result).toMatchObject({ compliant: true, error_count: 0, warning_count: 1 });
   });
 
-  it('dismissing a scan is all or nothing for a caller who may not update issues', async () => {
+  it('a caller who may not update issues dismisses none of a scan\'s issues', async () => {
     const [scan] = await scans();
     expect((await run('dismissScan', { scan_id: scan.id }, reader.cookie)).status).toBe(403);
     expect((await issues()).some((i: Any) => i.dismissed)).toBe(false);
