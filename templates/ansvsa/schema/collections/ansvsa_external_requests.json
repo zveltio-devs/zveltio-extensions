@@ -1,0 +1,76 @@
+{
+  "name": "ansvsa_external_requests",
+  "displayName": "Cereri depuse",
+  "fields": [
+    {
+      "name": "external_user",
+      "type": "text"
+    },
+    {
+      "name": "entity",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_entities"
+      }
+    },
+    {
+      "name": "template",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "ansvsa_request_templates"
+      }
+    },
+    {
+      "name": "request_status",
+      "type": "enum",
+      "options": {
+        "values": [
+          "DRAFT",
+          "DEPUS",
+          "IN_EVALUARE",
+          "APROBAT",
+          "RESPINS"
+        ]
+      }
+    },
+    {
+      "name": "submitted_at",
+      "type": "datetime"
+    },
+    {
+      "name": "approval_date",
+      "type": "datetime"
+    },
+    {
+      "name": "reviewer",
+      "type": "text"
+    },
+    {
+      "name": "decision_notes",
+      "type": "textarea"
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_external_requests_entity",
+      "type": "m2o",
+      "field": "entity",
+      "target": "ansvsa_entities",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "ansvsa_external_requests_template",
+      "type": "m2o",
+      "field": "template",
+      "target": "ansvsa_request_templates",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "name": "inv_products",
+  "displayName": "Products",
+  "fields": [
+    {
+      "name": "sku",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "description",
+      "type": "text"
+    },
+    {
+      "name": "supplier",
+      "type": "m2o",
+      "options": {
+        "related_collection": "inv_suppliers"
+      }
+    },
+    {
+      "name": "unit_cost",
+      "type": "number"
+    },
+    {
+      "name": "unit_price",
+      "type": "number"
+    },
+    {
+      "name": "reorder_level",
+      "type": "integer"
+    }
+  ],
+  "relations": [
+    {
+      "name": "inv_products_supplier",
+      "type": "m2o",
+      "field": "supplier",
+      "target": "inv_suppliers",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

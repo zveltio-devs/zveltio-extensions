@@ -1,0 +1,92 @@
+{
+  "name": "ansvsa_checklist_responses",
+  "displayName": "Răspunsuri checklist (cu snapshot)",
+  "fields": [
+    {
+      "name": "checklist",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "ansvsa_inspection_checklists"
+      }
+    },
+    {
+      "name": "item",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "ansvsa_checklist_items"
+      }
+    },
+    {
+      "name": "item_code",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "requirement_snapshot",
+      "type": "text"
+    },
+    {
+      "name": "nc_severity_snapshot",
+      "type": "enum",
+      "options": {
+        "values": [
+          "Mj",
+          "S",
+          "M"
+        ]
+      }
+    },
+    {
+      "name": "score_max_snapshot",
+      "type": "integer"
+    },
+    {
+      "name": "response",
+      "type": "enum",
+      "options": {
+        "values": [
+          "A",
+          "AR",
+          "NC",
+          "NA"
+        ]
+      }
+    },
+    {
+      "name": "score_obtained",
+      "type": "integer"
+    },
+    {
+      "name": "observations",
+      "type": "textarea"
+    },
+    {
+      "name": "responded_at",
+      "type": "datetime"
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_checklist_responses_checklist",
+      "type": "m2o",
+      "field": "checklist",
+      "target": "ansvsa_inspection_checklists",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "ansvsa_checklist_responses_item",
+      "type": "m2o",
+      "field": "item",
+      "target": "ansvsa_checklist_items",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

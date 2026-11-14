@@ -1,0 +1,97 @@
+{
+  "name": "ansvsa_institutions",
+  "displayName": "Instituții (autoritate)",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "county",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_counties"
+      }
+    },
+    {
+      "name": "locality",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_localities"
+      }
+    },
+    {
+      "name": "street",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_streets"
+      }
+    },
+    {
+      "name": "building_number",
+      "type": "text"
+    },
+    {
+      "name": "extra_address_info",
+      "type": "text"
+    },
+    {
+      "name": "phone",
+      "type": "phone"
+    },
+    {
+      "name": "email",
+      "type": "email"
+    },
+    {
+      "name": "parent_institution",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_institutions"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_institutions_county",
+      "type": "m2o",
+      "field": "county",
+      "target": "ansvsa_counties",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "ansvsa_institutions_locality",
+      "type": "m2o",
+      "field": "locality",
+      "target": "ansvsa_localities",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "ansvsa_institutions_street",
+      "type": "m2o",
+      "field": "street",
+      "target": "ansvsa_streets",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "ansvsa_institutions_parent_institution",
+      "type": "m2o",
+      "field": "parent_institution",
+      "target": "ansvsa_institutions",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

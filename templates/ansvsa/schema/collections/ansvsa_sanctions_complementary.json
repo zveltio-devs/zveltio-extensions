@@ -1,0 +1,51 @@
+{
+  "name": "ansvsa_sanctions_complementary",
+  "displayName": "Sancțiuni complementare",
+  "fields": [
+    {
+      "name": "report",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_finding_reports"
+      }
+    },
+    {
+      "name": "sanction",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_sanctions"
+      }
+    },
+    {
+      "name": "measure",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "details",
+      "type": "textarea"
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_sanctions_complementary_report",
+      "type": "m2o",
+      "field": "report",
+      "target": "ansvsa_finding_reports",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "ansvsa_sanctions_complementary_sanction",
+      "type": "m2o",
+      "field": "sanction",
+      "target": "ansvsa_sanctions",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

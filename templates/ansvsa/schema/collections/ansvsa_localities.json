@@ -1,0 +1,64 @@
+{
+  "name": "ansvsa_localities",
+  "displayName": "Localități",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "county",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_counties"
+      }
+    },
+    {
+      "name": "locality_type",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_locality_types"
+      }
+    },
+    {
+      "name": "parent_locality",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_localities"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_localities_county",
+      "type": "m2o",
+      "field": "county",
+      "target": "ansvsa_counties",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "ansvsa_localities_locality_type",
+      "type": "m2o",
+      "field": "locality_type",
+      "target": "ansvsa_locality_types",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "ansvsa_localities_parent_locality",
+      "type": "m2o",
+      "field": "parent_locality",
+      "target": "ansvsa_localities",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

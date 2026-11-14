@@ -1,0 +1,47 @@
+{
+  "name": "templates/invoicing",
+  "displayName": "Invoicing Starter",
+  "category": "templates",
+  "description": "Starter app: customers, invoices, line items and payments as four collections. Was the built-in Invoicing template.",
+  "version": "1.0.0",
+  "zveltioMinVersion": "3.0.0-beta.112",
+  "zveltioMaxVersion": "4.0.0",
+  "package": "@zveltio/ext-template-invoicing",
+  "i18nPrefixes": [
+    "templates.invoicing"
+  ],
+  "collections": [
+    "inv_customers",
+    "inv_invoices",
+    "inv_line_items",
+    "inv_payments"
+  ],
+  "studio": {
+    "pages": [
+      {
+        "path": "/admin/templates/invoicing",
+        "label": "Invoicing Starter",
+        "icon": "Receipt",
+        "schema": "schemas/invoicing.json"
+      }
+    ],
+    "navGroup": "finance"
+  },
+  "contributes": {
+    "engine": true,
+    "studio": true,
+    "fieldTypes": []
+  },
+  "engine": {
+    "entry": "engine/index.js",
+    "format": "esm",
+    "target": "bun",
+    "bundled": true,
+    "bundlePeers": false
+  },
+  "integrity": {
+    "engineSha256": "e4235d6e05dfb6f0777bac6bb86e6c52e62fa4151e83a152230c5882d6a1019c",
+    "sourceSha256": "a00cacbfef83526e0de0b7dd972948c99a6c133c112f1e5ef8f0b823bd7633d8",
+    "schemaSha256": "1a7b296d63c4cdd6d5a6c241a10e1946ccd7b7e78a90970b627eca708e0c899a"
+  }
+}

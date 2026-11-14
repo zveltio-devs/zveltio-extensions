@@ -1,0 +1,28 @@
+{
+  "name": "ansvsa_unit_types",
+  "displayName": "Tipuri de unități (Anexa 9)",
+  "fields": [
+    {
+      "name": "code",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "subtitle",
+      "type": "text"
+    },
+    {
+      "name": "annex9_ref",
+      "type": "text"
+    },
+    {
+      "name": "is_active",
+      "type": "boolean"
+    }
+  ]
+}

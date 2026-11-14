@@ -1,0 +1,27 @@
+{
+  "name": "ansvsa_laboratories",
+  "displayName": "Laboratoare",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "accreditation_number",
+      "type": "text"
+    },
+    {
+      "name": "address",
+      "type": "text"
+    },
+    {
+      "name": "phone",
+      "type": "phone"
+    },
+    {
+      "name": "email",
+      "type": "email"
+    }
+  ]
+}

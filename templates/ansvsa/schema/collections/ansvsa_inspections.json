@@ -1,0 +1,109 @@
+{
+  "name": "ansvsa_inspections",
+  "displayName": "Inspecții",
+  "fields": [
+    {
+      "name": "plan",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_inspection_plans"
+      }
+    },
+    {
+      "name": "unit",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "ansvsa_establishment_units"
+      }
+    },
+    {
+      "name": "entity",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_entities"
+      }
+    },
+    {
+      "name": "inspection_type",
+      "type": "enum",
+      "options": {
+        "values": [
+          "RUTINA",
+          "PE_RISC",
+          "SESIZARE",
+          "REVERIFICARE",
+          "AUTORIZARE"
+        ]
+      }
+    },
+    {
+      "name": "planned_date",
+      "type": "date"
+    },
+    {
+      "name": "performed_date",
+      "type": "date"
+    },
+    {
+      "name": "inspector",
+      "type": "text"
+    },
+    {
+      "name": "inspection_status",
+      "type": "enum",
+      "options": {
+        "values": [
+          "PLANIFICATA",
+          "IN_DESFASURARE",
+          "FINALIZATA",
+          "ANULATA"
+        ]
+      }
+    },
+    {
+      "name": "result",
+      "type": "enum",
+      "options": {
+        "values": [
+          "CONFORM",
+          "NECONFORMITATE_MINORA",
+          "NECONFORMITATE_MAJORA",
+          "NECONFORMITATE_CRITICA"
+        ]
+      }
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_inspections_plan",
+      "type": "m2o",
+      "field": "plan",
+      "target": "ansvsa_inspection_plans",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "ansvsa_inspections_unit",
+      "type": "m2o",
+      "field": "unit",
+      "target": "ansvsa_establishment_units",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "ansvsa_inspections_entity",
+      "type": "m2o",
+      "field": "entity",
+      "target": "ansvsa_entities",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "ansvsa_locality_types",
+  "displayName": "Tipuri de localitate",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    }
+  ]
+}

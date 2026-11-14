@@ -1,0 +1,43 @@
+{
+  "name": "ansvsa_registration_evaluation_reports",
+  "displayName": "Rapoarte de evaluare la înregistrare",
+  "fields": [
+    {
+      "name": "report",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "ansvsa_finding_reports"
+      }
+    },
+    {
+      "name": "report_type",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "operator_is_compliant",
+      "type": "boolean"
+    },
+    {
+      "name": "deficiencies",
+      "type": "textarea"
+    },
+    {
+      "name": "evaluation_date",
+      "type": "date"
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_registration_evaluation_reports_report",
+      "type": "m2o",
+      "field": "report",
+      "target": "ansvsa_finding_reports",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

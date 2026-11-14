@@ -1,0 +1,19 @@
+{
+  "name": "hd_categories",
+  "displayName": "Categories",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "description",
+      "type": "text"
+    },
+    {
+      "name": "color",
+      "type": "text"
+    }
+  ]
+}

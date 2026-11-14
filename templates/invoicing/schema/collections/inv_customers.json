@@ -1,0 +1,35 @@
+{
+  "name": "inv_customers",
+  "displayName": "Customers",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "email",
+      "type": "email"
+    },
+    {
+      "name": "tax_id",
+      "type": "text"
+    },
+    {
+      "name": "billing_address",
+      "type": "text"
+    },
+    {
+      "name": "currency",
+      "type": "enum",
+      "options": {
+        "values": [
+          "EUR",
+          "USD",
+          "GBP",
+          "RON"
+        ]
+      }
+    }
+  ]
+}

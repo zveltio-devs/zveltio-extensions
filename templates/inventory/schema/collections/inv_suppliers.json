@@ -1,0 +1,23 @@
+{
+  "name": "inv_suppliers",
+  "displayName": "Suppliers",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "contact_email",
+      "type": "email"
+    },
+    {
+      "name": "phone",
+      "type": "text"
+    },
+    {
+      "name": "country",
+      "type": "text"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "templates.inventory.tab.inv_locations": "Locations",
+  "templates.inventory.tab.inv_movements": "Stock movements",
+  "templates.inventory.tab.inv_products": "Products",
+  "templates.inventory.tab.inv_suppliers": "Suppliers",
+  "templates.inventory.title": "Asset Inventory Starter"
+}

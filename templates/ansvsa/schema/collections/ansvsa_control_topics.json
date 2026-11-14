@@ -1,0 +1,15 @@
+{
+  "name": "ansvsa_control_topics",
+  "displayName": "Teme de control",
+  "fields": [
+    {
+      "name": "topic_name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "description",
+      "type": "textarea"
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "name": "ansvsa_approval_activities",
+  "displayName": "Activități de aprobare",
+  "fields": [
+    {
+      "name": "activity_name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "description",
+      "type": "textarea"
+    },
+    {
+      "name": "legal_act",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_legal_acts"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_approval_activities_legal_act",
+      "type": "m2o",
+      "field": "legal_act",
+      "target": "ansvsa_legal_acts",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

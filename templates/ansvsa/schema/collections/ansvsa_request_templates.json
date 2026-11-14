@@ -1,0 +1,48 @@
+{
+  "name": "ansvsa_request_templates",
+  "displayName": "Șabloane de cerere",
+  "fields": [
+    {
+      "name": "template_name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "full_name_ro",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "ordin_group",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "legal_act",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_legal_acts"
+      }
+    },
+    {
+      "name": "form_schema",
+      "type": "json"
+    },
+    {
+      "name": "detail_table_name",
+      "type": "text"
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_request_templates_legal_act",
+      "type": "m2o",
+      "field": "legal_act",
+      "target": "ansvsa_legal_acts",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

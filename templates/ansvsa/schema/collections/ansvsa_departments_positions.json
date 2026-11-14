@@ -1,0 +1,30 @@
+{
+  "name": "ansvsa_departments_positions",
+  "displayName": "Funcții în departament",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "department",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_institutions_departments"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_departments_positions_department",
+      "type": "m2o",
+      "field": "department",
+      "target": "ansvsa_institutions_departments",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

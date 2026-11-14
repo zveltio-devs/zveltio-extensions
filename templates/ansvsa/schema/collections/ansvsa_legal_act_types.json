@@ -1,0 +1,11 @@
+{
+  "name": "ansvsa_legal_act_types",
+  "displayName": "Tipuri act normativ",
+  "fields": [
+    {
+      "name": "type_name",
+      "type": "text",
+      "required": true
+    }
+  ]
+}

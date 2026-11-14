@@ -1,0 +1,40 @@
+{
+  "name": "pm_projects",
+  "displayName": "Projects",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "description",
+      "type": "richtext"
+    },
+    {
+      "name": "project_status",
+      "type": "enum",
+      "options": {
+        "values": [
+          "planning",
+          "active",
+          "on_hold",
+          "completed",
+          "archived"
+        ]
+      }
+    },
+    {
+      "name": "owner",
+      "type": "text"
+    },
+    {
+      "name": "start_date",
+      "type": "date"
+    },
+    {
+      "name": "end_date",
+      "type": "date"
+    }
+  ]
+}
