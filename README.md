@@ -68,9 +68,10 @@ for end-user applications. Import them directly:
 | `projects` | `helpdesk`, `management` |
 | `sms` | `sms` |
 | `storage` | `cloud` |
+| `templates` | `ansvsa`, `helpdesk`, `inventory`, `invoicing`, `project` (starter apps: collections and a page, no code) |
 | `workflow` | `approvals`, `checklists` |
 
-**Catalog size:** 52 official extensions across 22 categories.
+**Catalog size:** 57 official extensions across 23 categories.
 
 Admin Studio pages are **SDUI schemas** unless listed in [STUDIO-DEFERRED.md](./STUDIO-DEFERRED.md).
 
