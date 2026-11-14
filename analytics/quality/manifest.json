@@ -3,14 +3,9 @@
   "displayName": "Data Quality",
   "category": "analytics",
   "description": "Data quality scans over the data API, as the scanning user: duplicates, missing values, outliers and optional AI normalization hints",
-  "version": "2.0.1",
-  "zveltioMinVersion": "3.0.0-beta.99",
+  "version": "3.0.0",
+  "zveltioMinVersion": "3.0.0-beta.121",
   "zveltioMaxVersion": "4.0.0",
-  "optionalDependencies": [
-    {
-      "name": "ai"
-    }
-  ],
   "package": "@zveltio/ext-quality",
   "permissions": [
     "data:write"
@@ -19,6 +14,121 @@
     "quality_scans",
     "quality_issues",
     "quality_targets"
+  ],
+  "actions": [
+    {
+      "name": "scan",
+      "permission": {
+        "resource": "quality_scans",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "collection"
+        ],
+        "properties": {
+          "collection": {
+            "type": "string",
+            "minLength": 1
+          },
+          "scan_type": {
+            "type": "string",
+            "enum": [
+              "full",
+              "duplicates",
+              "anomalies",
+              "missing_data",
+              "normalization"
+            ],
+            "default": "full"
+          }
+        },
+        "additionalProperties": false
+      },
+      "reads": [
+        "*"
+      ],
+      "writes": [
+        "quality_scans",
+        "quality_issues"
+      ]
+    },
+    {
+      "name": "dismissIssue",
+      "permission": {
+        "resource": "quality_issues",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "reads": [
+        "quality_issues"
+      ],
+      "writes": [
+        "quality_issues"
+      ]
+    },
+    {
+      "name": "dismissScan",
+      "permission": {
+        "resource": "quality_issues",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "scan_id"
+        ],
+        "properties": {
+          "scan_id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "reads": [
+        "quality_issues"
+      ],
+      "writes": [
+        "quality_issues"
+      ]
+    },
+    {
+      "name": "slaStatus",
+      "permission": {
+        "resource": "quality_scans",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "scan_id"
+        ],
+        "properties": {
+          "scan_id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "reads": [
+        "quality_scans",
+        "quality_targets",
+        "quality_issues"
+      ],
+      "writes": []
+    }
   ],
   "i18nPrefixes": [
     "analytics.quality"
@@ -46,8 +156,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "eba9340d34656af24a347321f663023fac2f40bddf0074ad8e12dda3e0b2b5e5",
-    "sourceSha256": "e51f779e65211a8137f30f162e2a96ee09d730a087d985ff7ae682d95756654f",
+    "engineSha256": "25e9ae78b2b0359d014607b56fcf0ef09e2551328eaa3b2c58007f498825d0ac",
+    "sourceSha256": "b54991e61c6120e8f72186ce367d5c66c4d59a0a541334a0a7ea2cb4cf2ceba9",
     "schemaSha256": "1efbfb3359a1d793759dde3ca983900aab9bced5c0965cfe2cf293e3244d6e43"
   }
 }
