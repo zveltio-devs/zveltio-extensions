@@ -41,7 +41,8 @@ d(`${NAME}: declared collections`, () => {
     await applyDeclaredCollections(db, NAME, files, false);
 
     const owned = await sql`SELECT name FROM zvd_collections WHERE owner_extension = ${NAME} ORDER BY name`.execute(db);
-    expect(owned.rows.map((r: { name: string }) => r.name)).toEqual([...COLLECTIONS].sort());
+    // Sorted here: Postgres collation orders `_` apart from JavaScript.
+    expect(owned.rows.map((r: { name: string }) => r.name).sort()).toEqual([...COLLECTIONS].sort());
 
     const declared = COLLECTIONS.flatMap((c) =>
       (JSON.parse(files[`collections/${c}.json`]).relations ?? []).map(
