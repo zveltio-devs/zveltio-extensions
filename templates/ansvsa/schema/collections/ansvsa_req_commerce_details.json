@@ -1,0 +1,59 @@
+{
+  "name": "ansvsa_req_commerce_details",
+  "displayName": "Detalii cerere: comerț",
+  "fields": [
+    {
+      "name": "request",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "ansvsa_external_requests"
+      }
+    },
+    {
+      "name": "commerce_type",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "is_year_round_operation",
+      "type": "boolean"
+    },
+    {
+      "name": "is_seasonal_operation",
+      "type": "boolean"
+    },
+    {
+      "name": "storage_ambient_capacity",
+      "type": "number"
+    },
+    {
+      "name": "storage_refrigerated_capacity",
+      "type": "number"
+    },
+    {
+      "name": "storage_frozen_capacity",
+      "type": "number"
+    },
+    {
+      "name": "total_staff",
+      "type": "number"
+    },
+    {
+      "name": "haccp_team_responsible",
+      "type": "text"
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_req_commerce_details_request",
+      "type": "m2o",
+      "field": "request",
+      "target": "ansvsa_external_requests",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

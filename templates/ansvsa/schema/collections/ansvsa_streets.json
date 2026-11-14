@@ -1,0 +1,30 @@
+{
+  "name": "ansvsa_streets",
+  "displayName": "Străzi",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "locality",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_localities"
+      }
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_streets_locality",
+      "type": "m2o",
+      "field": "locality",
+      "target": "ansvsa_localities",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

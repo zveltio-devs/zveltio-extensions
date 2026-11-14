@@ -1,0 +1,31 @@
+{
+  "name": "ansvsa_checklist_haccp",
+  "displayName": "Checklist HACCP",
+  "fields": [
+    {
+      "name": "report",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "ansvsa_finding_reports"
+      }
+    },
+    {
+      "name": "haccp_data",
+      "type": "json",
+      "required": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_checklist_haccp_report",
+      "type": "m2o",
+      "field": "report",
+      "target": "ansvsa_finding_reports",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

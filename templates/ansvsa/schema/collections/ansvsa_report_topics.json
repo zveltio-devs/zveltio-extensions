@@ -1,0 +1,48 @@
+{
+  "name": "ansvsa_report_topics",
+  "displayName": "Teme raportate",
+  "fields": [
+    {
+      "name": "report",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "ansvsa_finding_reports"
+      }
+    },
+    {
+      "name": "topic",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "ansvsa_control_topics"
+      }
+    },
+    {
+      "name": "data",
+      "type": "json"
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_report_topics_report",
+      "type": "m2o",
+      "field": "report",
+      "target": "ansvsa_finding_reports",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "ansvsa_report_topics_topic",
+      "type": "m2o",
+      "field": "topic",
+      "target": "ansvsa_control_topics",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

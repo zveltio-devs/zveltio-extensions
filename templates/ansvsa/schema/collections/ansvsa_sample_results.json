@@ -1,0 +1,59 @@
+{
+  "name": "ansvsa_sample_results",
+  "displayName": "Rezultate probe",
+  "fields": [
+    {
+      "name": "sample",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "ansvsa_samples"
+      }
+    },
+    {
+      "name": "parameter",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "value",
+      "type": "text"
+    },
+    {
+      "name": "unit_of_measure",
+      "type": "text"
+    },
+    {
+      "name": "limit_value",
+      "type": "text"
+    },
+    {
+      "name": "is_compliant",
+      "type": "boolean"
+    },
+    {
+      "name": "method",
+      "type": "text"
+    },
+    {
+      "name": "result_date",
+      "type": "date"
+    },
+    {
+      "name": "notes",
+      "type": "textarea"
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_sample_results_sample",
+      "type": "m2o",
+      "field": "sample",
+      "target": "ansvsa_samples",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

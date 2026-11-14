@@ -1,0 +1,13 @@
+{
+  "templates.ansvsa.tab.ansvsa_certificates": "Certificate",
+  "templates.ansvsa.tab.ansvsa_complaints": "Sesizări consumatori",
+  "templates.ansvsa.tab.ansvsa_entities": "Operatori economici",
+  "templates.ansvsa.tab.ansvsa_establishment_units": "Unități / puncte de lucru",
+  "templates.ansvsa.tab.ansvsa_external_requests": "Cereri depuse",
+  "templates.ansvsa.tab.ansvsa_finding_reports": "Rapoarte de constatare (PV)",
+  "templates.ansvsa.tab.ansvsa_inspection_plans": "Planuri de control",
+  "templates.ansvsa.tab.ansvsa_inspections": "Inspecții",
+  "templates.ansvsa.tab.ansvsa_samples": "Probe oficiale",
+  "templates.ansvsa.tab.ansvsa_sanctions": "Sancțiuni",
+  "templates.ansvsa.title": "ANSVSA — control oficial"
+}

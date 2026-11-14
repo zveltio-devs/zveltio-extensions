@@ -1,0 +1,51 @@
+{
+  "name": "ansvsa_inspection_plans",
+  "displayName": "Planuri de control",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "year",
+      "type": "integer"
+    },
+    {
+      "name": "institution",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_institutions"
+      }
+    },
+    {
+      "name": "plan_type",
+      "type": "enum",
+      "options": {
+        "values": [
+          "RUTINA",
+          "PE_RISC",
+          "CAMPANIE",
+          "SESIZARE",
+          "REVERIFICARE"
+        ]
+      }
+    },
+    {
+      "name": "description",
+      "type": "textarea"
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_inspection_plans_institution",
+      "type": "m2o",
+      "field": "institution",
+      "target": "ansvsa_institutions",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

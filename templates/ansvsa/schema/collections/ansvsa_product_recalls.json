@@ -1,0 +1,84 @@
+{
+  "name": "ansvsa_product_recalls",
+  "displayName": "Rechemări / retrageri produse",
+  "fields": [
+    {
+      "name": "alert",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_rapid_alerts"
+      }
+    },
+    {
+      "name": "entity",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_entities"
+      }
+    },
+    {
+      "name": "product_name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "batch_number",
+      "type": "text"
+    },
+    {
+      "name": "recall_type",
+      "type": "enum",
+      "options": {
+        "values": [
+          "RECHEMARE",
+          "RETRAGERE"
+        ]
+      }
+    },
+    {
+      "name": "quantity",
+      "type": "number"
+    },
+    {
+      "name": "unit_of_measure",
+      "type": "text"
+    },
+    {
+      "name": "recall_date",
+      "type": "date"
+    },
+    {
+      "name": "recall_status",
+      "type": "enum",
+      "options": {
+        "values": [
+          "INITIATA",
+          "IN_DESFASURARE",
+          "FINALIZATA"
+        ]
+      }
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_product_recalls_alert",
+      "type": "m2o",
+      "field": "alert",
+      "target": "ansvsa_rapid_alerts",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "ansvsa_product_recalls_entity",
+      "type": "m2o",
+      "field": "entity",
+      "target": "ansvsa_entities",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

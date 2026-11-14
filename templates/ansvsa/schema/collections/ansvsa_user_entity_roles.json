@@ -1,0 +1,39 @@
+{
+  "name": "ansvsa_user_entity_roles",
+  "displayName": "Roluri utilizator ↔ operator",
+  "fields": [
+    {
+      "name": "user",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "entity",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "ansvsa_entities"
+      }
+    },
+    {
+      "name": "role_in_entity",
+      "type": "text"
+    },
+    {
+      "name": "is_active",
+      "type": "boolean"
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_user_entity_roles_entity",
+      "type": "m2o",
+      "field": "entity",
+      "target": "ansvsa_entities",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

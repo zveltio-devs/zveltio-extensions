@@ -1,0 +1,35 @@
+{
+  "name": "pm_comments",
+  "displayName": "Comments",
+  "fields": [
+    {
+      "name": "task",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "pm_tasks"
+      }
+    },
+    {
+      "name": "author",
+      "type": "text"
+    },
+    {
+      "name": "body",
+      "type": "richtext",
+      "required": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "pm_comments_task",
+      "type": "m2o",
+      "field": "task",
+      "target": "pm_tasks",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

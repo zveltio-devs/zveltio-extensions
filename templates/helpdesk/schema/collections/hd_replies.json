@@ -1,0 +1,40 @@
+{
+  "name": "hd_replies",
+  "displayName": "Replies",
+  "fields": [
+    {
+      "name": "ticket",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "hd_tickets"
+      }
+    },
+    {
+      "name": "author",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "body",
+      "type": "richtext",
+      "required": true
+    },
+    {
+      "name": "is_internal",
+      "type": "boolean"
+    }
+  ],
+  "relations": [
+    {
+      "name": "hd_replies_ticket",
+      "type": "m2o",
+      "field": "ticket",
+      "target": "hd_tickets",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

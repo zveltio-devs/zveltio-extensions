@@ -1,0 +1,140 @@
+{
+  "name": "ansvsa_inspection_checklists",
+  "displayName": "Checklisturi de control (instanțe)",
+  "fields": [
+    {
+      "name": "inspection",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "ansvsa_inspections"
+      }
+    },
+    {
+      "name": "report",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_finding_reports"
+      }
+    },
+    {
+      "name": "unit_type",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "ansvsa_unit_types"
+      }
+    },
+    {
+      "name": "scoring_config",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_scoring_configs"
+      }
+    },
+    {
+      "name": "started_at",
+      "type": "datetime"
+    },
+    {
+      "name": "completed_at",
+      "type": "datetime"
+    },
+    {
+      "name": "conformity_score",
+      "type": "number"
+    },
+    {
+      "name": "total_items",
+      "type": "integer"
+    },
+    {
+      "name": "count_a",
+      "type": "integer"
+    },
+    {
+      "name": "count_ar",
+      "type": "integer"
+    },
+    {
+      "name": "count_nc_m",
+      "type": "integer"
+    },
+    {
+      "name": "count_nc_s",
+      "type": "integer"
+    },
+    {
+      "name": "count_nc_mj",
+      "type": "integer"
+    },
+    {
+      "name": "count_na",
+      "type": "integer"
+    },
+    {
+      "name": "has_nc_major",
+      "type": "boolean"
+    },
+    {
+      "name": "activity_suspended",
+      "type": "boolean"
+    },
+    {
+      "name": "recontrol_date",
+      "type": "date"
+    },
+    {
+      "name": "checklist_status",
+      "type": "enum",
+      "options": {
+        "values": [
+          "IN_COMPLETARE",
+          "FINALIZAT"
+        ]
+      }
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_inspection_checklists_inspection",
+      "type": "m2o",
+      "field": "inspection",
+      "target": "ansvsa_inspections",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "ansvsa_inspection_checklists_report",
+      "type": "m2o",
+      "field": "report",
+      "target": "ansvsa_finding_reports",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "ansvsa_inspection_checklists_unit_type",
+      "type": "m2o",
+      "field": "unit_type",
+      "target": "ansvsa_unit_types",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "ansvsa_inspection_checklists_scoring_config",
+      "type": "m2o",
+      "field": "scoring_config",
+      "target": "ansvsa_scoring_configs",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

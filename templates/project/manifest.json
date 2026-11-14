@@ -1,0 +1,47 @@
+{
+  "name": "templates/project",
+  "displayName": "Project Starter",
+  "category": "templates",
+  "description": "Starter app: projects, tasks, comments and time logs as four collections. Was the built-in Project Management template.",
+  "version": "1.0.0",
+  "zveltioMinVersion": "3.0.0-beta.112",
+  "zveltioMaxVersion": "4.0.0",
+  "package": "@zveltio/ext-template-project",
+  "i18nPrefixes": [
+    "templates.project"
+  ],
+  "collections": [
+    "pm_projects",
+    "pm_tasks",
+    "pm_comments",
+    "pm_time_logs"
+  ],
+  "studio": {
+    "pages": [
+      {
+        "path": "/admin/templates/project",
+        "label": "Project Starter",
+        "icon": "Kanban",
+        "schema": "schemas/project.json"
+      }
+    ],
+    "navGroup": "projects"
+  },
+  "contributes": {
+    "engine": true,
+    "studio": true,
+    "fieldTypes": []
+  },
+  "engine": {
+    "entry": "engine/index.js",
+    "format": "esm",
+    "target": "bun",
+    "bundled": true,
+    "bundlePeers": false
+  },
+  "integrity": {
+    "engineSha256": "408deda7264c10e41a4afdf6fb453324482677a5487711b59a0a1dce40721894",
+    "sourceSha256": "d486d47bead7113a93eaf2a7c0fa4a7f19bac68141a51c9f6f1fc03066b23eb6",
+    "schemaSha256": "2d67322aa2d7c67beef0b59f86f1cb3b78c68c085a1a5c7ef27c315ed6ea1de5"
+  }
+}

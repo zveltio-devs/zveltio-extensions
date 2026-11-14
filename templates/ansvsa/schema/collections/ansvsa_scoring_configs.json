@@ -1,0 +1,60 @@
+{
+  "name": "ansvsa_scoring_configs",
+  "displayName": "Configurații scor conformitate",
+  "fields": [
+    {
+      "name": "version_name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "valid_from",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "valid_until",
+      "type": "date"
+    },
+    {
+      "name": "points_a",
+      "type": "integer"
+    },
+    {
+      "name": "points_ar",
+      "type": "integer"
+    },
+    {
+      "name": "points_nc_m",
+      "type": "integer"
+    },
+    {
+      "name": "points_nc_s",
+      "type": "integer"
+    },
+    {
+      "name": "points_nc_mj",
+      "type": "integer"
+    },
+    {
+      "name": "threshold_conform",
+      "type": "number"
+    },
+    {
+      "name": "threshold_conform_obs",
+      "type": "number"
+    },
+    {
+      "name": "threshold_neconform",
+      "type": "number"
+    },
+    {
+      "name": "is_current",
+      "type": "boolean"
+    },
+    {
+      "name": "description",
+      "type": "textarea"
+    }
+  ]
+}

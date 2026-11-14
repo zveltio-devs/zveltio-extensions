@@ -1,0 +1,52 @@
+{
+  "name": "inv_payments",
+  "displayName": "Payments",
+  "fields": [
+    {
+      "name": "invoice",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "inv_invoices"
+      }
+    },
+    {
+      "name": "received_at",
+      "type": "datetime",
+      "required": true
+    },
+    {
+      "name": "amount",
+      "type": "number",
+      "required": true
+    },
+    {
+      "name": "method",
+      "type": "enum",
+      "options": {
+        "values": [
+          "bank",
+          "card",
+          "cash",
+          "other"
+        ]
+      }
+    },
+    {
+      "name": "reference",
+      "type": "text"
+    }
+  ],
+  "relations": [
+    {
+      "name": "inv_payments_invoice",
+      "type": "m2o",
+      "field": "invoice",
+      "target": "inv_invoices",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}
