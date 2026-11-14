@@ -1,10 +1,10 @@
-// Names and helpers the actions, the jobs and the import route share.
+// Names and helpers the actions, the jobs and the import action share.
 
 export const CONNECTIONS = 'migrator_connections';
 export const FETCHES = 'migrator_fetches';
 export const RUNS = 'migrator_runs';
 
-/** Rows one fetch may hold: the import route writes them in one request. */
+/** Rows one fetch may hold: the import action writes them in one request. */
 export const MAX_ROWS = 1000;
 
 /** Source field name → safe snake_case field name. */

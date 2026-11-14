@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.0.0 (2026-11-14)
+
+- feat!: the import route is an action (ADR 0039, ADR 0047): `POST /fetches/:id/import` `{ target_collection, mapping? }` is `POST /ext/integrations/migrators/actions/importFetch` `{ fetch_id, target_collection, mapping? }`. It needs `execute` on `migrator_runs`, granted to `tenant_member` at install, and answers `{ result: { run, imported_rows, skipped_fields } }` with 200 (was the same object, unwrapped, with 201). It lists `"*"` in `writes`, because the target is the collection the caller names: it reaches it only as the caller, under their grants, row rules and column rules, as the route did through `ctx.internals.createRecord`; install consent shows it as `collections:any:write`, and an engine from 3.0.0-beta.121 is required
+- feat!: refusals are the engine's problem answers with a `code`, not `{ error }`: an unknown fetch 404 `fetch_not_found` (was the data API's 404 body), a fetch not ready 409 `fetch_not_ready`, an imported fetch 409 `already_imported`, a mapping naming a field the fetch lacks 400 `unknown_source_field`, a mapping naming a target field twice 400 `duplicate_target_field`. A bad `target_collection`, a `mapping` that is not an object of strings, a missing `fetch_id` or an unknown key are refused by the input schema with 400 (the route ignored unknown keys)
+- feat!: the import still keeps every row or none (the action is the request's transaction; a throw rolls back every row it wrote), but stops at the first row the data API refuses and answers with that refusal's status, `code` and `errors` (422, 403, ...). The route went on checking after a 422 and answered `{ error, errors: [{ row, status, error }] }` with up to 100 rows: a database-raised 422 aborts the transaction, so the rows after it cannot be checked in it
+- feat!: no Hono route and no `ctx.internals` left; the bundle carries neither hono nor zod
+- feat: the page is a `view/2` of three tabs (connections, fetches, runs): connections are created and deleted through the data API's own form, discover and fetch run per connection, and import runs per ready fetch (the target collection prompted). It called the import route by address; the fetch form on the fetches tab is gone (fetch runs from its connection)
+
 ## 2.0.1 (2026-11-09)
 
 - build: repacked with hono 4.13.17 and kysely 0.29.8, in lockstep with the engine; no behaviour change
