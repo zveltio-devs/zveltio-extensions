@@ -1212,6 +1212,11 @@ export async function onEngine(engineDir: string): Promise<{
     harness,
     done: async () => {
       await sql`DELETE FROM zv_extension_registry WHERE name = ${name}`.execute(db);
+      // dropTestCollection leaves the relation rows; a later apply of the same
+      // collections would then build foreign keys onto columns not there yet.
+      if (manifest.collections?.length) {
+        await sql`DELETE FROM zvd_relations WHERE source_collection IN (${sql.join(manifest.collections)})`.execute(db);
+      }
       for (const c of [...(manifest.collections ?? [])].reverse()) await harness.dropTestCollection(db, c);
       await seatHarnessGod();
     },

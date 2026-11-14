@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.0.0 (2026-11-14)
+
+- feat!: the routes are actions (ADR 0039, ADR 0047): `POST /ext/analytics/quality/actions/scan` (`{ collection, scan_type? }`), `dismissIssue` (`{ id }`), `dismissScan` (`{ scan_id }`, was `POST /scan/:scanId/dismiss-all`) and `slaStatus` (`{ scan_id }`, was `GET /scan/:scanId/sla`). Each answers `{ result }` with 200 (a scan answered 201) and needs `execute` on its resource (`quality_scans`, or `quality_issues` for the dismissals), granted to `tenant_member` at install. `scan` lists `"*"` in `reads`: it reaches the collection it is asked to scan only as the caller, under their grants, row rules and column rules; install consent shows it as `collections:any:read`, and an engine from 3.0.0-beta.121 is required
+- feat!: no Hono route and no `ctx.internals` left; the bundle carries neither hono nor zod
+- feat!: the `ai` optional dependency is dropped: since `ai` 2.0 no extension offers the `ai.providers` service this read, so the normalization check is always listed in `skipped_checks`, as it already was with `ai` 2.x installed
+- feat: the page is a `view/2` split (scans, then the selected scan's open issues), with the scan, dismiss and dismiss-all buttons calling the actions. The collection to scan is typed, not picked from a list (view/2 prompts have no relation picker yet)
+
 ## 2.0.1 (2026-11-09)
 
 - build: repacked with hono 4.13.17 and kysely 0.29.8, in lockstep with the engine; no behaviour change
