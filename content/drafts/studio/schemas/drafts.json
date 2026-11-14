@@ -1,89 +1,62 @@
 {
-  "sduiSchema": 1,
+  "spec": "zveltio.view/2",
+  "type": "list",
   "title": "content.drafts.title",
-  "subtitle": "content.drafts.subtitle",
-  "resources": [
+  "collection": "content_drafts",
+  "fields": [
+    { "field": "target_collection", "label": "common.col.collection", "display": "badge" },
+    { "field": "record_id", "label": "content.drafts.col.record", "display": "mono" },
     {
-      "id": "drafts",
-      "dataSource": "/api/data/content_drafts?sort=updated_at&order=desc&limit=500&filter=%7B%22published_at%22%3A%7B%22null%22%3Atrue%7D%7D",
-      "dataPath": "records",
-      "columns": [
-        {
-          "key": "target_collection",
-          "label": "common.col.collection",
-          "type": "badge",
-          "badge": {
-            "colors": {}
-          }
-        },
-        {
-          "key": "record_id",
-          "label": "content.drafts.col.record",
-          "type": "mono"
-        },
-        {
-          "key": "review_status",
-          "label": "content.drafts.col.review",
-          "type": "badge",
-          "badge": {
-            "colors": {
-              "draft": "badge-ghost",
-              "approved": "badge-success",
-              "rejected": "badge-error"
-            }
-          }
-        },
-        {
-          "key": "created_by",
-          "label": "content.drafts.col.author",
-          "type": "mono"
-        },
-        {
-          "key": "updated_at",
-          "label": "content.drafts.col.updated",
-          "type": "date"
-        }
-      ],
-      "rowActions": [
-        {
-          "id": "publish",
-          "label": "content.drafts.btn.publish",
-          "icon": "Send",
-          "variant": "text-success",
-          "method": "POST",
-          "endpoint": "/ext/content/drafts/{id}/publish"
-        },
-        {
-          "id": "approve",
-          "label": "content.drafts.btn.approve",
-          "icon": "Check",
-          "method": "POST",
-          "endpoint": "/ext/content/drafts/actions/reviewDraft",
-          "body": {
-            "id": "{id}",
-            "decision": "approved"
-          }
-        },
-        {
-          "id": "reject",
-          "label": "content.drafts.btn.reject",
-          "icon": "X",
-          "method": "POST",
-          "endpoint": "/ext/content/drafts/actions/reviewDraft",
-          "body": {
-            "id": "{id}",
-            "decision": "rejected"
-          }
-        },
-        {
-          "id": "discard",
-          "label": "common.discard",
-          "variant": "text-error",
-          "method": "DELETE",
-          "endpoint": "/api/data/content_drafts/{id}",
-          "confirm": "content.drafts.confirmDiscard"
-        }
-      ]
+      "field": "review_status",
+      "label": "content.drafts.col.review",
+      "display": "badge",
+      "tones": { "draft": "neutral", "approved": "success", "rejected": "danger" }
+    },
+    { "field": "scheduled_at", "label": "content.drafts.col.scheduled" },
+    { "field": "created_by", "label": "content.drafts.col.author", "display": "mono" },
+    { "field": "updated_at", "label": "content.drafts.col.updated" }
+  ],
+  "filter": [{ "field": "published_at", "op": "null" }],
+  "sort": "-updated_at",
+  "selectable": true,
+  "delete": true,
+  "actions": [
+    { "action": "publishDue", "label": "content.drafts.btn.publishDue", "confirm": "content.drafts.confirmPublishDue" }
+  ],
+  "bulkActions": [
+    {
+      "action": "bulkPublish",
+      "label": "content.drafts.btn.publishSelected",
+      "input": { "draft_ids": { "$selection": "id" } },
+      "confirm": "content.drafts.confirmPublish"
+    }
+  ],
+  "rowActions": [
+    {
+      "action": "publishDraft",
+      "label": "content.drafts.btn.publish",
+      "tone": "success",
+      "input": { "id": { "$record": "id" } },
+      "confirm": "content.drafts.confirmPublish"
+    },
+    {
+      "action": "reviewDraft",
+      "label": "content.drafts.btn.approve",
+      "input": { "id": { "$record": "id" }, "decision": "approved" },
+      "prompt": ["note"]
+    },
+    {
+      "action": "reviewDraft",
+      "label": "content.drafts.btn.reject",
+      "tone": "danger",
+      "input": { "id": { "$record": "id" }, "decision": "rejected" },
+      "prompt": ["note"]
+    },
+    {
+      "action": "snapshotDraft",
+      "label": "content.drafts.btn.snapshot",
+      "input": { "id": { "$record": "id" } },
+      "prompt": ["description"]
     }
   ]
 }

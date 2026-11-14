@@ -3,8 +3,8 @@
   "displayName": "Content Drafts",
   "category": "content",
   "description": "Draft, review and publish workflow for content collections, through the data API as the publishing user",
-  "version": "2.1.1",
-  "zveltioMinVersion": "3.0.0-beta.99",
+  "version": "3.0.0",
+  "zveltioMinVersion": "3.0.0-beta.121",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-drafts",
   "permissions": [
@@ -116,6 +116,84 @@
       "writes": [
         "content_drafts",
         "content_draft_snapshots"
+      ]
+    },
+    {
+      "name": "publishDraft",
+      "permission": {
+        "resource": "content_drafts",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "content_drafts"
+      ],
+      "writes": [
+        "content_drafts",
+        "*"
+      ]
+    },
+    {
+      "name": "bulkPublish",
+      "permission": {
+        "resource": "content_drafts",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "draft_ids"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "draft_ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 200,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
+      "reads": [
+        "content_drafts"
+      ],
+      "writes": [
+        "content_drafts",
+        "*"
+      ]
+    },
+    {
+      "name": "publishDue",
+      "permission": {
+        "resource": "content_drafts",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {}
+      },
+      "reads": [
+        "content_drafts"
+      ],
+      "writes": [
+        "content_drafts",
+        "*"
       ]
     }
   ]
