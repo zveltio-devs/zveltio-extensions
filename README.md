@@ -96,3 +96,15 @@ bun run typecheck
 ```
 
 Extensions depend on `@zveltio/sdk` (for `ZveltioExtension` type) and are loaded at runtime by the Zveltio engine.
+
+## Licence
+
+The first-party extensions in this repository are licensed under the GNU Affero
+General Public License v3.0 only ([LICENSE](LICENSE)), copyright © 2026 DaRe IT
+Systems S.R.L. A commercial licence is available for those who cannot accept the
+AGPL. Your own extensions are not affected: an extension that uses only the
+Zveltio extension interface may be under any licence (Zveltio Extension
+Exception). Scope, exception and FAQ:
+[zveltio/LICENSING.md](https://github.com/zveltio-devs/zveltio/blob/master/LICENSING.md).
+Contributions are accepted under the
+[Contributor License Agreement](https://github.com/zveltio-devs/zveltio/blob/master/CLA.md).
