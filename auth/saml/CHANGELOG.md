@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.2 (2026-11-16)
+
+- build: repacked with hono 4.13.18 (security: GHSA-92p4-j3wq-jmqx, GHSA-39q9-qp46-w8xg, GHSA-h25j-2p75-qj33) and kysely 0.29.9, in lockstep with the engine; no behaviour change
+
 ## 2.2.1 (2026-11-12)
 
 - fix: a person the tenant does not admit (`not_a_member`) or a sign-in through an extension without `auth:session` (`capability_required`) is answered like an account the provider has no claim to: 403 with the extension's message, and the assertion is spent. Before, the engine's problem response passed through and the request rolled back. Needs engine 3.0.0-beta.113

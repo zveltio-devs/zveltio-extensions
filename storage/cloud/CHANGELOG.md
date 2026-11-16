@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.1 (2026-11-16)
+
+- build: repacked with hono 4.13.18 (security: GHSA-92p4-j3wq-jmqx, GHSA-39q9-qp46-w8xg, GHSA-h25j-2p75-qj33) and kysely 0.29.9, in lockstep with the engine; no behaviour change
+
 ## 2.0.0 (2026-11-10)
 
 - feat!: files, folders, uploads, downloads, deletes and quotas are the engine's own `/api/storage` (ADR 0034): its size, quota, type sniffing and folder checks, as the signed-in user. The extension's own copies are dropped: `GET /files` (browse by path), `POST /upload` and its hard-coded 5 GiB quota, `GET /files/:id/download`, `DELETE /files/:id`, `GET /quota`, `/admin/quotas` (list, set, delete), `/admin/stats`, and `GET /access-logs/:fileId` (the engine serves the bytes, so the extension sees no download). A user's own usage is `GET /api/storage/quota`; a quota is set by a god, behind step-up, at `PUT /api/admin/storage-quotas/:userId`. The 1.x role quotas, `max_file_size_bytes` and `allowed_extensions` were never enforced and are gone

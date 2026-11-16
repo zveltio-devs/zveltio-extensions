@@ -1,5 +1,5 @@
 // @bun
-// zveltio-extensions/node_modules/graphql/jsutils/devAssert.mjs
+// /zveltio-extension/node_modules/graphql/jsutils/devAssert.mjs
 function devAssert(condition, message) {
   const booleanCondition = Boolean(condition);
   if (!booleanCondition) {
@@ -7,7 +7,7 @@ function devAssert(condition, message) {
   }
 }
 
-// zveltio-extensions/node_modules/graphql/jsutils/inspect.mjs
+// /zveltio-extension/node_modules/graphql/jsutils/inspect.mjs
 var MAX_ARRAY_LENGTH = 10;
 var MAX_RECURSIVE_DEPTH = 2;
 function inspect(value) {
@@ -88,7 +88,7 @@ function getObjectTag(object) {
   return tag;
 }
 
-// zveltio-extensions/node_modules/graphql/jsutils/instanceOf.mjs
+// /zveltio-extension/node_modules/graphql/jsutils/instanceOf.mjs
 var isProduction = globalThis.process && false;
 var instanceOf = isProduction ? function instanceOf(value, constructor) {
   return value instanceof constructor;
@@ -119,12 +119,12 @@ spurious results.`);
   return false;
 };
 
-// zveltio-extensions/node_modules/graphql/jsutils/isObjectLike.mjs
+// /zveltio-extension/node_modules/graphql/jsutils/isObjectLike.mjs
 function isObjectLike(value) {
   return typeof value == "object" && value !== null;
 }
 
-// zveltio-extensions/node_modules/graphql/jsutils/toObjMap.mjs
+// /zveltio-extension/node_modules/graphql/jsutils/toObjMap.mjs
 function toObjMap(obj) {
   if (obj == null) {
     return Object.create(null);
@@ -139,7 +139,7 @@ function toObjMap(obj) {
   return map;
 }
 
-// zveltio-extensions/node_modules/graphql/language/ast.mjs
+// /zveltio-extension/node_modules/graphql/language/ast.mjs
 class Location {
   constructor(startToken, endToken, source) {
     this.start = startToken.start;
@@ -288,7 +288,7 @@ var OperationTypeNode;
   OperationTypeNode["SUBSCRIPTION"] = "subscription";
 })(OperationTypeNode || (OperationTypeNode = {}));
 
-// zveltio-extensions/node_modules/graphql/jsutils/didYouMean.mjs
+// /zveltio-extension/node_modules/graphql/jsutils/didYouMean.mjs
 var MAX_SUGGESTIONS = 5;
 function didYouMean(firstArg, secondArg) {
   const [subMessage, suggestionsArg] = secondArg ? [firstArg, secondArg] : [undefined, firstArg];
@@ -310,12 +310,12 @@ function didYouMean(firstArg, secondArg) {
   return message + selected.join(", ") + ", or " + lastItem + "?";
 }
 
-// zveltio-extensions/node_modules/graphql/jsutils/identityFunc.mjs
+// /zveltio-extension/node_modules/graphql/jsutils/identityFunc.mjs
 function identityFunc(x) {
   return x;
 }
 
-// zveltio-extensions/node_modules/graphql/jsutils/keyMap.mjs
+// /zveltio-extension/node_modules/graphql/jsutils/keyMap.mjs
 function keyMap(list, keyFn) {
   const result = Object.create(null);
   for (const item of list) {
@@ -324,7 +324,7 @@ function keyMap(list, keyFn) {
   return result;
 }
 
-// zveltio-extensions/node_modules/graphql/jsutils/keyValMap.mjs
+// /zveltio-extension/node_modules/graphql/jsutils/keyValMap.mjs
 function keyValMap(list, keyFn, valFn) {
   const result = Object.create(null);
   for (const item of list) {
@@ -333,7 +333,7 @@ function keyValMap(list, keyFn, valFn) {
   return result;
 }
 
-// zveltio-extensions/node_modules/graphql/jsutils/mapValue.mjs
+// /zveltio-extension/node_modules/graphql/jsutils/mapValue.mjs
 function mapValue(map, fn) {
   const result = Object.create(null);
   for (const key of Object.keys(map)) {
@@ -342,7 +342,7 @@ function mapValue(map, fn) {
   return result;
 }
 
-// zveltio-extensions/node_modules/graphql/jsutils/naturalCompare.mjs
+// /zveltio-extension/node_modules/graphql/jsutils/naturalCompare.mjs
 function naturalCompare(aStr, bStr) {
   let aIndex = 0;
   let bIndex = 0;
@@ -387,7 +387,7 @@ function isDigit(code) {
   return !isNaN(code) && DIGIT_0 <= code && code <= DIGIT_9;
 }
 
-// zveltio-extensions/node_modules/graphql/jsutils/suggestionList.mjs
+// /zveltio-extension/node_modules/graphql/jsutils/suggestionList.mjs
 function suggestionList(input, options) {
   const optionsByDistance = Object.create(null);
   const lexicalDistance = new LexicalDistance(input);
@@ -472,7 +472,7 @@ function stringToArray(str) {
   return array;
 }
 
-// zveltio-extensions/node_modules/graphql/language/location.mjs
+// /zveltio-extension/node_modules/graphql/language/location.mjs
 function getLocation(source, position) {
   const lineRegexp = /\r\n|[\n\r]/g;
   let line = 1;
@@ -525,7 +525,7 @@ function getLocations(locations) {
   return result;
 }
 
-// zveltio-extensions/node_modules/graphql/language/printLocation.mjs
+// /zveltio-extension/node_modules/graphql/language/printLocation.mjs
 function printLocation(location) {
   return printSourceLocation(location.source, getLocation(location.source, location.start));
 }
@@ -569,7 +569,7 @@ function printPrefixedLines(lines) {
 `);
 }
 
-// zveltio-extensions/node_modules/graphql/error/GraphQLError.mjs
+// /zveltio-extension/node_modules/graphql/error/GraphQLError.mjs
 function toNormalizedOptions(args) {
   const firstArg = args[0];
   if (firstArg == null || "kind" in firstArg || "length" in firstArg) {
@@ -682,7 +682,7 @@ function undefinedIfEmpty(array) {
   return array === undefined || array.length === 0 ? undefined : array;
 }
 
-// zveltio-extensions/node_modules/graphql/language/kinds.mjs
+// /zveltio-extension/node_modules/graphql/language/kinds.mjs
 var Kind;
 (function(Kind) {
   Kind["NAME"] = "Name";
@@ -736,7 +736,7 @@ var Kind;
   Kind["DIRECTIVE_ARGUMENT_COORDINATE"] = "DirectiveArgumentCoordinate";
 })(Kind || (Kind = {}));
 
-// zveltio-extensions/node_modules/graphql/language/characterClasses.mjs
+// /zveltio-extension/node_modules/graphql/language/characterClasses.mjs
 function isWhiteSpace(code) {
   return code === 9 || code === 32;
 }
@@ -753,7 +753,7 @@ function isNameContinue(code) {
   return isLetter(code) || isDigit2(code) || code === 95;
 }
 
-// zveltio-extensions/node_modules/graphql/language/blockString.mjs
+// /zveltio-extension/node_modules/graphql/language/blockString.mjs
 function dedentBlockStringLines(lines) {
   var _firstNonEmptyLine2;
   let commonIndent = Number.MAX_SAFE_INTEGER;
@@ -805,7 +805,7 @@ function printBlockString(value, options) {
   return '"""' + result + '"""';
 }
 
-// zveltio-extensions/node_modules/graphql/language/printString.mjs
+// /zveltio-extension/node_modules/graphql/language/printString.mjs
 function printString(str) {
   return `"${str.replace(escapedRegExp, escapedReplacer)}"`;
 }
@@ -976,7 +976,7 @@ var escapeSequences = [
   "\\u009F"
 ];
 
-// zveltio-extensions/node_modules/graphql/language/reducer.mjs
+// /zveltio-extension/node_modules/graphql/language/reducer.mjs
 function reduce(root, reducer) {
   const stack = [];
   let frame = {
@@ -1042,7 +1042,7 @@ function reduce(root, reducer) {
   return node;
 }
 
-// zveltio-extensions/node_modules/graphql/language/printer.mjs
+// /zveltio-extension/node_modules/graphql/language/printer.mjs
 function print(ast, options) {
   var _options$maxIndentDep;
   return render(reduce(ast, printDocASTReducer), (_options$maxIndentDep = options === null || options === undefined ? undefined : options.maxIndentDepth) !== null && _options$maxIndentDep !== undefined ? _options$maxIndentDep : Infinity);
@@ -1406,7 +1406,7 @@ function wrappedLineAndArgs(prefix, args) {
   ]);
 }
 
-// zveltio-extensions/node_modules/graphql/utilities/valueFromASTUntyped.mjs
+// /zveltio-extension/node_modules/graphql/utilities/valueFromASTUntyped.mjs
 function valueFromASTUntyped(valueNode, variables) {
   switch (valueNode.kind) {
     case Kind.NULL:
@@ -1428,7 +1428,7 @@ function valueFromASTUntyped(valueNode, variables) {
   }
 }
 
-// zveltio-extensions/node_modules/graphql/type/assertName.mjs
+// /zveltio-extension/node_modules/graphql/type/assertName.mjs
 function assertName(name) {
   name != null || devAssert(false, "Must provide name.");
   typeof name === "string" || devAssert(false, "Expected name to be a string.");
@@ -1452,7 +1452,7 @@ function assertEnumValueName(name) {
   return assertName(name);
 }
 
-// zveltio-extensions/node_modules/graphql/type/definition.mjs
+// /zveltio-extension/node_modules/graphql/type/definition.mjs
 function isType(type) {
   return isScalarType(type) || isObjectType(type) || isInterfaceType(type) || isUnionType(type) || isEnumType(type) || isInputObjectType(type) || isListType(type) || isNonNullType(type);
 }
@@ -1981,7 +1981,7 @@ function isRequiredInputField(field) {
   return isNonNullType(field.type) && field.defaultValue === undefined;
 }
 
-// zveltio-extensions/node_modules/graphql/language/directiveLocation.mjs
+// /zveltio-extension/node_modules/graphql/language/directiveLocation.mjs
 var DirectiveLocation;
 (function(DirectiveLocation) {
   DirectiveLocation["QUERY"] = "QUERY";
@@ -2006,7 +2006,7 @@ var DirectiveLocation;
   DirectiveLocation["DIRECTIVE_DEFINITION"] = "DIRECTIVE_DEFINITION";
 })(DirectiveLocation || (DirectiveLocation = {}));
 
-// zveltio-extensions/node_modules/graphql/type/scalars.mjs
+// /zveltio-extension/node_modules/graphql/type/scalars.mjs
 var GRAPHQL_MAX_INT = 2147483647;
 var GRAPHQL_MIN_INT = -2147483648;
 var GraphQLInt = new GraphQLScalarType({
@@ -2195,7 +2195,7 @@ function serializeObject(outputValue) {
   return outputValue;
 }
 
-// zveltio-extensions/node_modules/graphql/type/directives.mjs
+// /zveltio-extension/node_modules/graphql/type/directives.mjs
 function isDirective(directive) {
   return instanceOf(directive, GraphQLDirective);
 }
@@ -2312,7 +2312,7 @@ var specifiedDirectives = Object.freeze([
   GraphQLOneOfDirective
 ]);
 
-// zveltio-extensions/node_modules/graphql/jsutils/invariant.mjs
+// /zveltio-extension/node_modules/graphql/jsutils/invariant.mjs
 function invariant(condition, message) {
   const booleanCondition = Boolean(condition);
   if (!booleanCondition) {
@@ -2320,12 +2320,12 @@ function invariant(condition, message) {
   }
 }
 
-// zveltio-extensions/node_modules/graphql/jsutils/isIterableObject.mjs
+// /zveltio-extension/node_modules/graphql/jsutils/isIterableObject.mjs
 function isIterableObject(maybeIterable) {
   return typeof maybeIterable === "object" && typeof (maybeIterable === null || maybeIterable === undefined ? undefined : maybeIterable[Symbol.iterator]) === "function";
 }
 
-// zveltio-extensions/node_modules/graphql/utilities/astFromValue.mjs
+// /zveltio-extension/node_modules/graphql/utilities/astFromValue.mjs
 function astFromValue(value, type) {
   if (isNonNullType(type)) {
     const astValue = astFromValue(value, type.ofType);
@@ -2427,7 +2427,7 @@ function astFromValue(value, type) {
 }
 var integerStringRegExp = /^-?(?:0|[1-9][0-9]*)$/;
 
-// zveltio-extensions/node_modules/graphql/type/introspection.mjs
+// /zveltio-extension/node_modules/graphql/type/introspection.mjs
 var __Schema = new GraphQLObjectType({
   name: "__Schema",
   description: "A GraphQL Schema defines the capabilities of a GraphQL server. It exposes all available types and directives on the server, as well as the entry points for query, mutation, and subscription operations.",
@@ -2920,7 +2920,7 @@ function isIntrospectionType(type) {
   return introspectionTypes.some(({ name }) => type.name === name);
 }
 
-// zveltio-extensions/node_modules/graphql/type/schema.mjs
+// /zveltio-extension/node_modules/graphql/type/schema.mjs
 function isSchema(schema) {
   return instanceOf(schema, GraphQLSchema);
 }
@@ -3118,7 +3118,7 @@ function collectReferencedTypes(type, typeSet) {
   }
   return typeSet;
 }
-// zveltio-extensions/node_modules/graphql/utilities/typeComparators.mjs
+// /zveltio-extension/node_modules/graphql/utilities/typeComparators.mjs
 function isEqualType(typeA, typeB) {
   if (typeA === typeB) {
     return true;
@@ -3171,7 +3171,7 @@ function doTypesOverlap(schema, typeA, typeB) {
   return false;
 }
 
-// zveltio-extensions/node_modules/graphql/type/validate.mjs
+// /zveltio-extension/node_modules/graphql/type/validate.mjs
 function validateSchema(schema) {
   assertSchema(schema);
   if (schema.__validationErrors) {
@@ -3503,7 +3503,7 @@ function getDeprecatedDirectiveNode(definitionNode) {
   var _definitionNode$direc;
   return definitionNode === null || definitionNode === undefined ? undefined : (_definitionNode$direc = definitionNode.directives) === null || _definitionNode$direc === undefined ? undefined : _definitionNode$direc.find((node) => node.name.value === GraphQLDeprecatedDirective.name);
 }
-// zveltio-extensions/node_modules/graphql/language/source.mjs
+// /zveltio-extension/node_modules/graphql/language/source.mjs
 class Source {
   constructor(body, name = "GraphQL request", locationOffset = {
     line: 1,
@@ -3524,7 +3524,7 @@ function isSource(source) {
   return instanceOf(source, Source);
 }
 
-// zveltio-extensions/node_modules/graphql/language/tokenKind.mjs
+// /zveltio-extension/node_modules/graphql/language/tokenKind.mjs
 var TokenKind;
 (function(TokenKind) {
   TokenKind["SOF"] = "<SOF>";
@@ -3552,7 +3552,7 @@ var TokenKind;
   TokenKind["COMMENT"] = "Comment";
 })(TokenKind || (TokenKind = {}));
 
-// zveltio-extensions/node_modules/graphql/error/syntaxError.mjs
+// /zveltio-extension/node_modules/graphql/error/syntaxError.mjs
 function syntaxError(source, position, description) {
   return new GraphQLError(`Syntax Error: ${description}`, {
     source,
@@ -3560,7 +3560,7 @@ function syntaxError(source, position, description) {
   });
 }
 
-// zveltio-extensions/node_modules/graphql/language/lexer.mjs
+// /zveltio-extension/node_modules/graphql/language/lexer.mjs
 class Lexer {
   constructor(source) {
     const startOfFileToken = new Token(TokenKind.SOF, 0, 0, 0, 0);
@@ -3972,7 +3972,7 @@ function readName(lexer, start) {
   return createToken(lexer, TokenKind.NAME, start, position, body.slice(start, position));
 }
 
-// zveltio-extensions/node_modules/graphql/language/parser.mjs
+// /zveltio-extension/node_modules/graphql/language/parser.mjs
 function parse(source, options) {
   const parser = new Parser(source, options);
   const document = parser.parseDocument();
@@ -4894,7 +4894,7 @@ function getTokenDesc(token) {
 function getTokenKindDesc(kind) {
   return isPunctuatorTokenKind(kind) ? `"${kind}"` : kind;
 }
-// zveltio-extensions/node_modules/graphql/language/visitor.mjs
+// /zveltio-extension/node_modules/graphql/language/visitor.mjs
 var BREAK = Object.freeze({});
 function visit(root, visitor, visitorKeys = QueryDocumentKeys) {
   const enterLeaveMap = new Map;
@@ -5077,7 +5077,7 @@ function getEnterLeaveForKind(visitor, kind) {
   };
 }
 
-// zveltio-extensions/node_modules/graphql/language/predicates.mjs
+// /zveltio-extension/node_modules/graphql/language/predicates.mjs
 function isExecutableDefinitionNode(node) {
   return node.kind === Kind.OPERATION_DEFINITION || node.kind === Kind.FRAGMENT_DEFINITION;
 }
@@ -5093,7 +5093,7 @@ function isTypeSystemExtensionNode(node) {
 function isTypeExtensionNode(node) {
   return node.kind === Kind.SCALAR_TYPE_EXTENSION || node.kind === Kind.OBJECT_TYPE_EXTENSION || node.kind === Kind.INTERFACE_TYPE_EXTENSION || node.kind === Kind.UNION_TYPE_EXTENSION || node.kind === Kind.ENUM_TYPE_EXTENSION || node.kind === Kind.INPUT_OBJECT_TYPE_EXTENSION;
 }
-// zveltio-extensions/node_modules/graphql/jsutils/Path.mjs
+// /zveltio-extension/node_modules/graphql/jsutils/Path.mjs
 function addPath(prev, key, typename) {
   return {
     prev,
@@ -5111,12 +5111,12 @@ function pathToArray(path) {
   return flattened.reverse();
 }
 
-// zveltio-extensions/node_modules/graphql/jsutils/isPromise.mjs
+// /zveltio-extension/node_modules/graphql/jsutils/isPromise.mjs
 function isPromise(value) {
   return typeof (value === null || value === undefined ? undefined : value.then) === "function";
 }
 
-// zveltio-extensions/node_modules/graphql/jsutils/memoize3.mjs
+// /zveltio-extension/node_modules/graphql/jsutils/memoize3.mjs
 function memoize3(fn) {
   let cache0;
   return function memoized(a1, a2, a3) {
@@ -5142,7 +5142,7 @@ function memoize3(fn) {
   };
 }
 
-// zveltio-extensions/node_modules/graphql/jsutils/promiseForObject.mjs
+// /zveltio-extension/node_modules/graphql/jsutils/promiseForObject.mjs
 function promiseForObject(object) {
   return Promise.all(Object.values(object)).then((resolvedValues) => {
     const resolvedObject = Object.create(null);
@@ -5153,7 +5153,7 @@ function promiseForObject(object) {
   });
 }
 
-// zveltio-extensions/node_modules/graphql/jsutils/promiseReduce.mjs
+// /zveltio-extension/node_modules/graphql/jsutils/promiseReduce.mjs
 function promiseReduce(values, callbackFn, initialValue) {
   let accumulator = initialValue;
   for (const value of values) {
@@ -5162,7 +5162,7 @@ function promiseReduce(values, callbackFn, initialValue) {
   return accumulator;
 }
 
-// zveltio-extensions/node_modules/graphql/jsutils/toError.mjs
+// /zveltio-extension/node_modules/graphql/jsutils/toError.mjs
 function toError(thrownValue) {
   return thrownValue instanceof Error ? thrownValue : new NonErrorThrown(thrownValue);
 }
@@ -5175,7 +5175,7 @@ class NonErrorThrown extends Error {
   }
 }
 
-// zveltio-extensions/node_modules/graphql/error/locatedError.mjs
+// /zveltio-extension/node_modules/graphql/error/locatedError.mjs
 function locatedError(rawOriginalError, nodes, path) {
   var _nodes;
   const originalError = toError(rawOriginalError);
@@ -5194,7 +5194,7 @@ function isLocatedGraphQLError(error) {
   return Array.isArray(error.path);
 }
 
-// zveltio-extensions/node_modules/graphql/utilities/typeFromAST.mjs
+// /zveltio-extension/node_modules/graphql/utilities/typeFromAST.mjs
 function typeFromAST(schema, typeNode) {
   switch (typeNode.kind) {
     case Kind.LIST_TYPE: {
@@ -5210,12 +5210,12 @@ function typeFromAST(schema, typeNode) {
   }
 }
 
-// zveltio-extensions/node_modules/graphql/jsutils/printPathArray.mjs
+// /zveltio-extension/node_modules/graphql/jsutils/printPathArray.mjs
 function printPathArray(path) {
   return path.map((key) => typeof key === "number" ? "[" + key.toString() + "]" : "." + key).join("");
 }
 
-// zveltio-extensions/node_modules/graphql/utilities/coerceInputValue.mjs
+// /zveltio-extension/node_modules/graphql/utilities/coerceInputValue.mjs
 function coerceInputValue(inputValue, type, onError = defaultOnError, hideSuggestions) {
   return coerceInputValueImpl(inputValue, type, onError, undefined, hideSuggestions);
 }
@@ -5311,7 +5311,7 @@ function coerceInputValueImpl(inputValue, type, onError, path, hideSuggestions) 
   invariant(false, "Unexpected input type: " + inspect(type));
 }
 
-// zveltio-extensions/node_modules/graphql/utilities/valueFromAST.mjs
+// /zveltio-extension/node_modules/graphql/utilities/valueFromAST.mjs
 function valueFromAST(valueNode, type, variables) {
   if (!valueNode) {
     return;
@@ -5416,7 +5416,7 @@ function hasOwnProperty(obj, prop) {
   return Object.prototype.hasOwnProperty.call(obj, prop);
 }
 
-// zveltio-extensions/node_modules/graphql/execution/values.mjs
+// /zveltio-extension/node_modules/graphql/execution/values.mjs
 function getVariableValues(schema, varDefNodes, inputs, options) {
   const errors = [];
   const maxErrors = options === null || options === undefined ? undefined : options.maxErrors;
@@ -5544,7 +5544,7 @@ function hasOwnProperty2(obj, prop) {
   return Object.prototype.hasOwnProperty.call(obj, prop);
 }
 
-// zveltio-extensions/node_modules/graphql/execution/collectFields.mjs
+// /zveltio-extension/node_modules/graphql/execution/collectFields.mjs
 function collectFields(schema, fragments, variableValues, runtimeType, selectionSet, onSelectionSet) {
   const fields = new Map;
   collectFieldsImpl(schema, fragments, variableValues, runtimeType, selectionSet, fields, new Set, onSelectionSet);
@@ -5629,7 +5629,7 @@ function getFieldEntryKey(node) {
   return node.alias ? node.alias.value : node.name.value;
 }
 
-// zveltio-extensions/node_modules/graphql/execution/execute.mjs
+// /zveltio-extension/node_modules/graphql/execution/execute.mjs
 var collectSubfields2 = memoize3((exeContext, returnType, fieldNodes) => collectSubfields(exeContext.schema, exeContext.fragments, exeContext.variableValues, returnType, fieldNodes));
 
 class CollectedErrors {
@@ -6058,7 +6058,7 @@ function getFieldDef(schema, parentType, fieldNode) {
   }
   return parentType.getFields()[fieldName];
 }
-// zveltio-extensions/node_modules/graphql/utilities/TypeInfo.mjs
+// /zveltio-extension/node_modules/graphql/utilities/TypeInfo.mjs
 class TypeInfo {
   constructor(schema, initialType, getFieldDefFn) {
     this._schema = schema;
@@ -6298,7 +6298,7 @@ function visitWithTypeInfo(typeInfo, visitor) {
   };
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/ExecutableDefinitionsRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/ExecutableDefinitionsRule.mjs
 function ExecutableDefinitionsRule(context) {
   return {
     Document(node) {
@@ -6315,7 +6315,7 @@ function ExecutableDefinitionsRule(context) {
   };
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/FieldsOnCorrectTypeRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/FieldsOnCorrectTypeRule.mjs
 function FieldsOnCorrectTypeRule(context) {
   return {
     Field(node) {
@@ -6380,7 +6380,7 @@ function getSuggestedFieldNames(type, fieldName) {
   return [];
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/FragmentsOnCompositeTypesRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/FragmentsOnCompositeTypesRule.mjs
 function FragmentsOnCompositeTypesRule(context) {
   return {
     InlineFragment(node) {
@@ -6407,7 +6407,7 @@ function FragmentsOnCompositeTypesRule(context) {
   };
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/KnownArgumentNamesRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/KnownArgumentNamesRule.mjs
 function KnownArgumentNamesRule(context) {
   return {
     ...KnownArgumentNamesOnDirectivesRule(context),
@@ -6460,7 +6460,7 @@ function KnownArgumentNamesOnDirectivesRule(context) {
   };
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/KnownDirectivesRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/KnownDirectivesRule.mjs
 function KnownDirectivesRule(context) {
   const locationsMap = Object.create(null);
   const schema = context.getSchema();
@@ -6557,7 +6557,7 @@ function getDirectiveLocationForOperation(operation) {
   }
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/KnownFragmentNamesRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/KnownFragmentNamesRule.mjs
 function KnownFragmentNamesRule(context) {
   return {
     FragmentSpread(node) {
@@ -6572,7 +6572,7 @@ function KnownFragmentNamesRule(context) {
   };
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/KnownTypeNamesRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/KnownTypeNamesRule.mjs
 function KnownTypeNamesRule(context) {
   const schema = context.getSchema();
   const existingTypesMap = schema ? schema.getTypeMap() : Object.create(null);
@@ -6609,7 +6609,7 @@ function isSDLNode(value) {
   return "kind" in value && (isTypeSystemDefinitionNode(value) || isTypeSystemExtensionNode(value));
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/LoneAnonymousOperationRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/LoneAnonymousOperationRule.mjs
 function LoneAnonymousOperationRule(context) {
   let operationCount = 0;
   return {
@@ -6626,7 +6626,7 @@ function LoneAnonymousOperationRule(context) {
   };
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/LoneSchemaDefinitionRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/LoneSchemaDefinitionRule.mjs
 function LoneSchemaDefinitionRule(context) {
   var _ref, _ref2, _oldSchema$astNode;
   const oldSchema = context.getSchema();
@@ -6650,7 +6650,7 @@ function LoneSchemaDefinitionRule(context) {
   };
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/MaxIntrospectionDepthRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/MaxIntrospectionDepthRule.mjs
 var MAX_LISTS_DEPTH = 3;
 function MaxIntrospectionDepthRule(context) {
   const checkedFragments = Object.create(null);
@@ -6709,7 +6709,7 @@ function MaxIntrospectionDepthRule(context) {
   };
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/NoFragmentCyclesRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/NoFragmentCyclesRule.mjs
 function NoFragmentCyclesRule(context) {
   const visitedFrags = Object.create(null);
   const spreadPath = [];
@@ -6754,7 +6754,7 @@ function NoFragmentCyclesRule(context) {
   }
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/NoUndefinedVariablesRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/NoUndefinedVariablesRule.mjs
 function NoUndefinedVariablesRule(context) {
   let variableNameDefined = Object.create(null);
   return {
@@ -6780,7 +6780,7 @@ function NoUndefinedVariablesRule(context) {
   };
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/NoUnusedFragmentsRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/NoUnusedFragmentsRule.mjs
 function NoUnusedFragmentsRule(context) {
   const operationDefs = [];
   const fragmentDefs = [];
@@ -6809,7 +6809,7 @@ function NoUnusedFragmentsRule(context) {
   };
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/NoUnusedVariablesRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/NoUnusedVariablesRule.mjs
 function NoUnusedVariablesRule(context) {
   let variableDefs = [];
   return {
@@ -6839,10 +6839,10 @@ function NoUnusedVariablesRule(context) {
   };
 }
 
-// zveltio-extensions/node_modules/graphql/validation/validationAbortedError.mjs
+// /zveltio-extension/node_modules/graphql/validation/validationAbortedError.mjs
 var validationAbortedError = new GraphQLError("Validation aborted.");
 
-// zveltio-extensions/node_modules/graphql/validation/rules/OverlappingFieldsCanBeMergedRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/OverlappingFieldsCanBeMergedRule.mjs
 var MAX_CONFLICT_DETAIL_LENGTH = 1000;
 var MAX_CONFLICT_NODES = 20;
 var MAX_COMPLEXITY_BUDGET = 500000;
@@ -7279,7 +7279,7 @@ class PairSet {
   }
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/PossibleFragmentSpreadsRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/PossibleFragmentSpreadsRule.mjs
 function PossibleFragmentSpreadsRule(context) {
   return {
     InlineFragment(node) {
@@ -7317,7 +7317,7 @@ function getFragmentType(context, name) {
   }
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/PossibleTypeExtensionsRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/PossibleTypeExtensionsRule.mjs
 function PossibleTypeExtensionsRule(context) {
   const schema = context.getSchema();
   const definedTypes = Object.create(null);
@@ -7411,7 +7411,7 @@ function extensionKindToTypeName(kind) {
   }
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/ProvidedRequiredArgumentsRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/ProvidedRequiredArgumentsRule.mjs
 function ProvidedRequiredArgumentsRule(context) {
   return {
     ...ProvidedRequiredArgumentsOnDirectivesRule(context),
@@ -7477,7 +7477,7 @@ function isRequiredArgumentNode(arg) {
   return arg.type.kind === Kind.NON_NULL_TYPE && arg.defaultValue == null;
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/ScalarLeafsRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/ScalarLeafsRule.mjs
 function ScalarLeafsRule(context) {
   return {
     Field(node) {
@@ -7510,7 +7510,7 @@ function ScalarLeafsRule(context) {
   };
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/SingleFieldSubscriptionsRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/SingleFieldSubscriptionsRule.mjs
 function SingleFieldSubscriptionsRule(context) {
   let fragments;
   function reserveSelectionSetWork(selectionSet) {
@@ -7570,7 +7570,7 @@ function SingleFieldSubscriptionsRule(context) {
   };
 }
 
-// zveltio-extensions/node_modules/graphql/jsutils/groupBy.mjs
+// /zveltio-extension/node_modules/graphql/jsutils/groupBy.mjs
 function groupBy(list, keyFn) {
   const result = new Map;
   for (const item of list) {
@@ -7585,7 +7585,7 @@ function groupBy(list, keyFn) {
   return result;
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/UniqueArgumentDefinitionNamesRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/UniqueArgumentDefinitionNamesRule.mjs
 function UniqueArgumentDefinitionNamesRule(context) {
   return {
     DirectiveDefinition(directiveNode) {
@@ -7623,7 +7623,7 @@ function UniqueArgumentDefinitionNamesRule(context) {
   }
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/UniqueArgumentNamesRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/UniqueArgumentNamesRule.mjs
 function UniqueArgumentNamesRule(context) {
   return {
     Field: checkArgUniqueness,
@@ -7643,7 +7643,7 @@ function UniqueArgumentNamesRule(context) {
   }
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/UniqueDirectiveNamesRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/UniqueDirectiveNamesRule.mjs
 function UniqueDirectiveNamesRule(context) {
   const knownDirectiveNames = Object.create(null);
   const schema = context.getSchema();
@@ -7668,7 +7668,7 @@ function UniqueDirectiveNamesRule(context) {
   };
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/UniqueDirectivesPerLocationRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/UniqueDirectivesPerLocationRule.mjs
 function UniqueDirectivesPerLocationRule(context) {
   const uniqueDirectiveMap = Object.create(null);
   const schema = context.getSchema();
@@ -7724,7 +7724,7 @@ function UniqueDirectivesPerLocationRule(context) {
   };
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/UniqueEnumValueNamesRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/UniqueEnumValueNamesRule.mjs
 function UniqueEnumValueNamesRule(context) {
   const schema = context.getSchema();
   const existingTypeMap = schema ? schema.getTypeMap() : Object.create(null);
@@ -7760,7 +7760,7 @@ function UniqueEnumValueNamesRule(context) {
   }
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/UniqueFieldDefinitionNamesRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/UniqueFieldDefinitionNamesRule.mjs
 function UniqueFieldDefinitionNamesRule(context) {
   const schema = context.getSchema();
   const existingTypeMap = schema ? schema.getTypeMap() : Object.create(null);
@@ -7805,7 +7805,7 @@ function hasField(type, fieldName) {
   return false;
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/UniqueFragmentNamesRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/UniqueFragmentNamesRule.mjs
 function UniqueFragmentNamesRule(context) {
   const knownFragmentNames = Object.create(null);
   return {
@@ -7824,7 +7824,7 @@ function UniqueFragmentNamesRule(context) {
   };
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/UniqueInputFieldNamesRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/UniqueInputFieldNamesRule.mjs
 function UniqueInputFieldNamesRule(context) {
   const knownNameStack = [];
   let knownNames = Object.create(null);
@@ -7853,7 +7853,7 @@ function UniqueInputFieldNamesRule(context) {
   };
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/UniqueOperationNamesRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/UniqueOperationNamesRule.mjs
 function UniqueOperationNamesRule(context) {
   const knownOperationNames = Object.create(null);
   return {
@@ -7877,7 +7877,7 @@ function UniqueOperationNamesRule(context) {
   };
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/UniqueOperationTypesRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/UniqueOperationTypesRule.mjs
 function UniqueOperationTypesRule(context) {
   const schema = context.getSchema();
   const definedOperationTypes = Object.create(null);
@@ -7912,7 +7912,7 @@ function UniqueOperationTypesRule(context) {
   }
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/UniqueTypeNamesRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/UniqueTypeNamesRule.mjs
 function UniqueTypeNamesRule(context) {
   const knownTypeNames = Object.create(null);
   const schema = context.getSchema();
@@ -7943,7 +7943,7 @@ function UniqueTypeNamesRule(context) {
   }
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/UniqueVariableNamesRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/UniqueVariableNamesRule.mjs
 function UniqueVariableNamesRule(context) {
   return {
     OperationDefinition(operationNode) {
@@ -7961,7 +7961,7 @@ function UniqueVariableNamesRule(context) {
   };
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/ValuesOfCorrectTypeRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/ValuesOfCorrectTypeRule.mjs
 function ValuesOfCorrectTypeRule(context) {
   return {
     ListValue(node) {
@@ -8068,7 +8068,7 @@ function validateOneOfInputObject(context, node, type, fieldNodeMap) {
   }
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/VariablesAreInputTypesRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/VariablesAreInputTypesRule.mjs
 function VariablesAreInputTypesRule(context) {
   return {
     VariableDefinition(node) {
@@ -8084,7 +8084,7 @@ function VariablesAreInputTypesRule(context) {
   };
 }
 
-// zveltio-extensions/node_modules/graphql/validation/rules/VariablesInAllowedPositionRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/VariablesInAllowedPositionRule.mjs
 function VariablesInAllowedPositionRule(context) {
   let varDefMap = Object.create(null);
   return {
@@ -8134,7 +8134,7 @@ function allowedVariableUsage(schema, varType, varDefaultValue, locationType, lo
   return isTypeSubTypeOf(schema, varType, locationType);
 }
 
-// zveltio-extensions/node_modules/graphql/validation/specifiedRules.mjs
+// /zveltio-extension/node_modules/graphql/validation/specifiedRules.mjs
 var recommendedRules = Object.freeze([MaxIntrospectionDepthRule]);
 var specifiedRules = Object.freeze([
   ExecutableDefinitionsRule,
@@ -8183,7 +8183,7 @@ var specifiedSDLRules = Object.freeze([
   ProvidedRequiredArgumentsOnDirectivesRule
 ]);
 
-// zveltio-extensions/node_modules/graphql/jsutils/SetMap.mjs
+// /zveltio-extension/node_modules/graphql/jsutils/SetMap.mjs
 class SetMap {
   constructor() {
     this._entries = new Map;
@@ -8211,7 +8211,7 @@ class SetMap {
   }
 }
 
-// zveltio-extensions/node_modules/graphql/validation/ValidationContext.mjs
+// /zveltio-extension/node_modules/graphql/validation/ValidationContext.mjs
 class ASTValidationContext {
   _remainingFragmentWork = 50000;
   constructor(ast, onError) {
@@ -8381,7 +8381,7 @@ class ValidationContext extends ASTValidationContext {
   }
 }
 
-// zveltio-extensions/node_modules/graphql/validation/validate.mjs
+// /zveltio-extension/node_modules/graphql/validation/validate.mjs
 var QueryDocumentKeysToValidate = mapValue(QueryDocumentKeys, (keys) => keys.filter((key) => key !== "description"));
 function validate(schema, documentAST, rules = specifiedRules, options, typeInfo = new TypeInfo(schema)) {
   var _options$maxErrors, _options$hideSuggesti;
@@ -8410,7 +8410,7 @@ function validate(schema, documentAST, rules = specifiedRules, options, typeInfo
   }
   return errors;
 }
-// zveltio-extensions/node_modules/graphql/validation/rules/custom/NoSchemaIntrospectionCustomRule.mjs
+// /zveltio-extension/node_modules/graphql/validation/rules/custom/NoSchemaIntrospectionCustomRule.mjs
 function NoSchemaIntrospectionCustomRule(context) {
   return {
     Field(node) {
@@ -8423,7 +8423,7 @@ function NoSchemaIntrospectionCustomRule(context) {
     }
   };
 }
-// zveltio-extensions/node_modules/kysely/dist/util/object-utils.js
+// /zveltio-extension/node_modules/kysely/dist/util/object-utils.js
 function isUndefined(obj) {
   return typeof obj === "undefined" || obj === undefined;
 }
@@ -8465,7 +8465,7 @@ function getMessage(error) {
   return error instanceof Error ? error.message : String(error);
 }
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/identifier-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/identifier-node.js
 var IdentifierNode = freeze({
   is(node) {
     return node.kind === "IdentifierNode";
@@ -8478,7 +8478,7 @@ var IdentifierNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/schemable-identifier-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/schemable-identifier-node.js
 var SchemableIdentifierNode = freeze({
   is(node) {
     return node.kind === "SchemableIdentifierNode";
@@ -8498,7 +8498,7 @@ var SchemableIdentifierNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/alias-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/alias-node.js
 var AliasNode = freeze({
   is(node) {
     return node.kind === "AliasNode";
@@ -8512,7 +8512,7 @@ var AliasNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/table-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/table-node.js
 var TableNode = freeze({
   is(node) {
     return node.kind === "TableNode";
@@ -8531,12 +8531,12 @@ var TableNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/operation-node-source.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/operation-node-source.js
 function isOperationNodeSource(obj) {
   return isObject(obj) && isFunction(obj.toOperationNode);
 }
 
-// zveltio-extensions/node_modules/kysely/dist/expression/expression.js
+// /zveltio-extension/node_modules/kysely/dist/expression/expression.js
 function isExpression(obj) {
   return isObject(obj) && "expressionType" in obj && isOperationNodeSource(obj);
 }
@@ -8544,7 +8544,7 @@ function isAliasedExpression(obj) {
   return isObject(obj) && "expression" in obj && isString(obj.alias) && isOperationNodeSource(obj);
 }
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/select-modifier-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/select-modifier-node.js
 var SelectModifierNode = freeze({
   is(node) {
     return node.kind === "SelectModifierNode";
@@ -8564,7 +8564,7 @@ var SelectModifierNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/and-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/and-node.js
 var AndNode = freeze({
   is(node) {
     return node.kind === "AndNode";
@@ -8578,7 +8578,7 @@ var AndNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/or-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/or-node.js
 var OrNode = freeze({
   is(node) {
     return node.kind === "OrNode";
@@ -8592,7 +8592,7 @@ var OrNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/on-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/on-node.js
 var OnNode = freeze({
   is(node) {
     return node.kind === "OnNode";
@@ -8611,7 +8611,7 @@ var OnNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/join-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/join-node.js
 var JoinNode = freeze({
   is(node) {
     return node.kind === "JoinNode";
@@ -8640,7 +8640,7 @@ var JoinNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/binary-operation-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/binary-operation-node.js
 var BinaryOperationNode = freeze({
   is(node) {
     return node.kind === "BinaryOperationNode";
@@ -8655,7 +8655,7 @@ var BinaryOperationNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/operator-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/operator-node.js
 var COMPARISON_OPERATORS_DICTIONARY = freeze({
   "=": true,
   "==": true,
@@ -8761,7 +8761,7 @@ function isUnaryOperator(op) {
   return isString(op) && UNARY_OPERATORS_DICTIONARY[op];
 }
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/column-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/column-node.js
 var ColumnNode = freeze({
   is(node) {
     return node.kind === "ColumnNode";
@@ -8774,7 +8774,7 @@ var ColumnNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/select-all-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/select-all-node.js
 var SelectAllNode = freeze({
   is(node) {
     return node.kind === "SelectAllNode";
@@ -8786,7 +8786,7 @@ var SelectAllNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/reference-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/reference-node.js
 var ReferenceNode = freeze({
   is(node) {
     return node.kind === "ReferenceNode";
@@ -8807,12 +8807,12 @@ var ReferenceNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/dynamic/dynamic-reference-builder.js
+// /zveltio-extension/node_modules/kysely/dist/dynamic/dynamic-reference-builder.js
 function isDynamicReferenceBuilder(obj) {
   return isObject(obj) && isOperationNodeSource(obj) && isString(obj.dynamicReference);
 }
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/order-by-item-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/order-by-item-node.js
 var OrderByItemNode = freeze({
   is(node) {
     return node.kind === "OrderByItemNode";
@@ -8832,7 +8832,7 @@ var OrderByItemNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/raw-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/raw-node.js
 var RawNode = freeze({
   is(node) {
     return node.kind === "RawNode";
@@ -8855,7 +8855,7 @@ var RawNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/collate-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/collate-node.js
 var CollateNode = freeze({
   is(node) {
     return node.kind === "CollateNode";
@@ -8868,7 +8868,7 @@ var CollateNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/query-builder/order-by-item-builder.js
+// /zveltio-extension/node_modules/kysely/dist/query-builder/order-by-item-builder.js
 class OrderByItemBuilder {
   #props;
   constructor(props) {
@@ -8910,7 +8910,7 @@ class OrderByItemBuilder {
   }
 }
 
-// zveltio-extensions/node_modules/kysely/dist/util/log-once.js
+// /zveltio-extension/node_modules/kysely/dist/util/log-once.js
 var LOGGED_MESSAGES = new Set;
 function logOnce(message) {
   if (LOGGED_MESSAGES.has(message)) {
@@ -8920,7 +8920,7 @@ function logOnce(message) {
   console.log(message);
 }
 
-// zveltio-extensions/node_modules/kysely/dist/parser/order-by-parser.js
+// /zveltio-extension/node_modules/kysely/dist/parser/order-by-parser.js
 function isOrderByDirection(thing) {
   return thing === "asc" || thing === "desc";
 }
@@ -8980,7 +8980,7 @@ function parseOrderByWithModifiers(expr, modifiers) {
   return modifiers(new OrderByItemBuilder({ node })).toOperationNode();
 }
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/json-reference-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/json-reference-node.js
 var JSONReferenceNode = freeze({
   is(node) {
     return node.kind === "JSONReferenceNode";
@@ -9000,7 +9000,7 @@ var JSONReferenceNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/json-operator-chain-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/json-operator-chain-node.js
 var JSONOperatorChainNode = freeze({
   is(node) {
     return node.kind === "JSONOperatorChainNode";
@@ -9020,7 +9020,7 @@ var JSONOperatorChainNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/json-path-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/json-path-node.js
 var JSONPathNode = freeze({
   is(node) {
     return node.kind === "JSONPathNode";
@@ -9040,7 +9040,7 @@ var JSONPathNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/parser/reference-parser.js
+// /zveltio-extension/node_modules/kysely/dist/parser/reference-parser.js
 function parseSimpleReferenceExpression(exp) {
   if (isString(exp)) {
     return parseStringReference(exp);
@@ -9104,7 +9104,7 @@ function trim(str) {
   return str.trim();
 }
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/primitive-value-list-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/primitive-value-list-node.js
 var PrimitiveValueListNode = freeze({
   is(node) {
     return node.kind === "PrimitiveValueListNode";
@@ -9117,7 +9117,7 @@ var PrimitiveValueListNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/value-list-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/value-list-node.js
 var ValueListNode = freeze({
   is(node) {
     return node.kind === "ValueListNode";
@@ -9130,7 +9130,7 @@ var ValueListNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/value-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/value-node.js
 var ValueNode = freeze({
   is(node) {
     return node.kind === "ValueNode";
@@ -9150,7 +9150,7 @@ var ValueNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/parser/value-parser.js
+// /zveltio-extension/node_modules/kysely/dist/parser/value-parser.js
 function parseValueExpressionOrList(arg) {
   if (isReadonlyArray(arg)) {
     return parseValueExpressionList(arg);
@@ -9179,7 +9179,7 @@ function parseValueExpressionList(arg) {
   return PrimitiveValueListNode.create(arg);
 }
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/parens-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/parens-node.js
 var ParensNode = freeze({
   is(node) {
     return node.kind === "ParensNode";
@@ -9192,7 +9192,7 @@ var ParensNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/parser/binary-operation-parser.js
+// /zveltio-extension/node_modules/kysely/dist/parser/binary-operation-parser.js
 function parseValueBinaryOperationOrExpression(args) {
   if (args.length === 3) {
     return parseValueBinaryOperation(args[0], args[1], args[2]);
@@ -9246,7 +9246,7 @@ function toOperationNode(nodeOrSource) {
   return isOperationNodeSource(nodeOrSource) ? nodeOrSource.toOperationNode() : nodeOrSource;
 }
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/order-by-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/order-by-node.js
 var OrderByNode = freeze({
   is(node) {
     return node.kind === "OrderByNode";
@@ -9265,7 +9265,7 @@ var OrderByNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/partition-by-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/partition-by-node.js
 var PartitionByNode = freeze({
   is(node) {
     return node.kind === "PartitionByNode";
@@ -9284,7 +9284,7 @@ var PartitionByNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/over-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/over-node.js
 var OverNode = freeze({
   is(node) {
     return node.kind === "OverNode";
@@ -9308,7 +9308,7 @@ var OverNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/from-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/from-node.js
 var FromNode = freeze({
   is(node) {
     return node.kind === "FromNode";
@@ -9327,7 +9327,7 @@ var FromNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/group-by-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/group-by-node.js
 var GroupByNode = freeze({
   is(node) {
     return node.kind === "GroupByNode";
@@ -9346,7 +9346,7 @@ var GroupByNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/having-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/having-node.js
 var HavingNode = freeze({
   is(node) {
     return node.kind === "HavingNode";
@@ -9365,7 +9365,7 @@ var HavingNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/insert-query-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/insert-query-node.js
 var InsertQueryNode = freeze({
   is(node) {
     return node.kind === "InsertQueryNode";
@@ -9391,7 +9391,7 @@ var InsertQueryNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/list-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/list-node.js
 var ListNode = freeze({
   is(node) {
     return node.kind === "ListNode";
@@ -9404,7 +9404,7 @@ var ListNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/update-query-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/update-query-node.js
 var UpdateQueryNode = freeze({
   is(node) {
     return node.kind === "UpdateQueryNode";
@@ -9441,7 +9441,7 @@ var UpdateQueryNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/using-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/using-node.js
 var UsingNode = freeze({
   is(node) {
     return node.kind === "UsingNode";
@@ -9460,7 +9460,7 @@ var UsingNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/delete-query-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/delete-query-node.js
 var DeleteQueryNode = freeze({
   is(node) {
     return node.kind === "DeleteQueryNode";
@@ -9494,7 +9494,7 @@ var DeleteQueryNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/where-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/where-node.js
 var WhereNode = freeze({
   is(node) {
     return node.kind === "WhereNode";
@@ -9513,7 +9513,7 @@ var WhereNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/returning-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/returning-node.js
 var ReturningNode = freeze({
   is(node) {
     return node.kind === "ReturningNode";
@@ -9532,7 +9532,7 @@ var ReturningNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/explain-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/explain-node.js
 var ExplainNode = freeze({
   is(node) {
     return node.kind === "ExplainNode";
@@ -9546,7 +9546,7 @@ var ExplainNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/when-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/when-node.js
 var WhenNode = freeze({
   is(node) {
     return node.kind === "WhenNode";
@@ -9565,7 +9565,7 @@ var WhenNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/merge-query-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/merge-query-node.js
 var MergeQueryNode = freeze({
   is(node) {
     return node.kind === "MergeQueryNode";
@@ -9600,7 +9600,7 @@ var MergeQueryNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/output-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/output-node.js
 var OutputNode = freeze({
   is(node) {
     return node.kind === "OutputNode";
@@ -9619,7 +9619,7 @@ var OutputNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/query-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/query-node.js
 var QueryNode = freeze({
   is(node) {
     return SelectQueryNode.is(node) || InsertQueryNode.is(node) || UpdateQueryNode.is(node) || DeleteQueryNode.is(node) || MergeQueryNode.is(node);
@@ -9692,7 +9692,7 @@ var QueryNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/select-query-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/select-query-node.js
 var SelectQueryNode = freeze({
   is(node) {
     return node.kind === "SelectQueryNode";
@@ -9792,7 +9792,7 @@ var SelectQueryNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/query-builder/join-builder.js
+// /zveltio-extension/node_modules/kysely/dist/query-builder/join-builder.js
 class JoinBuilder {
   #props;
   constructor(props) {
@@ -9824,7 +9824,7 @@ class JoinBuilder {
   }
 }
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/partition-by-item-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/partition-by-item-node.js
 var PartitionByItemNode = freeze({
   is(node) {
     return node.kind === "PartitionByItemNode";
@@ -9837,12 +9837,12 @@ var PartitionByItemNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/parser/partition-by-parser.js
+// /zveltio-extension/node_modules/kysely/dist/parser/partition-by-parser.js
 function parsePartitionBy(partitionBy) {
   return parseReferenceExpressionOrList(partitionBy).map(PartitionByItemNode.create);
 }
 
-// zveltio-extensions/node_modules/kysely/dist/query-builder/over-builder.js
+// /zveltio-extension/node_modules/kysely/dist/query-builder/over-builder.js
 class OverBuilder {
   #props;
   constructor(props) {
@@ -9871,7 +9871,7 @@ class OverBuilder {
   }
 }
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/selection-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/selection-node.js
 var SelectionNode = freeze({
   is(node) {
     return node.kind === "SelectionNode";
@@ -9896,7 +9896,7 @@ var SelectionNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/parser/select-parser.js
+// /zveltio-extension/node_modules/kysely/dist/parser/select-parser.js
 function parseSelectArg(selection) {
   if (isFunction(selection)) {
     return parseSelectArg(selection(expressionBuilder()));
@@ -9931,7 +9931,7 @@ function parseSelectAllArg(table) {
   throw new Error(`invalid value selectAll expression: ${JSON.stringify(table)}`);
 }
 
-// zveltio-extensions/node_modules/kysely/dist/query-builder/no-result-error.js
+// /zveltio-extension/node_modules/kysely/dist/query-builder/no-result-error.js
 class NoResultError extends Error {
   node;
   constructor(node) {
@@ -9943,7 +9943,7 @@ function isNoResultErrorConstructor(fn) {
   return Object.prototype.hasOwnProperty.call(fn, "prototype");
 }
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/top-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/top-node.js
 var TopNode = freeze({
   is(node) {
     return node.kind === "TopNode";
@@ -9957,7 +9957,7 @@ var TopNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/parser/top-parser.js
+// /zveltio-extension/node_modules/kysely/dist/parser/top-parser.js
 function parseTop(expression, modifiers) {
   if (!isNumber(expression) && !isBigInt(expression)) {
     throw new Error(`Invalid top expression: ${expression}`);
@@ -9971,7 +9971,7 @@ function isTopModifiers(modifiers) {
   return modifiers === "percent" || modifiers === "with ties" || modifiers === "percent with ties";
 }
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/limit-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/limit-node.js
 var LimitNode = freeze({
   is(node) {
     return node.kind === "LimitNode";
@@ -9984,7 +9984,7 @@ var LimitNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/util/random-string.js
+// /zveltio-extension/node_modules/kysely/dist/util/random-string.js
 var CHARS = [
   "A",
   "B",
@@ -10060,7 +10060,7 @@ function randomChar() {
   return CHARS[~~(Math.random() * CHARS.length)];
 }
 
-// zveltio-extensions/node_modules/kysely/dist/util/query-id.js
+// /zveltio-extension/node_modules/kysely/dist/util/query-id.js
 function createQueryId() {
   return new LazyQueryId;
 }
@@ -10075,7 +10075,7 @@ class LazyQueryId {
   }
 }
 
-// zveltio-extensions/node_modules/kysely/dist/util/deferred.js
+// /zveltio-extension/node_modules/kysely/dist/util/deferred.js
 class Deferred {
   #promise;
   #resolve;
@@ -10099,7 +10099,7 @@ class Deferred {
   };
 }
 
-// zveltio-extensions/node_modules/kysely/dist/util/provide-controlled-connection.js
+// /zveltio-extension/node_modules/kysely/dist/util/provide-controlled-connection.js
 async function provideControlledConnection(connectionProvider, options) {
   const connectionDefer = new Deferred;
   const connectionReleaseDefer = new Deferred;
@@ -10113,7 +10113,7 @@ async function provideControlledConnection(connectionProvider, options) {
   });
 }
 
-// zveltio-extensions/node_modules/kysely/dist/util/abort.js
+// /zveltio-extension/node_modules/kysely/dist/util/abort.js
 function getInflightQueryAbortHandler(abortStrategy = "ignore query", connection, beforeThrow) {
   if (abortStrategy === "ignore query") {
     return;
@@ -10165,7 +10165,7 @@ function decorateWithTiming(reason, timing) {
   }
 }
 
-// zveltio-extensions/node_modules/kysely/dist/query-executor/query-executor-base.js
+// /zveltio-extension/node_modules/kysely/dist/query-executor/query-executor-base.js
 var NO_PLUGINS = freeze([]);
 
 class QueryExecutorBase {
@@ -10316,7 +10316,7 @@ class QueryExecutorBase {
   }
 }
 
-// zveltio-extensions/node_modules/kysely/dist/query-executor/noop-query-executor.js
+// /zveltio-extension/node_modules/kysely/dist/query-executor/noop-query-executor.js
 class NoopQueryExecutor extends QueryExecutorBase {
   get adapter() {
     throw new Error("this query cannot be compiled to SQL");
@@ -10345,7 +10345,7 @@ class NoopQueryExecutor extends QueryExecutorBase {
 }
 var NOOP_QUERY_EXECUTOR = new NoopQueryExecutor;
 
-// zveltio-extensions/node_modules/kysely/dist/parser/parse-utils.js
+// /zveltio-extension/node_modules/kysely/dist/parser/parse-utils.js
 function createJoinBuilder(joinType, table) {
   return new JoinBuilder({
     joinNode: JoinNode.create(joinType, parseTableExpression(table))
@@ -10357,7 +10357,7 @@ function createOverBuilder() {
   });
 }
 
-// zveltio-extensions/node_modules/kysely/dist/parser/join-parser.js
+// /zveltio-extension/node_modules/kysely/dist/parser/join-parser.js
 function parseJoin(joinType, args) {
   if (args.length === 3) {
     return parseSingleOnJoin(joinType, args[0], args[1], args[2]);
@@ -10379,7 +10379,7 @@ function parseOnlessJoin(joinType, from) {
   return JoinNode.create(joinType, parseTableExpression(from));
 }
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/offset-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/offset-node.js
 var OffsetNode = freeze({
   is(node) {
     return node.kind === "OffsetNode";
@@ -10392,7 +10392,7 @@ var OffsetNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/group-by-item-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/group-by-item-node.js
 var GroupByItemNode = freeze({
   is(node) {
     return node.kind === "GroupByItemNode";
@@ -10405,13 +10405,13 @@ var GroupByItemNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/parser/group-by-parser.js
+// /zveltio-extension/node_modules/kysely/dist/parser/group-by-parser.js
 function parseGroupBy(groupBy) {
   groupBy = isFunction(groupBy) ? groupBy(expressionBuilder()) : groupBy;
   return parseReferenceExpressionOrList(groupBy).map(GroupByItemNode.create);
 }
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/set-operation-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/set-operation-node.js
 var SetOperationNode = freeze({
   is(node) {
     return node.kind === "SetOperationNode";
@@ -10426,7 +10426,7 @@ var SetOperationNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/parser/set-operation-parser.js
+// /zveltio-extension/node_modules/kysely/dist/parser/set-operation-parser.js
 function parseSetOperations(operator, expression, all) {
   if (isFunction(expression)) {
     expression = expression(createExpressionBuilder());
@@ -10437,7 +10437,7 @@ function parseSetOperations(operator, expression, all) {
   return expression.map((expr) => SetOperationNode.create(operator, parseExpression(expr), all));
 }
 
-// zveltio-extensions/node_modules/kysely/dist/expression/expression-wrapper.js
+// /zveltio-extension/node_modules/kysely/dist/expression/expression-wrapper.js
 class ExpressionWrapper {
   #node;
   constructor(node) {
@@ -10528,7 +10528,7 @@ class AndWrapper {
   }
 }
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/fetch-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/fetch-node.js
 var FetchNode = freeze({
   is(node) {
     return node.kind === "FetchNode";
@@ -10542,7 +10542,7 @@ var FetchNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/parser/fetch-parser.js
+// /zveltio-extension/node_modules/kysely/dist/parser/fetch-parser.js
 function parseFetch(rowCount, modifier) {
   if (!isNumber(rowCount) && !isBigInt(rowCount)) {
     throw new Error(`Invalid fetch row count: ${rowCount}`);
@@ -10556,7 +10556,7 @@ function isFetchModifier(value) {
   return value === "only" || value === "with ties";
 }
 
-// zveltio-extensions/node_modules/kysely/dist/query-builder/select-query-builder.js
+// /zveltio-extension/node_modules/kysely/dist/query-builder/select-query-builder.js
 var _a;
 
 class SelectQueryBuilderImpl {
@@ -10920,7 +10920,7 @@ class AliasedSelectQueryBuilderImpl {
   }
 }
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/aggregate-function-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/aggregate-function-node.js
 var AggregateFunctionNode = freeze({
   is(node) {
     return node.kind === "AggregateFunctionNode";
@@ -10965,7 +10965,7 @@ var AggregateFunctionNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/function-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/function-node.js
 var FunctionNode = freeze({
   is(node) {
     return node.kind === "FunctionNode";
@@ -10979,7 +10979,7 @@ var FunctionNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/query-builder/aggregate-function-builder.js
+// /zveltio-extension/node_modules/kysely/dist/query-builder/aggregate-function-builder.js
 class AggregateFunctionBuilder {
   #props;
   constructor(props) {
@@ -11066,7 +11066,7 @@ class AliasedAggregateFunctionBuilder {
   }
 }
 
-// zveltio-extensions/node_modules/kysely/dist/query-builder/function-module.js
+// /zveltio-extension/node_modules/kysely/dist/query-builder/function-module.js
 function createFunctionModule() {
   const fn = (name, args) => {
     return new ExpressionWrapper(FunctionNode.create(name, parseReferenceExpressionOrList(args ?? [])));
@@ -11119,7 +11119,7 @@ function createFunctionModule() {
   });
 }
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/unary-operation-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/unary-operation-node.js
 var UnaryOperationNode = freeze({
   is(node) {
     return node.kind === "UnaryOperationNode";
@@ -11133,7 +11133,7 @@ var UnaryOperationNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/parser/unary-operation-parser.js
+// /zveltio-extension/node_modules/kysely/dist/parser/unary-operation-parser.js
 function parseUnaryOperation(operator, operand) {
   if (isUnaryOperator(operator)) {
     return UnaryOperationNode.create(OperatorNode.create(operator), parseReferenceExpression(operand));
@@ -11141,7 +11141,7 @@ function parseUnaryOperation(operator, operand) {
   throw new Error(`invalid unary operator ${JSON.stringify(operator)}`);
 }
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/case-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/case-node.js
 var CaseNode = freeze({
   is(node) {
     return node.kind === "CaseNode";
@@ -11175,7 +11175,7 @@ var CaseNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/query-builder/case-builder.js
+// /zveltio-extension/node_modules/kysely/dist/query-builder/case-builder.js
 class CaseBuilder {
   #props;
   constructor(props) {
@@ -11268,7 +11268,7 @@ class CaseEndBuilder {
   }
 }
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/json-path-leg-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/json-path-leg-node.js
 var JSONPathLegNode = freeze({
   is(node) {
     return node.kind === "JSONPathLegNode";
@@ -11282,7 +11282,7 @@ var JSONPathLegNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/query-builder/json-path-builder.js
+// /zveltio-extension/node_modules/kysely/dist/query-builder/json-path-builder.js
 var HASH_NEGATIVE_INDEX_REGEX = /^#-\d+$/;
 
 class JSONPathBuilder {
@@ -11348,7 +11348,7 @@ class AliasedJSONPathBuilder {
   }
 }
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/tuple-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/tuple-node.js
 var TupleNode = freeze({
   is(node) {
     return node.kind === "TupleNode";
@@ -11361,7 +11361,7 @@ var TupleNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/data-type-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/data-type-node.js
 var SIMPLE_COLUMN_DATA_TYPES = freeze({
   bigint: true,
   bigserial: true,
@@ -11437,7 +11437,7 @@ function isColumnDataType(dataType) {
   return SIMPLE_COLUMN_DATA_TYPES[dataType] || COLUMN_DATA_TYPE_REGEX.some((r) => r.test(dataType));
 }
 
-// zveltio-extensions/node_modules/kysely/dist/parser/data-type-parser.js
+// /zveltio-extension/node_modules/kysely/dist/parser/data-type-parser.js
 function parseDataTypeExpression(dataType) {
   if (isOperationNodeSource(dataType)) {
     return dataType.toOperationNode();
@@ -11448,7 +11448,7 @@ function parseDataTypeExpression(dataType) {
   throw new Error(`invalid column data type ${JSON.stringify(dataType)}`);
 }
 
-// zveltio-extensions/node_modules/kysely/dist/operation-node/cast-node.js
+// /zveltio-extension/node_modules/kysely/dist/operation-node/cast-node.js
 var CastNode = freeze({
   is(node) {
     return node.kind === "CastNode";
@@ -11462,7 +11462,7 @@ var CastNode = freeze({
   }
 });
 
-// zveltio-extensions/node_modules/kysely/dist/expression/expression-builder.js
+// /zveltio-extension/node_modules/kysely/dist/expression/expression-builder.js
 function createExpressionBuilder(executor = NOOP_QUERY_EXECUTOR) {
   function binary(lhs, op, rhs) {
     return new ExpressionWrapper(parseValueBinaryOperation(lhs, op, rhs));
@@ -11557,7 +11557,7 @@ function expressionBuilder(_) {
   return createExpressionBuilder();
 }
 
-// zveltio-extensions/node_modules/kysely/dist/parser/expression-parser.js
+// /zveltio-extension/node_modules/kysely/dist/parser/expression-parser.js
 function parseExpression(exp) {
   if (isOperationNodeSource(exp)) {
     return exp.toOperationNode();
@@ -11578,12 +11578,12 @@ function isExpressionOrFactory(obj) {
   return isExpression(obj) || isAliasedExpression(obj) || isFunction(obj);
 }
 
-// zveltio-extensions/node_modules/kysely/dist/dynamic/dynamic-table-builder.js
+// /zveltio-extension/node_modules/kysely/dist/dynamic/dynamic-table-builder.js
 function isAliasedDynamicTableBuilder(obj) {
   return isObject(obj) && isOperationNodeSource(obj) && isString(obj.table) && isString(obj.alias);
 }
 
-// zveltio-extensions/node_modules/kysely/dist/parser/table-parser.js
+// /zveltio-extension/node_modules/kysely/dist/parser/table-parser.js
 function parseTableExpressionOrList(table) {
   if (isReadonlyArray(table)) {
     return table.map((it) => parseTableExpression(it));
@@ -11621,7 +11621,7 @@ function parseTable(from) {
 function trim2(str) {
   return str.trim();
 }
-// zveltio-extensions/node_modules/kysely/dist/raw-builder/raw-builder.js
+// /zveltio-extension/node_modules/kysely/dist/raw-builder/raw-builder.js
 class RawBuilderImpl {
   #props;
   constructor(props) {
@@ -11693,7 +11693,7 @@ class AliasedRawBuilderImpl {
     return AliasNode.create(this.#rawBuilder.toOperationNode(), isOperationNodeSource(this.#alias) ? this.#alias.toOperationNode() : IdentifierNode.create(this.#alias));
   }
 }
-// zveltio-extensions/node_modules/kysely/dist/raw-builder/sql.js
+// /zveltio-extension/node_modules/kysely/dist/raw-builder/sql.js
 var sql = Object.assign((sqlFragments, ...parameters) => {
   return createRawBuilder({
     queryId: createQueryId(),
@@ -12280,4 +12280,4 @@ var engine_default = extension;
 export {
   engine_default as default
 };
-// @zveltio-bundled kysely@0.29.8
+// @zveltio-bundled kysely@0.29.9
