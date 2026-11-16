@@ -3,7 +3,7 @@
   "displayName": "Data Import",
   "category": "data",
   "description": "Import collection data from CSV, JSON or NDJSON files through the data API, as the importing user",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "zveltioMinVersion": "3.0.0-beta.99",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-import",
@@ -40,7 +40,7 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "b66b279ab55b70a0af14d767b182cfc379d2e375f287369ad2ac92ade3639d25",
+    "engineSha256": "4a9320754be80fd626cb365e523c98e114b1fe51fd8fc61f1c25ffa16ea3bd26",
     "sourceSha256": "c9a96d23a56a40314cf275106d97f7b3f3ceacff746dfffee164f336276ea6c9",
     "schemaSha256": "0060c4c59b859f1e6599f9ab40060e0f682f642c50b9c8e736e6924792327fb8"
   }

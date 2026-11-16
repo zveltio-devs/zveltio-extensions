@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.1 (2026-11-16)
+
+- build: repacked with hono 4.13.18 (security: GHSA-92p4-j3wq-jmqx, GHSA-39q9-qp46-w8xg, GHSA-h25j-2p75-qj33) and kysely 0.29.9, in lockstep with the engine; no behaviour change
+
 ## 3.0.0 (2026-11-13)
 
 - feat!: `DELETE /delete-my-account` is gone. Erasing one's own account is the engine's `DELETE /api/me` (ADR 0046), re-authenticated there by the account's own sign-in method (a step-up when it has a passkey or TOTP, else its password, else a fresh OAuth sign-in); the extension no longer calls `ctx.internals.deleteUser`, which the engine withdrew because it let an extension delete any account id it named

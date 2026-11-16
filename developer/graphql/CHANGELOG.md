@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.1 (2026-11-16)
+
+- build: repacked with hono 4.13.18 (security: GHSA-92p4-j3wq-jmqx, GHSA-39q9-qp46-w8xg, GHSA-h25j-2p75-qj33) and kysely 0.29.9, in lockstep with the engine; no behaviour change
+
 ## 2.2.0 (2026-11-13)
 
 - The four routes (`GET /` playground, `POST /`, `POST /refresh-schema`, `POST /persisted/:name/execute`) are declared routes (ADR 0039): the manifest's `routes` names each, `caller`, and the engine serves them with plain handlers. Same URLs, same answers; no Hono in the bundle. The handlers name the request's caller and write as it through `ctx.internals` with the `Request` they are handed (`caller`, `createRecord`, `updateRecord`, `deleteRecord`), instead of the Hono context; the schema cache is keyed by the caller's tenant as the engine reports it
