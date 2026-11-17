@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.3.0 (2026-11-17)
+
+- feat: mail syncs in the background. The job `syncAll` runs on the engine's clock every five minutes (the manifest's `schedule`, ADR 0048 decision 1), in every tenant where Mail is active: it syncs the active accounts synced longest ago, up to four a run (one run's relayed streams), skipping one a sync already holds unless that sync died (15 minutes). The `sync` action still syncs one account at once
+- a background sync reads new messages and flags as the `sync` action does; a message synced before 2.2.0 still has no `thread_id`
+- requires engine 3.0.0-beta.126 (`jobs[].schedule`)
+
 ## 2.2.0 (2026-11-13)
 
 - feat: the Inbox is three `zveltio.view/2` views (ADR 0042 slice 5) instead of Svelte code: `mail.inbox` (accounts, folders, messages, the message), `mail.compose` (a draft) and `mail.thread` (a conversation). The extension ships no Studio code any more; `MailInbox.svelte` and its sanitizer are gone, and Studio draws the message body inert itself (sanitised, in a sandboxed frame, remote images blocked)
