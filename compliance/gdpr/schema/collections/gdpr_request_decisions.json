@@ -1,6 +1,7 @@
 {
   "name": "gdpr_request_decisions",
   "writtenBy": "actions",
+  "defaultGrants": false,
   "fields": [
     {
       "name": "request_id",

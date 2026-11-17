@@ -3,7 +3,7 @@
 ## 3.1.0 (2026-11-17)
 
 - feat: `GET /export-my-data` includes the caller's own consents (`consents`) and subject requests (`subject_requests`) in the request's tenant, read as the caller through the data API and filtered on `created_by` (ADR 0058 decision 3; 2.0.0 had dropped them)
-- docs(security): `README.md` gives the operator setup every install needs (ADR 0058 decision 3, finding U2): under the engine's default grants any member reads all consents and requests, withdraws another member's consent and completes or rejects anyone's request, an erasure included. The fix is the engine's rules, not extension code: a row rule `tenant_member: created_by eq user_id` on `gdpr_consent_records` and `gdpr_subject_requests`, and the default grants on `gdpr_request_decisions` revoked, so only the roles the operator grants (a tenant admin, a DPO who does not hold `tenant_member`) decide. Nothing changes on upgrade until the operator applies both steps
+- feat(security)!: members are kept apart by what the extension declares (ADR 0058 decision 3, finding U2), no operator step: the owner-only row rule `tenant_member: created_by eq user_id` on `gdpr_consent_records` and `gdpr_subject_requests`, and `"defaultGrants": false` on `gdpr_request_decisions`. Under 3.0.x any member read every consent and request, withdrew another member's consent and completed or rejected anyone's request, an erasure included. Now a member sees and acts on their own consents and requests only, and only a tenant admin or a role the operator grants on `gdpr_request_decisions` decides; that role's holder must not be a `tenant_member` (see `README.md`). A member no longer withdraws their own request
 
 ## 3.0.1 (2026-11-16)
 
