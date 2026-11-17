@@ -41,8 +41,7 @@
             "fields": [
               { "name": "callback_url", "label": "auth.saml.ui.acs_callback_url", "required": true, "mono": true, "colSpan": 2, "placeholder": "auth.saml.ui.acs_placeholder" },
               { "name": "private_key", "label": "auth.saml.ui.private_key", "type": "textarea", "rows": 4, "mono": true, "colSpan": 2 },
-              { "name": "audience", "label": "auth.saml.ui.audience", "mono": true },
-              { "name": "audience_check", "label": "auth.saml.ui.audience_check", "type": "boolean", "default": true }
+              { "name": "audience", "label": "auth.saml.ui.audience", "mono": true }
             ]
           }
         ]

@@ -5,7 +5,6 @@
   "auth.ldap.section.enable": "LDAP-hitelesítés engedélyezése",
   "auth.ldap.section.search": "Keresési beállítások",
   "auth.ldap.section.server": "Szerverkapcsolat",
-  "auth.ldap.section.tls": "TLS-tanúsítvány ellenőrzése",
   "auth.ldap.subtitle": "Címtár-hitelesítési beállítások",
   "auth.ldap.title": "LDAP",
   "auth.ldap.toast.connectionOk": "Sikeres kapcsolat!",

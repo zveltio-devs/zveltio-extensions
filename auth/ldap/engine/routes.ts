@@ -46,7 +46,11 @@ class LdapConfigUnreadable extends Error {
  * more firms with a saved row than it lists. With no `tenant` (`/login`, read
  * as the system, whose reach is the request's firm) the one row it reads.
  */
-async function getLdapConfig(collections: HostCollections, tenant?: string): Promise<Settings | null> {
+async function getLdapConfig(
+  collections: HostCollections,
+  ctx: Pick<ExtensionContext, 'config'>,
+  tenant?: string,
+): Promise<Settings | null> {
   const { records } = await collections.list('ldap_settings', { limit: 100 });
   const rows = records as Record<string, any>[];
   const row = tenant === undefined ? rows[0] : rows.find((r) => r.tenant_id === tenant);
@@ -62,8 +66,30 @@ async function getLdapConfig(collections: HostCollections, tenant?: string): Pro
     usernameAttribute: row.username_attribute || 'uid',
     emailAttribute: row.email_attribute || 'mail',
     nameAttribute: row.name_attribute || 'cn',
-    tlsVerify: row.tls_verify !== false,
+    tlsVerify: tlsVerify(ctx, row.tls_verify),
   };
+}
+
+let warnedStoredTlsVerify = false;
+
+/**
+ * Whether to verify the LDAPS certificate: always, unless the operator set
+ * `ZVELTIO_ALLOW_UNVERIFIED_LDAPS` (ADR 0058 d4). The Console field
+ * `tls_verify` is no longer read — any tenant admin could turn it off — so a
+ * stored `false` is ignored, and said once, with the variable that restores it.
+ * An engine without `allowUnverifiedLdaps` verifies.
+ */
+function tlsVerify(ctx: Pick<ExtensionContext, 'config'>, stored: unknown): boolean {
+  if (ctx.config?.allowUnverifiedLdaps === true) return false;
+  if (stored === false && !warnedStoredTlsVerify) {
+    warnedStoredTlsVerify = true;
+    console.warn(
+      '[ldap] ldap_settings.tls_verify=false is ignored since auth/ldap 4.0.0: the LDAPS ' +
+        'certificate is verified. Trust the directory CA with NODE_EXTRA_CA_CERTS, or set ' +
+        'ZVELTIO_ALLOW_UNVERIFIED_LDAPS=1 on the engine (every tenant; removed in 3.1.0).',
+    );
+  }
+  return true;
 }
 
 /**
@@ -142,7 +168,7 @@ export const login: RouteHandler = async (request, { host }) => {
   // The caller has no principal yet: the settings are read as the system
   // (`data:system`, audited), whose reach is the request's tenant.
   const loaded = await loadConfig(() =>
-    ctx.internals.asSystem(['ldap_settings'], () => getLdapConfig(host.collections)),
+    ctx.internals.asSystem(['ldap_settings'], () => getLdapConfig(host.collections, ctx)),
   );
   if (loaded.error) return loaded.error;
   const config = loaded.config;
@@ -211,7 +237,7 @@ export function ldapRoutes(ctx: ExtensionContext): Hono {
 
     // As the caller: the settings are read under the caller's own grants.
     const tenant = (c.get('tenant') as { id?: string } | null | undefined)?.id;
-    const loaded = await loadConfig(() => getLdapConfig(host(c).collections, tenant ?? ''));
+    const loaded = await loadConfig(() => getLdapConfig(host(c).collections, ctx, tenant ?? ''));
     if (loaded.error) return loaded.error;
     const config = loaded.config;
     if (!config) return c.json({ error: 'LDAP not configured' }, 503);

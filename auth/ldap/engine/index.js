@@ -14411,7 +14411,7 @@ class LdapConfigUnreadable extends Error {
     this.name = "LdapConfigUnreadable";
   }
 }
-async function getLdapConfig(collections, tenant) {
+async function getLdapConfig(collections, ctx, tenant) {
   const { records } = await collections.list("ldap_settings", { limit: 100 });
   const rows = records;
   const row = tenant === undefined ? rows[0] : rows.find((r) => r.tenant_id === tenant);
@@ -14429,8 +14429,18 @@ async function getLdapConfig(collections, tenant) {
     usernameAttribute: row.username_attribute || "uid",
     emailAttribute: row.email_attribute || "mail",
     nameAttribute: row.name_attribute || "cn",
-    tlsVerify: row.tls_verify !== false
+    tlsVerify: tlsVerify(ctx, row.tls_verify)
   };
+}
+var warnedStoredTlsVerify = false;
+function tlsVerify(ctx, stored) {
+  if (ctx.config?.allowUnverifiedLdaps === true)
+    return false;
+  if (stored === false && !warnedStoredTlsVerify) {
+    warnedStoredTlsVerify = true;
+    console.warn("[ldap] ldap_settings.tls_verify=false is ignored since auth/ldap 4.0.0: the LDAPS " + "certificate is verified. Trust the directory CA with NODE_EXTRA_CA_CERTS, or set " + "ZVELTIO_ALLOW_UNVERIFIED_LDAPS=1 on the engine (every tenant; removed in 3.1.0).");
+  }
+  return true;
 }
 function assertLdapTransportSafe(ctx, url) {
   const inProd = ctx.config?.isProduction ?? false;
@@ -14471,7 +14481,7 @@ var login = async (request, { host }) => {
   if (!parsed.success)
     return answer({ success: false, error: parsed.error }, 400);
   const { username, password } = parsed.data;
-  const loaded = await loadConfig(() => ctx.internals.asSystem(["ldap_settings"], () => getLdapConfig(host.collections)));
+  const loaded = await loadConfig(() => ctx.internals.asSystem(["ldap_settings"], () => getLdapConfig(host.collections, ctx)));
   if (loaded.error)
     return loaded.error;
   const config = loaded.config;
@@ -14532,7 +14542,7 @@ function ldapRoutes(ctx) {
     if (admin instanceof Response)
       return admin;
     const tenant = c.get("tenant")?.id;
-    const loaded = await loadConfig(() => getLdapConfig(host(c).collections, tenant ?? ""));
+    const loaded = await loadConfig(() => getLdapConfig(host(c).collections, ctx, tenant ?? ""));
     if (loaded.error)
       return loaded.error;
     const config = loaded.config;
