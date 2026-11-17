@@ -23,7 +23,6 @@ Tier-3 pages appear only where the product calls for them (e.g.
 | `communications/mail` | accounts, identities, signatures, filters, contacts | **Inbox, compose and conversation are `view/2` views** (2.2.0, ADR 0042 slice 5; no Studio code). Still deferred: a remote-images switch (undecided, ADR 0042 decision 10), an address and folder picker | Folders, read/compose/reply, attachments, sync, flags |
 | `content/pages` | sites + page metadata list | **Block builder shipped** (`/admin/pages/builder/:id`). Still optional: live resolved preview, templates/menus/insights shell | Canvas under `studio/src/components/builder/` |
 | `content/media` | metadata CRUD | File browser + upload UI | |
-| `developer/graphql` | schema/endpoints admin | **Playground shipped** (`/admin/developer/graphql/playground`) | POST `/ext/developer/graphql` |
 | `geospatial/postgis` | geofences CRUD | **Explore shipped** (`/admin/geospatial/postgis/explore`) — near/cluster/bbox | MapView |
 | `projects/management` | projects CRUD | **Kanban shipped** (`/admin/projects/management/kanban`) | Drag → PATCH status |
 | `projects/helpdesk` | tickets list/create/reply | Live conversation panel | |
