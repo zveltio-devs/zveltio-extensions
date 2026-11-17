@@ -330,6 +330,14 @@ jobs:
       - name: Install engine deps
         run: cd ../zveltio && bun install --frozen-lockfile
 
+      # In production a directory runs inline only on the registry's signature,
+      # kept with its files and re-verified at every load, never on its name
+      # (zveltio U3). This checkout carries none: sign each extension as a
+      # registry download leaves it, with a key made for this run, and trust that
+      # key through REGISTRY_PUBLIC_KEYS_JSON.
+      - name: Sign the extensions as a registry download leaves them
+        run: cd ../zveltio && bun scripts/sign-as-registry.ts "$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+
       - name: Boot engine + create god + probe SDUI contract
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/zveltio_probe
