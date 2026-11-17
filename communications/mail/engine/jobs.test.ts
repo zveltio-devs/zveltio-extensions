@@ -354,6 +354,47 @@ describe('sync', () => {
   });
 });
 
+describe('syncAll (the manifest schedule)', () => {
+  let srv: Awaited<ReturnType<typeof imapServer>>;
+  beforeAll(async () => {
+    srv = await imapServer({ INBOX: { messages: [{ raw: 'From: b@x.test\r\nSubject: one\r\n\r\nbody', flags: [] }] } });
+  });
+  afterAll(() => srv.close());
+
+  it('is declared on a five-minute schedule with an input the clock can send', () => {
+    const def = manifest.jobs.find((j: Row) => j.name === 'syncAll');
+    expect(def.schedule).toBe('*/5 * * * *');
+    expect(def.input).toEqual({ type: 'object', additionalProperties: false });
+    expect(manifest.permissions).toContain('data:system');
+  });
+
+  it('syncs the four accounts synced longest ago, skipping inactive and busy ones', async () => {
+    const w = world([`127.0.0.1:${srv.port}`]);
+    const at = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
+    const due = [
+      account(w, srv.port, 1, { sync_status: 'idle', last_sync_at: null }),
+      account(w, srv.port, 1, { sync_status: 'error', last_sync_at: at(60) }),
+      account(w, srv.port, 1, { sync_status: 'idle', last_sync_at: at(30) }),
+      account(w, srv.port, 1, { sync_status: 'idle', last_sync_at: at(20) }),
+    ];
+    const newest = account(w, srv.port, 1, { sync_status: 'idle', last_sync_at: at(10) });
+    const inactive = account(w, srv.port, 1, { sync_status: 'idle', is_active: false });
+    const busy = account(w, srv.port, 1, { sync_status: 'syncing' });
+    await w.run('syncAll', {});
+
+    expect(w.connects).toHaveLength(4);
+    for (const a of due) {
+      const row = w.table('mail_accounts').get(a.id)!;
+      expect(row.sync_error ?? null).toBeNull();
+      expect(row.sync_status).toBe('idle');
+      expect(w.rows('mail_messages', { account_id: a.id })).toHaveLength(1);
+    }
+    expect(w.table('mail_accounts').get(newest.id)!.last_sync_at).toBe(newest.last_sync_at);
+    expect(w.table('mail_accounts').get(inactive.id)!.sync_status).toBe('idle');
+    expect(w.table('mail_accounts').get(busy.id)!.sync_status).toBe('syncing');
+  }, 60_000);
+});
+
 describe('send', () => {
   it('sends a draft, files a copy in Sent, remembers the recipients and deletes the draft', async () => {
     const imap = await imapServer({ INBOX: { messages: [] }, '': { folders: { Sent: { 'special-use': '\\Sent', messages: [] } } } });

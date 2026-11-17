@@ -2280,8 +2280,9 @@ var require_css_syntax_error = __commonJS(function(exports, module) {
         if (number === this.line) {
           if (line.length > 160) {
             let padding = 20;
+            let endColumn = typeof this.endColumn === "number" ? this.endColumn : this.column;
             let subLineStart = Math.max(0, this.column - padding);
-            let subLineEnd = Math.max(this.column + padding, this.endColumn + padding);
+            let subLineEnd = Math.max(this.column + padding, endColumn + padding);
             let subLine = line.slice(subLineStart, subLineEnd);
             let spacing = aside(gutter.replace(/\d/g, " ")) + line.slice(0, Math.min(this.column - 1, padding - 1)).replace(/[^\t]/g, " ");
             return mark(">") + aside(gutter) + highlight(subLine) + `
@@ -3728,7 +3729,7 @@ var require_document = __commonJS(function(exports, module) {
   Document.default = Document;
 });
 
-// /zveltio-extension/node_modules/nanoid/non-secure/index.cjs
+// /zveltio-extension/node_modules/postcss/node_modules/nanoid/non-secure/index.cjs
 var require_non_secure = __commonJS(function(exports, module) {
   var urlAlphabet = "useandom-26T198340PX75pxJACKVERYMINDBUSHWOLF_GQZbfghjklqvwyzrict";
   var customAlphabet = (alphabet, defaultSize = 21) => {
@@ -4460,9 +4461,11 @@ var require_map_generator = __commonJS(function(exports, module) {
           let endIndex = this.css.indexOf("*/", startIndex + annotation.length);
           if (endIndex === -1)
             break;
-          while (startIndex > cursor && this.css[startIndex - 1] === `
-`) {
-            startIndex--;
+          if (endIndex + 2 === this.css.length || /[\t\n\f\r ]/.test(this.css[endIndex + 2])) {
+            while (startIndex > cursor && (this.css[startIndex - 1] === `
+` || this.css[startIndex - 1] === "\r")) {
+              startIndex--;
+            }
           }
           css += this.css.slice(cursor, startIndex);
           cursor = endIndex + 2;
@@ -4752,14 +4755,15 @@ var require_tokenize = __commonJS(function(exports, module) {
   var RE_WORD_END = /[\t\n\f\r !"#'():;@[\\\]{}]|\/(?=\*)/g;
   var RE_BAD_BRACKET = /.[\r\n"'(/\\]/;
   var RE_HEX_ESCAPE = /[\da-f]/i;
+  var RE_URL_NAME = /(^|[\t\n\f\r "'(),/:;[\]{}])url$/i;
+  var RE_QUOTED = /[\t\n\f\r ]*["']/y;
   module.exports = function tokenizer(input, options = {}) {
     let css = input.css.valueOf();
     let ignore = options.ignoreErrors;
     let code, content, escape, next, quote;
-    let currentToken, escaped, escapePos, n, prev;
+    let currentToken, escaped, escapePos;
     let length = css.length;
     let pos = 0;
-    let buffer = [];
     let returned = [];
     let lastBadParen = -1;
     function position() {
@@ -4805,9 +4809,8 @@ var require_tokenize = __commonJS(function(exports, module) {
           break;
         }
         case OPEN_PARENTHESES: {
-          prev = buffer.length ? buffer.pop()[1] : "";
-          n = css.charCodeAt(pos + 1);
-          if (prev === "url" && n !== SINGLE_QUOTE && n !== DOUBLE_QUOTE && n !== SPACE && n !== NEWLINE && n !== TAB && n !== FEED && n !== CR) {
+          RE_QUOTED.lastIndex = pos + 1;
+          if (RE_URL_NAME.test(css.substring(pos - 4, pos)) && !RE_QUOTED.test(css)) {
             next = pos;
             do {
               escaped = false;
@@ -4924,7 +4927,6 @@ var require_tokenize = __commonJS(function(exports, module) {
               next = RE_WORD_END.lastIndex - 2;
             }
             currentToken = ["word", css.slice(pos, next + 1), pos, next];
-            buffer.push(currentToken);
             pos = next;
           }
           break;
@@ -6255,7 +6257,7 @@ var require_processor = __commonJS(function(exports, module) {
 
   class Processor {
     constructor(plugins = []) {
-      this.version = "8.5.32";
+      this.version = "8.5.33";
       this.plugins = this.normalize(plugins);
     }
     normalize(plugins) {
@@ -7197,6 +7199,9 @@ var require_sanitize_html = __commonJS(function(exports, module) {
     }
     options = Object.assign({}, sanitizeHtml.defaults, options);
     options.parser = Object.assign({}, htmlParserDefaults, options.parser);
+    if (typeof html === "string" && !options.parser.xmlMode) {
+      html = html.replaceAll("<![CDATA[", "<!&#91;CDATA[");
+    }
     const logger = loggerFor(options);
     const tagAllowed = function(name) {
       return options.allowedTags === false || (options.allowedTags || []).indexOf(name) > -1;
@@ -7573,8 +7578,10 @@ var require_sanitize_html = __commonJS(function(exports, module) {
         }
         if (options.disallowedTagsMode === "completelyDiscard" && !tagAllowed(tag)) {
           text = "";
-        } else if (tag && tagAllowed(tag) && (options.disallowedTagsMode === "discard" || options.disallowedTagsMode === "completelyDiscard") && (tag === "script" || tag === "style")) {
+        } else if (tag && tagAllowed(tag) && (options.disallowedTagsMode === "discard" || options.disallowedTagsMode === "completelyDiscard") && tag === "script") {
           result += text;
+        } else if (tag && tagAllowed(tag) && (options.disallowedTagsMode === "discard" || options.disallowedTagsMode === "completelyDiscard") && tag === "style") {
+          result += stack.some((frame) => [frame.tag, frame.name].some((name) => name === "svg" || name === "math")) ? text.replace(/</g, "\\3c ") : text;
         } else if (tag && tagAllowed(tag) && (options.disallowedTagsMode === "discard" || options.disallowedTagsMode === "completelyDiscard") && (tag === "textarea" || tag === "xmp")) {
           if (tag === "xmp") {
             result += text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -7720,7 +7727,7 @@ var require_sanitize_html = __commonJS(function(exports, module) {
           s = s.replace(/"/g, "&quot;");
         }
       }
-      s = s.replace(/&(?![a-zA-Z0-9#]{1,20};)/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      s = s.replace(/&(?![a-zA-Z0-9#]+;)/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
       if (quote) {
         s = s.replace(/"/g, "&quot;");
       }
@@ -7805,22 +7812,20 @@ var require_sanitize_html = __commonJS(function(exports, module) {
       return naughtyHref("meta", url);
     }
     function animatesUrlAttribute(name, attribs) {
-      if (svgAnimationTags.indexOf(localPart(name)) === -1) {
+      if (!nameParts(name).some((part) => svgAnimationTags.includes(part))) {
         return false;
       }
       const schemeCheckedAttributes = options.allowedSchemesAppliedToAttributes || [];
       return Object.keys(attribs || {}).some(function(attributeName) {
-        if (localPart(attributeName) !== "attributename") {
+        if (!nameParts(attributeName).includes("attributename")) {
           return false;
         }
         const target = (attribs[attributeName] || "").trim().toLowerCase();
-        const localName = target.slice(target.lastIndexOf(":") + 1);
-        return alwaysUrlAttributes.indexOf(localName) !== -1 || schemeCheckedAttributes.indexOf(target) !== -1 || schemeCheckedAttributes.indexOf(localName) !== -1;
+        return schemeCheckedAttributes.includes(target) || nameParts(target).some((part) => alwaysUrlAttributes.includes(part) || schemeCheckedAttributes.includes(part));
       });
     }
-    function localPart(name) {
-      const lower = name.toLowerCase();
-      return lower.slice(lower.lastIndexOf(":") + 1);
+    function nameParts(name) {
+      return name.toLowerCase().split(":").map((part) => part.trim());
     }
     function parseUrl(value) {
       value = value.replace(/^(\w+:)?\s*[\\/]\s*[\\/]/, "$1//");
@@ -12861,6 +12866,7 @@ var isPrecondition = (err) => /precondition/i.test(message(err)) || err?.status 
 class Run {
   host;
   calls = 0;
+  bytes = 0;
   constructor(host) {
     this.host = host;
   }
@@ -13094,7 +13100,7 @@ async function syncFolder(run, imap, acct, folder, filters) {
     fresh = fresh.slice(-FIRST_SYNC);
   const rules = folder.type === "inbox" ? filters : [];
   for (const m of fresh) {
-    if (run.spent || imap.bytesIn > BYTE_BUDGET) {
+    if (run.spent || run.bytes + imap.bytesIn > BYTE_BUDGET) {
       more = true;
       break;
     }
@@ -13128,18 +13134,17 @@ async function syncFolder(run, imap, acct, folder, filters) {
   });
   return more;
 }
-var sync = async (input, host) => {
-  const run = new Run(host);
-  const acct = await run.read(ACCOUNTS, input.account_id);
-  if (!acct)
-    return;
+async function claim(run, acct, from) {
   try {
-    await run.update(ACCOUNTS, acct.id, { sync_status: "syncing" }, { sync_status: ["queued"] });
+    await run.update(ACCOUNTS, acct.id, { sync_status: "syncing" }, { sync_status: [from] });
+    return true;
   } catch (err) {
     if (isPrecondition(err))
-      return;
+      return false;
     throw err;
   }
+}
+async function syncAccount(run, acct) {
   let imap = null;
   try {
     if (!acct.is_active)
@@ -13149,7 +13154,7 @@ var sync = async (input, host) => {
     const filters = await run.rows(FILTERS, { account_id: acct.id, is_active: true }, { sort: "sort_order", order: "asc" });
     let more = false;
     for (const f of folders) {
-      if (run.spent || imap.bytesIn > BYTE_BUDGET) {
+      if (run.spent || run.bytes + imap.bytesIn > BYTE_BUDGET) {
         more = true;
         break;
       }
@@ -13160,7 +13165,31 @@ var sync = async (input, host) => {
   } catch (err) {
     await run.update(ACCOUNTS, acct.id, { sync_status: "error", sync_error: message(err), sync_more: false });
   } finally {
+    run.bytes += imap?.bytesIn ?? 0;
     await imap?.logout();
+  }
+}
+var sync = async (input, host) => {
+  const run = new Run(host);
+  const acct = await run.read(ACCOUNTS, input.account_id);
+  if (!acct || !await claim(run, acct, "queued"))
+    return;
+  await syncAccount(run, acct);
+};
+var ACCOUNTS_PER_RUN = 4;
+function dueAccounts(accounts, now) {
+  const busy = (a) => (a.sync_status === "queued" || a.sync_status === "syncing") && now - Date.parse(String(a.updated_at ?? "")) < STALE_MS;
+  const last = (a) => a.last_sync_at ? Date.parse(String(a.last_sync_at)) : 0;
+  return accounts.filter((a) => a.is_active && !busy(a)).sort((a, b) => last(a) - last(b));
+}
+var syncAll = async (_input, host) => {
+  const run = new Run(host);
+  const due = dueAccounts(await run.rows(ACCOUNTS, { is_active: true }), Date.now());
+  for (const acct of due.slice(0, ACCOUNTS_PER_RUN)) {
+    if (run.spent || run.bytes > BYTE_BUDGET)
+      break;
+    if (await claim(run, acct, String(acct.sync_status)))
+      await syncAccount(run, acct);
   }
 };
 var addressList = (v) => (Array.isArray(v) ? v : []).map((a) => typeof a === "string" ? { address: a } : a && typeof a === "object" ? a : null).filter((a) => !!a && typeof a.address === "string" && a.address.includes("@")).map((a) => a.name ? { address: a.address.trim(), name: String(a.name) } : { address: a.address.trim() });
@@ -13363,9 +13392,11 @@ var fetchAttachment = async (input, host) => {
     await imap?.logout();
   }
 };
-var jobs_default = { sync, send, apply, fetchAttachment };
+var jobs_default = { sync, syncAll, send, apply, fetchAttachment };
 export {
+  ACCOUNTS_PER_RUN,
   jobs_default as default,
+  dueAccounts,
   folderType,
   judge,
   threadOf
