@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.1.0 (2026-11-17)
+
+- feat: `GET /export-my-data` includes the caller's own consents (`consents`) and subject requests (`subject_requests`) in the request's tenant, read as the caller through the data API and filtered on `created_by` (ADR 0058 decision 3; 2.0.0 had dropped them)
+- feat(security)!: members are kept apart by what the extension declares (ADR 0058 decision 3, finding U2), no operator step: the owner-only row rule `tenant_member: created_by eq user_id` on `gdpr_consent_records` and `gdpr_subject_requests`, and `"defaultGrants": false` on `gdpr_request_decisions`. Under 3.0.x any member read every consent and request, withdrew another member's consent and completed or rejected anyone's request, an erasure included. Now a member sees and acts on their own consents and requests only, and only a tenant admin or a role the operator grants on `gdpr_request_decisions` decides; that role's holder must not be a `tenant_member` (see `README.md`). A member no longer withdraws their own request
+
 ## 3.0.1 (2026-11-16)
 
 - build: repacked with hono 4.13.18 (security: GHSA-92p4-j3wq-jmqx, GHSA-39q9-qp46-w8xg, GHSA-h25j-2p75-qj33) and kysely 0.29.9, in lockstep with the engine; no behaviour change

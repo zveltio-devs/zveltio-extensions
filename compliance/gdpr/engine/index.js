@@ -1582,8 +1582,32 @@ var Hono2 = class extends Hono {
 };
 
 // engine/self-service.ts
+var PAGE = 500;
 function selfServiceRoutes(ctx) {
   const { auth } = ctx;
+  async function own(c, collection, userId) {
+    const { collections } = ctx.host(c);
+    const rows = [];
+    for (let page = 1;; page++) {
+      let records;
+      try {
+        ({ records } = await collections.list(collection, {
+          page,
+          limit: PAGE,
+          sort: "id",
+          count: "none",
+          filter: { created_by: { eq: userId } }
+        }));
+      } catch (err) {
+        if (err.status === 403)
+          return null;
+        throw err;
+      }
+      rows.push(...records);
+      if (records.length < PAGE)
+        return rows;
+    }
+  }
   async function sessionUser(c) {
     const session = await auth.api.getSession({ headers: c.req.raw.headers });
     return session?.user ?? null;
@@ -1600,7 +1624,9 @@ function selfServiceRoutes(ctx) {
       audit_log: engineData?.audit_log ?? [],
       notifications: engineData?.notifications ?? [],
       api_keys: engineData?.api_keys ?? [],
-      approval_requests: engineData?.approval_requests ?? []
+      approval_requests: engineData?.approval_requests ?? [],
+      consents: await own(c, "gdpr_consent_records", user.id),
+      subject_requests: await own(c, "gdpr_subject_requests", user.id)
     };
     return new Response(JSON.stringify(exportData, null, 2), {
       headers: {

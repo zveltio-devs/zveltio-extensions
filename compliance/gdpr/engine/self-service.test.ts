@@ -54,10 +54,15 @@ d('compliance/gdpr — export goes through the engine, erasure is the engine’s
       profile: { id: string; email: string } | null;
       audit_log: Array<{ action: string }>;
       notifications: Array<{ title: string }>;
+      consents: unknown;
+      subject_requests: unknown;
     };
     expect(body.profile).toMatchObject({ id, email });
     expect(body.audit_log.map((r) => r.action)).toContain('auth.login_success');
     expect(body.notifications.map((n) => n.title)).toEqual(['hello']);
+    // No grant on the extension's collections: those parts are null, the rest still comes.
+    expect(body.consents).toBeNull();
+    expect(body.subject_requests).toBeNull();
     await sql`DELETE FROM zv_audit_log WHERE user_id = ${id}`.execute(db);
     await sql`DELETE FROM "user" WHERE id = ${id}`.execute(db);
   });
