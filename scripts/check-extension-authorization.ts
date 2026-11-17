@@ -146,42 +146,31 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-/** Every directory holding a manifest.json next to an engine/ directory. */
-function findExtensions(root: string): string[] {
-  const found: string[] = [];
-  const consider = (dir: string) => {
+/**
+ * Every directory holding a manifest.json next to an engine/ directory, at any
+ * depth. A fixed two-level walk missed `compliance/ro/*` — the gate never read
+ * efactura, saft, etransport and the other Romanian extensions.
+ */
+function findExtensions(root: string, depth = 0, found: string[] = []): string[] {
+  if (depth > 4) return found;
+  let entries: string[];
+  try {
+    entries = readdirSync(root);
+  } catch {
+    return found;
+  }
+  for (const name of entries) {
+    if (name === 'node_modules' || name.startsWith('.')) continue;
+    const dir = join(root, name);
     try {
+      if (!statSync(dir).isDirectory()) continue;
       statSync(join(dir, 'manifest.json'));
       statSync(join(dir, 'engine'));
       found.push(dir);
     } catch {
       /* not an extension */
     }
-  };
-  let top: string[];
-  try {
-    top = readdirSync(root);
-  } catch {
-    return found;
-  }
-  for (const a of top) {
-    if (a === 'node_modules' || a.startsWith('.')) continue;
-    const dirA = join(root, a);
-    try {
-      if (!statSync(dirA).isDirectory()) continue;
-    } catch {
-      continue;
-    }
-    consider(dirA);
-    // Most extensions sit one level deeper (category/name); six sit at the top.
-    for (const b of readdirSync(dirA)) {
-      const dirB = join(dirA, b);
-      try {
-        if (statSync(dirB).isDirectory()) consider(dirB);
-      } catch {
-        /* ignore */
-      }
-    }
+    findExtensions(dir, depth + 1, found);
   }
   return found;
 }
@@ -302,13 +291,134 @@ function checkResourceDeclaration(extDir: string, code: string): string | null {
   return null;
 }
 
+/**
+ * First-party reach beyond the declared model (ADR 0056 d2, closes DR-14).
+ *
+ * A first-party extension uses nothing a third party does not have — host
+ * collections, actions, the data API as the caller — except what this list
+ * names. The names are the raw handles the declared model replaces: `ctx.db`
+ * (a SQL handle, row policies only), the authorization helpers the wave retired
+ * (`checkPermission`, `getUserRoles`), and each `ctx.internals.<method>` (most
+ * of them engine-side shortcuts, several of them `asSystem`).
+ *
+ * An extension reaching for a handle it is not listed for fails the gate. A
+ * listed handle it no longer uses is reported so the entry can go: this list
+ * only shrinks. Adding an entry is a decision against ADR 0056 d2 — the reason
+ * must say why the declared model cannot do it yet, and what replaces it.
+ *
+ * Lexical, like the rest of this file: it sees `ctx.db`, a destructure from
+ * `ctx`, and `internals.<method>` under that name. A handle renamed on the way
+ * (`const h = ctx; h.db`) passes unseen. Hygiene gate, not a boundary — the
+ * boundary is that third-party code runs on the runner, where `ctx.db` and
+ * `ctx.internals` do not exist.
+ */
+const FIRST_PARTY_REACH: Record<string, { reach: string[]; why: string }> = {
+  'analytics/dashboard': {
+    reach: ['db', 'checkPermission', 'getUserRoles', 'internals.listRoles'],
+    why: 'legacy widget queries over raw SQL; replaced by the aggregate route (ADR 0050) and view/2 `chart` (ADR 0051)',
+  },
+  'auth/ldap': {
+    reach: ['internals.asSystem', 'internals.isTenantAdmin'],
+    why: 'directory sync writes users and memberships outside any caller session (ADR 0039 directory)',
+  },
+  'auth/saml': {
+    reach: ['internals.asSystem'],
+    why: 'assertion consumer: records the spent assertion before any session exists',
+  },
+  billing: {
+    reach: ['internals.asSystem', 'internals.isSingleTenantInstance'],
+    why: 'Stripe webhook: no caller, the signature is the check; claims the event as the system',
+  },
+  'compliance/gdpr': {
+    reach: ['internals.exportUserData'],
+    why: 'Art. 15 export spans engine-owned identity tables no collection exposes',
+  },
+  'compliance/ro/efactura': {
+    reach: ['internals.asSystem'],
+    why: 'ANAF upload/poll jobs run without a caller; ported after RFC phase D',
+  },
+  'content/document-templates': {
+    reach: ['internals.createRecord', 'internals.readRecord', 'internals.generatePDFAsync'],
+    why: 'routes write as the caller through the data API and render PDFs on the engine renderer; actions pending',
+  },
+  'content/documents': {
+    reach: [
+      'internals.createRecord',
+      'internals.readRecord',
+      'internals.listRecords',
+      'internals.updateRecord',
+      'internals.generatePDFAsync',
+    ],
+    why: 'routes write as the caller through the data API and render PDFs on the engine renderer; actions pending',
+  },
+  'data/export': {
+    reach: ['internals.listRecords', 'internals.recordsToCsv', 'internals.audit'],
+    why: 'reads a collection the caller names at call time, as the caller; becomes an action with `"*"` reads (ADR 0047 d1)',
+  },
+  'data/import': {
+    reach: ['internals.createRecord', 'internals.readRecord', 'internals.updateRecord', 'internals.deleteRecord'],
+    why: 'writes a collection the caller names at call time, as the caller; becomes an action (ext#387, ADR 0047 d1)',
+  },
+  'developer/byod': {
+    reach: [
+      'db',
+      'internals.introspectSchema',
+      'internals.requireInstanceAdmin',
+      'internals.createRecord',
+      'internals.readRecord',
+      'internals.updateRecord',
+    ],
+    why: 'introspects an external database, instance admin only; replaced by `zveltio adopt` (ADR 0054)',
+  },
+  'developer/graphql': {
+    reach: [
+      'db',
+      'internals.caller',
+      'internals.checkAccess',
+      'internals.readScope',
+      'internals.isTenantAdmin',
+      'internals.createRecord',
+      'internals.updateRecord',
+      'internals.deleteRecord',
+    ],
+    why: 'resolvers read every collection through the caller\'s row-policy handle and write through the data API; declared routes until ADR 0039 slice 5/6',
+  },
+  'integrations/api-connector': {
+    reach: ['internals.asSystem'],
+    why: 'incoming webhook: no caller, the per-webhook HMAC is the check',
+  },
+  sms: {
+    reach: ['internals.asSystem'],
+    why: 'Twilio status callback: no caller, the signature is the check',
+  },
+};
+
+const REACH_MEMBERS = new Set(['db', 'checkPermission', 'getUserRoles']);
+
+/** The raw handles one extension's engine code reaches for. */
+function reachOf(code: string): Set<string> {
+  const found = new Set<string>();
+  for (const m of code.matchAll(/\bctx\.(db|checkPermission|getUserRoles)\b/g)) found.add(m[1]);
+  for (const m of code.matchAll(/\{([^{}]*)\}\s*=\s*ctx\b/g)) {
+    for (const part of m[1].split(',')) {
+      const name = part.split(':')[0].trim();
+      if (REACH_MEMBERS.has(name)) found.add(name);
+    }
+  }
+  for (const m of code.matchAll(/\binternals\.([A-Za-z_$][\w$]*)/g)) found.add(`internals.${m[1]}`);
+  return found;
+}
+
 const findings: string[] = [];
 const globalFindings: string[] = [];
 const resourceFindings: string[] = [];
+const reachFindings: string[] = [];
+const reachStale: string[] = [];
 let checked = 0;
 let exempt = 0;
 
-for (const extDir of findExtensions(ROOT).sort()) {
+const extensions = findExtensions(ROOT).sort();
+for (const extDir of extensions) {
   const rel = relative(ROOT, extDir) || extDir;
 
   let source = '';
@@ -331,6 +441,13 @@ for (const extDir of findExtensions(ROOT).sort()) {
 
   const resourceIssue = checkResourceDeclaration(extDir, code);
   if (resourceIssue) resourceFindings.push(`${rel} — ${resourceIssue}`);
+
+  const allowed = new Set(FIRST_PARTY_REACH[rel]?.reach ?? []);
+  const reach = reachOf(code);
+  const extra = [...reach].filter((r) => !allowed.has(r)).sort();
+  if (extra.length > 0) reachFindings.push(`${rel} — ${extra.join(', ')}`);
+  const unused = [...allowed].filter((r) => !reach.has(r)).sort();
+  if (unused.length > 0) reachStale.push(`${rel} — ${unused.join(', ')}`);
 
   if (!WRITE_ROUTE.test(stripComments(guarded))) continue;
 
@@ -364,7 +481,28 @@ if (resourceFindings.length > 0) {
   );
 }
 
-if (findings.length > 0 || globalFindings.length > 0 || resourceFindings.length > 0) {
+for (const name of Object.keys(FIRST_PARTY_REACH)) {
+  if (!extensions.some((d) => relative(ROOT, d) === name)) reachStale.push(`${name} — no such extension`);
+}
+
+if (reachStale.length > 0) {
+  console.log(`extension-authorization: FIRST_PARTY_REACH lists ${reachStale.length} handle set(s) no longer used — remove them:`);
+  for (const f of reachStale) console.log(`  ${f}`);
+}
+
+if (reachFindings.length > 0) {
+  console.error(
+    `\n❌ extension-authorization: ${reachFindings.length} extension(s) reach past the declared model without a FIRST_PARTY_REACH entry.\n`,
+  );
+  for (const f of reachFindings) console.error(`  ${f}`);
+  console.error(
+    '\n  ADR 0056 d2: a first-party extension uses what a third party has — host\n' +
+      '  collections, actions, the data API as the caller. Use those. An entry in\n' +
+      '  FIRST_PARTY_REACH is a decision the owner takes, with its reason.\n',
+  );
+}
+
+if (findings.length > 0 || globalFindings.length > 0 || resourceFindings.length > 0 || reachFindings.length > 0) {
   if (findings.length === 0) process.exit(1);
 }
 
