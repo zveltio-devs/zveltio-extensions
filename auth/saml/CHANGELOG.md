@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.0.0 (2026-11-17)
+
+- fix!: the SAML assertion audience check can no longer be turned off from the Console (ADR 0058 decision 4, DR-10). Any tenant admin could save `audience_check: false`, and an assertion the identity provider issued for another service then signed a person in here. The field leaves the form and a stored `false` is ignored, logged once with what to do. Only the operator turns the check off, for every tenant, with `ZVELTIO_ALLOW_SAML_ANY_AUDIENCE=1` on the engine (`ctx.config.allowSamlAnyAudience`; a dated mode, removed in 3.1.0); an engine without that member checks
+- **Upgrade:** an identity provider that sends an audience other than the issuer (or the `audience` setting) stops signing in. Set the audience it sends in the SAML settings, which keeps the check on, or set `ZVELTIO_ALLOW_SAML_ANY_AUDIENCE=1`. The `audience_check` column stays; nothing reads it
+
 ## 2.2.2 (2026-11-16)
 
 - build: repacked with hono 4.13.18 (security: GHSA-92p4-j3wq-jmqx, GHSA-39q9-qp46-w8xg, GHSA-h25j-2p75-qj33) and kysely 0.29.9, in lockstep with the engine; no behaviour change

@@ -5,7 +5,6 @@
   "auth.ldap.section.enable": "LDAP-authenticatie inschakelen",
   "auth.ldap.section.search": "Zoekinstellingen",
   "auth.ldap.section.server": "Serververbinding",
-  "auth.ldap.section.tls": "TLS-certificaat verifiëren",
   "auth.ldap.subtitle": "Instellingen voor directory-authenticatie",
   "auth.ldap.title": "LDAP",
   "auth.ldap.toast.connectionOk": "Verbinding geslaagd!",

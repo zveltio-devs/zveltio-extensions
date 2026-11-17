@@ -24,7 +24,10 @@ type SamlConfig = SamlIdpConfig & { enabled: boolean; mapEmail: string; mapName:
  * `secret` field, which only this extension reads back, decrypted (ADR 0024);
  * one the instance's key cannot decrypt comes back `null`, as an unset one does.
  */
-async function getSamlConfig(collections: HostCollections): Promise<SamlConfig | null> {
+async function getSamlConfig(
+  collections: HostCollections,
+  ctx: Pick<ExtensionContext, 'config'>,
+): Promise<SamlConfig | null> {
   const { records } = await collections.list('saml_settings', { limit: 1 });
   const row = (records as Record<string, any>[])[0];
   if (!row) return null;
@@ -37,10 +40,32 @@ async function getSamlConfig(collections: HostCollections): Promise<SamlConfig |
     privateKey: typeof row.private_key === 'string' && row.private_key !== '' ? row.private_key : undefined,
     signatureAlgorithm: row.signature_algorithm || 'sha256',
     wantAuthnResponseSigned: row.want_authn_response_signed !== false,
-    audience: row.audience_check === false ? false : row.audience || undefined,
+    audience: audienceCheck(ctx, row.audience_check) ? row.audience || undefined : false,
     mapEmail: row.map_email || 'email',
     mapName: row.map_name || 'displayName',
   };
+}
+
+let warnedStoredAudienceCheck = false;
+
+/**
+ * Whether to check the assertion audience: always, unless the operator set
+ * `ZVELTIO_ALLOW_SAML_ANY_AUDIENCE` (ADR 0058 d4). The Console field
+ * `audience_check` is no longer read — any tenant admin could turn it off — so a
+ * stored `false` is ignored, and said once, with the variable that restores it.
+ * An engine without `allowSamlAnyAudience` checks.
+ */
+function audienceCheck(ctx: Pick<ExtensionContext, 'config'>, stored: unknown): boolean {
+  if (ctx.config?.allowSamlAnyAudience === true) return false;
+  if (stored === false && !warnedStoredAudienceCheck) {
+    warnedStoredAudienceCheck = true;
+    console.warn(
+      '[saml] saml_settings.audience_check=false is ignored since auth/saml 3.0.0: the assertion ' +
+        'audience is checked. Set the audience your identity provider sends in the SAML settings, ' +
+        'or ZVELTIO_ALLOW_SAML_ANY_AUDIENCE=1 on the engine (every tenant; removed in 3.1.0).',
+    );
+  }
+  return true;
 }
 
 /**
@@ -48,13 +73,13 @@ async function getSamlConfig(collections: HostCollections): Promise<SamlConfig |
  * and its `host` only. Reading the settings and claiming an assertion are more
  * than the anonymous caller may (`asSystem`, `data:system`).
  */
-let kept: Pick<ExtensionContext, 'db' | 'internals'> | undefined;
+let kept: Pick<ExtensionContext, 'db' | 'internals' | 'config'> | undefined;
 
 export function keepContext(ctx: ExtensionContext): void {
   kept = ctx;
 }
 
-function context(): Pick<ExtensionContext, 'db' | 'internals'> {
+function context(): Pick<ExtensionContext, 'db' | 'internals' | 'config'> {
   if (!kept) throw new Error('[saml] the routes answer once the extension is registered');
   return kept;
 }
@@ -62,7 +87,7 @@ function context(): Pick<ExtensionContext, 'db' | 'internals'> {
 const answer = (body: unknown, status: number) => Response.json(body, { status });
 
 const readConfig = (collections: HostCollections) =>
-  context().internals.asSystem(['saml_settings'], () => getSamlConfig(collections));
+  context().internals.asSystem(['saml_settings'], () => getSamlConfig(collections, context()));
 
 /** A relative path to land on, else `/admin`: the open-redirect guard. */
 const landing = (raw: unknown) =>
