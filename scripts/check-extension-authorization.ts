@@ -370,19 +370,7 @@ const FIRST_PARTY_REACH: Record<string, { reach: string[]; why: string }> = {
     ],
     why: 'introspects an external database, instance admin only; replaced by `zveltio adopt` (ADR 0054)',
   },
-  'developer/graphql': {
-    reach: [
-      'db',
-      'internals.caller',
-      'internals.checkAccess',
-      'internals.readScope',
-      'internals.isTenantAdmin',
-      'internals.createRecord',
-      'internals.updateRecord',
-      'internals.deleteRecord',
-    ],
-    why: 'resolvers read every collection through the caller\'s row-policy handle and write through the data API; declared routes until ADR 0039 slice 5/6',
-  },
+
   'integrations/api-connector': {
     reach: ['internals.asSystem'],
     why: 'incoming webhook: no caller, the per-webhook HMAC is the check',

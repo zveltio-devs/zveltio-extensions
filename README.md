@@ -56,7 +56,7 @@ for end-user applications. Import them directly:
 | `content` | `document-templates`, `documents`, `drafts`, `media`, `pages`, `pdf-viewer` |
 | `crm` | CRM module |
 | `data` | `export`, `import` |
-| `developer` | `api-docs`, `byod`, `database`, `graphql` |
+| `developer` | `api-docs`, `byod`, `database` |
 | `ecommerce` | `store` |
 | `finance` | `accounting`, `banking`, `expenses`, `invoicing`, `quotes`, `subscriptions` |
 | `forms` | `forms` |
