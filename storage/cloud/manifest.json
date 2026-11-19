@@ -3,8 +3,8 @@
   "displayName": "Cloud Storage",
   "category": "storage",
   "description": "Version history, favorites and retention policies over the engine's stored files",
-  "version": "2.0.1",
-  "zveltioMinVersion": "3.0.0-beta.110",
+  "version": "3.0.0",
+  "zveltioMinVersion": "3.0.0-beta.129",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-cloud",
   "permissions": [
@@ -81,11 +81,46 @@
       "writes": [
         "cloud_file_versions"
       ]
+    },
+    {
+      "name": "addFileVersion",
+      "permission": {
+        "resource": "cloud_file_versions",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "file_id",
+          "file"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "file_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "file": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        }
+      },
+      "reads": [
+        "cloud_file_versions"
+      ],
+      "writes": [
+        "cloud_file_versions"
+      ]
     }
   ],
   "integrity": {
-    "engineSha256": "3d795746284d50247b1a4e55116235c1737158afdf2a1943e82fa9c676a1e746",
-    "sourceSha256": "fc589ad6a08d0143e54962c0883c8eeafe466e755e6128750edee804d5c3ce37",
+    "engineSha256": "379d57c3606d90be2cfe5cfdd837e09bcb0416da190881a7fb84668a70cd344a",
+    "sourceSha256": "6cf4b1939432cc5fc127c24231bd4908107e32b9f39856275f545f94acf4afa4",
     "schemaSha256": "86cdfc2ba774fd5bfd52d3769b63734c4d8b5cbb9abf320d966815e43ce011f9"
   }
 }

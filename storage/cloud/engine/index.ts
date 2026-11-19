@@ -1,13 +1,9 @@
 import type { ZveltioExtension } from '@zveltio/sdk/extension';
 import { cloudActions } from './versions.js';
-import { cloudRoutes } from './routes.js';
 
-// Files, folders, uploads, downloads, deletes, visibility and quotas are the
-// engine's own `/api/storage`. What this extension adds is collections it
-// declares in `schema/collections/` — version history, favorites, retention
-// policies — which the engine creates, owns the rules of and serves through the
-// data API; one route, where a new version's bytes and its history row commit
-// together; and one action, restoring an older version.
+// Files, folders, uploads and quotas are the engine's `/api/storage`. What is
+// left here is a file's version history: rows of a declared collection, added
+// and restored by the actions in `versions.ts`.
 const extension: ZveltioExtension = {
   name: 'storage/cloud',
   category: 'storage',
@@ -15,9 +11,7 @@ const extension: ZveltioExtension = {
 
   actions: cloudActions,
 
-  async register(app, ctx) {
-    app.route('/', cloudRoutes(ctx));
-  },
+  async register() {},
 };
 
 export default extension;
