@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.3.1 (2026-11-19)
+
+- Security: the public renderer put author-typed link targets (`cta_url`, `button_url`, a button's `href`/`url`, an image's `link`) straight into `href`, and a video block's `url` into `<iframe src>`. Svelte does not filter either and the engine scrubs only the HTML fields, so `javascript:…` ran in a visitor's browser. Each now goes through `safeHref` (same-site paths, `#`, `?`, http(s), mailto, tel; anything else becomes `#`; `//host` and `/\host` refused) or `safeFrameSrc` (http(s) only, else no frame), both exported from `client/sanitize.ts`
+- requires engine 3.0.0-beta.111 (unchanged)
+
 ## 2.3.0 (2026-11-13)
 
 - The page builder is no longer extension code (ADR 0042 decision 9). Its canvas is a Studio front-end package that Studio draws for the view `pages.builder`; the extension ships that view, a form over `pages` (title, slug, `blocks` as JSON, Save, Publish), which any other front end draws, and which Studio draws when it has no canvas. Same page path, `/admin/pages/builder/:id`. Removed: `studio/pages/builder`, the builder components and their `studio/src/lib` helpers, the `content.pages.b.*` messages (now Studio's `pageBuilder.*`). The block-vocabulary and breakpoint checks against the canvas moved with it into Studio
