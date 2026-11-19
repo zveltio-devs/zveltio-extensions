@@ -87,7 +87,28 @@ const generate: ExtensionAction = async (input, host) => {
     .records as Row[];
   if (file?.[0]) await host.collections.update(FILES, file[0].id as string, { xml });
   else await host.collections.insert(FILES, { export_id: id, xml });
-  return host.collections.update(C, id, { status: 'generated', entries_count: lines.length });
+  return host.collections.update(C, id, {
+    status: 'generated',
+    entries_count: lines.length,
+    file_name: `SAFT_${exp.company_cui}_${start}_${end}.xml`,
+  });
 };
 
-export const saftActions = { generate };
+/**
+ * Hand the caller the export's XML as a stored file of their own (ADR 0052): the
+ * request's `$files.write` names it, and the result `{ file }` is what a front end
+ * offers to save. Nothing is rebuilt; an export never generated has no file.
+ */
+const download: ExtensionAction = async (input, host) => {
+  const { id } = input as { id: string };
+  // Present from engine 3.0.0-beta.123; the manifest asks for later.
+  if (!host.files) throw new Error('This engine gives actions no host.files.');
+  const file = (await host.collections.list(FILES, { filter: { export_id: id }, limit: 1, count: 'none' }))
+    .records as Row[];
+  const xml = file?.[0]?.xml;
+  if (typeof xml !== 'string') throw new ActionRefusal(404, 'not_generated', 'Generate the XML first.');
+  const stored = await host.files.put(new TextEncoder().encode(xml), { contentType: 'application/xml' });
+  return { file: stored.id };
+};
+
+export const saftActions = { generate, download };

@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.1.0 (2026-11-19)
+
+- feat: the `download` action hands the caller the generated XML as a stored file of their own (ADR 0052): the request's `$files.write` names it, the result is `{ file }`; an export never generated is refused 404 `not_generated`
+- feat: `generate` records the file's name (`SAFT_<cui>_<start>_<end>.xml`) on the export, in the new `file_name` field
+- feat: the Studio page is a `zveltio.view/2` list; Download runs `download` instead of reading `saft_files` through a view/1 download button
+- needs the `files` capability and engine 3.0.0-beta.129
+
 ## 2.0.0 (2026-11-02)
 
 - feat!: exports are the `saft_exports` collection, declared in `schema/collections/` and created and owned by the engine; the generated XML is a row of `saft_files`, one per export; no SQL migrations

@@ -1,72 +1,37 @@
 {
-  "sduiSchema": 1,
+  "spec": "zveltio.view/2",
   "title": "compliance.ro.saft.title",
-  "subtitle": "compliance.ro.saft.subtitle",
-  "newLabel": "compliance.ro.saft.btn.newExport",
-  "resources": [
+  "type": "list",
+  "collection": "saft_exports",
+  "fields": [
+    { "field": "period_start", "label": "compliance.ro.saft.ui.period_start", "display": "mono" },
+    { "field": "period_end", "label": "compliance.ro.saft.ui.period_end", "display": "mono" },
+    { "field": "company_name", "label": "compliance.ro.saft.col.company" },
+    { "field": "company_cui", "label": "compliance.ro.saft.col.cui", "display": "mono" },
+    { "field": "entries_count", "label": "compliance.ro.saft.col.lines" },
     {
-      "id": "exports",
-      "dataSource": "/api/data/saft_exports?sort=period_start&order=desc&limit=500",
-      "dataPath": "records",
-      "columns": [
-        {
-          "key": "period_start",
-          "label": "compliance.ro.saft.col.period",
-          "type": "mono",
-          "join": { "keys": ["period_start", "period_end"], "sep": " → " }
-        },
-        { "key": "company_name", "label": "compliance.ro.saft.col.company" },
-        { "key": "company_cui", "label": "compliance.ro.saft.col.cui", "type": "mono" },
-        { "key": "entries_count", "label": "compliance.ro.saft.col.lines", "type": "mono" },
-        {
-          "key": "status",
-          "label": "common.col.status",
-          "type": "badge",
-          "badge": {
-            "colors": { "draft": "badge-warning", "generated": "badge-info" },
-            "labels": { "draft": "compliance.ro.saft.status.draft", "generated": "compliance.ro.saft.status.generated" }
-          }
-        }
-      ],
-      "rowActions": [
-        {
-          "id": "generate",
-          "label": "compliance.ro.saft.btn.generateXml",
-          "icon": "RefreshCw",
-          "method": "POST",
-          "endpoint": "/ext/compliance/ro/saft/actions/generate",
-          "body": { "id": "{id}" }
-        },
-        {
-          "id": "download",
-          "kind": "download",
-          "icon": "Download",
-          "label": "common.download",
-          "endpoint": "/api/data/saft_files?export_id[eq]={id}&limit=1",
-          "field": "xml",
-          "filename": "SAFT_{company_cui}_{period_start}_{period_end}.xml",
-          "visibleWhen": { "field": "status", "equals": "generated" }
-        },
-        {
-          "id": "delete",
-          "icon": "Trash2",
-          "variant": "text-error",
-          "label": "common.delete",
-          "method": "DELETE",
-          "endpoint": "/api/data/saft_exports/{id}",
-          "confirm": "compliance.ro.saft.confirmDeleteExport"
-        }
-      ],
-      "form": {
-        "endpoint": "/api/data/saft_exports",
-        "fields": [
-          { "name": "period_start", "label": "compliance.ro.saft.ui.period_start", "type": "date", "default": "today", "colSpan": 1 },
-          { "name": "period_end", "label": "compliance.ro.saft.ui.period_end", "type": "date", "default": "today", "colSpan": 1 },
-          { "name": "company_name", "label": "common.col.company", "required": true, "colSpan": 2 },
-          { "name": "company_cui", "label": "compliance.ro.saft.col.cui", "required": true, "mono": true, "colSpan": 2 },
-          { "name": "company_address", "label": "compliance.ro.saft.ui.address_optional", "colSpan": 2 }
-        ]
-      }
+      "field": "status",
+      "label": "common.col.status",
+      "display": "badge",
+      "tones": { "draft": "warning", "generated": "info" }
     }
-  ]
+  ],
+  "sort": "-period_start",
+  "rowActions": [
+    {
+      "action": "generate",
+      "label": "compliance.ro.saft.btn.generateXml",
+      "input": { "id": { "$record": "id" } }
+    },
+    {
+      "action": "download",
+      "label": "common.download",
+      "input": { "id": { "$record": "id" } },
+      "when": [{ "field": "status", "op": "eq", "value": "generated" }],
+      "files": { "write": { "name": { "$record": "file_name" }, "maxBytes": 33554432 } }
+    }
+  ],
+  "create": true,
+  "edit": true,
+  "delete": true
 }

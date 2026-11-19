@@ -172,9 +172,24 @@ var generate = async (input, host) => {
     await host.collections.update(FILES, file[0].id, { xml });
   else
     await host.collections.insert(FILES, { export_id: id, xml });
-  return host.collections.update(C, id, { status: "generated", entries_count: lines.length });
+  return host.collections.update(C, id, {
+    status: "generated",
+    entries_count: lines.length,
+    file_name: `SAFT_${exp.company_cui}_${start}_${end}.xml`
+  });
 };
-var saftActions = { generate };
+var download = async (input, host) => {
+  const { id } = input;
+  if (!host.files)
+    throw new Error("This engine gives actions no host.files.");
+  const file = (await host.collections.list(FILES, { filter: { export_id: id }, limit: 1, count: "none" })).records;
+  const xml = file?.[0]?.xml;
+  if (typeof xml !== "string")
+    throw new ActionRefusal(404, "not_generated", "Generate the XML first.");
+  const stored = await host.files.put(new TextEncoder().encode(xml), { contentType: "application/xml" });
+  return { file: stored.id };
+};
+var saftActions = { generate, download };
 
 // engine/index.ts
 var extension = {
