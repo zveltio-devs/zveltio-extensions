@@ -5,7 +5,6 @@
   "auth.ldap.section.enable": "Włącz uwierzytelnianie LDAP",
   "auth.ldap.section.search": "Ustawienia wyszukiwania",
   "auth.ldap.section.server": "Połączenie z serwerem",
-  "auth.ldap.section.tls": "Zweryfikuj certyfikat TLS",
   "auth.ldap.subtitle": "Ustawienia uwierzytelniania katalogowego",
   "auth.ldap.title": "LDAP",
   "auth.ldap.toast.connectionOk": "Połączenie udane!",

@@ -1,0 +1,13 @@
+{
+  "templates.ansvsa.tab.ansvsa_certificates": "Certificates",
+  "templates.ansvsa.tab.ansvsa_complaints": "Complaints",
+  "templates.ansvsa.tab.ansvsa_entities": "Operators",
+  "templates.ansvsa.tab.ansvsa_establishment_units": "Units",
+  "templates.ansvsa.tab.ansvsa_external_requests": "Requests",
+  "templates.ansvsa.tab.ansvsa_finding_reports": "Finding reports",
+  "templates.ansvsa.tab.ansvsa_inspection_plans": "Inspection plans",
+  "templates.ansvsa.tab.ansvsa_inspections": "Inspections",
+  "templates.ansvsa.tab.ansvsa_samples": "Samples",
+  "templates.ansvsa.tab.ansvsa_sanctions": "Sanctions",
+  "templates.ansvsa.title": "ANSVSA Official Control"
+}

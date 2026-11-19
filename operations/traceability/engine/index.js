@@ -57142,6 +57142,25 @@ var traceabilityActions = {
   report
 };
 
+// /zveltio-extension/node_modules/hono/dist/http-exception.js
+var HTTPException = class extends Error {
+  res;
+  status;
+  constructor(status = 500, options) {
+    super(options?.message, { cause: options?.cause });
+    this.res = options?.res;
+    this.status = status;
+  }
+  getResponse() {
+    if (this.res)
+      return new Response(this.res.body, {
+        status: this.status,
+        headers: this.res.headers
+      });
+    return new Response(this.message, { status: this.status });
+  }
+};
+
 // /zveltio-extension/node_modules/hono/dist/request/constants.js
 var GET_MATCH_RESULT = Symbol();
 
@@ -57306,7 +57325,7 @@ var tryDecode = (str, decoder) => {
     });
   }
 };
-var tryDecodeURI = (str) => tryDecode(str, decodeURI);
+var decodeURIWithPreservedPercent = (value) => decodeURI(value.includes("%25") ? value.replace(/%25/g, "%2525") : value);
 var getPath = (request) => {
   const url = request.url;
   const start = url.indexOf("/", url.indexOf(":") + 4);
@@ -57318,7 +57337,14 @@ var getPath = (request) => {
       const hashIndex = url.indexOf("#", i);
       const end = queryIndex === -1 ? hashIndex === -1 ? undefined : hashIndex : hashIndex === -1 ? queryIndex : Math.min(queryIndex, hashIndex);
       const path = url.slice(start, end);
-      return tryDecodeURI(path.includes("%25") ? path.replace(/%25/g, "%2525") : path);
+      const decoded = tryDecode(path, decodeURIWithPreservedPercent);
+      if (/%(?![0-9A-Fa-f]{2})/.test(path)) {
+        const rewritten = new URL("http://localhost");
+        rewritten.pathname = decoded.replace(/[\\\t\n\r]/g, encodeURIComponent);
+        if (tryDecode(rewritten.pathname, decodeURIWithPreservedPercent) !== decoded)
+          return tryDecode(path.replace(/%(?![0-9A-Fa-f]{2})/g, "%25"), decodeURIWithPreservedPercent);
+      }
+      return decoded;
     } else if (charCode === 63 || charCode === 35)
       break;
   }
@@ -57327,17 +57353,6 @@ var getPath = (request) => {
 var getPathNoStrict = (request) => {
   const result = getPath(request);
   return result.length > 1 && result.at(-1) === "/" ? result.slice(0, -1) : result;
-};
-var stripPathPrefix = (rawPath, decodedPath, prefixLength) => {
-  if (rawPath.at(-1) === "/" && decodedPath.at(-1) !== "/")
-    rawPath = rawPath.slice(0, -1);
-  let index = 0;
-  for (let i = decodedPath.indexOf("/");i !== -1 && i < prefixLength; i = decodedPath.indexOf("/", i + 1)) {
-    index = rawPath.indexOf("/", index + 1);
-    if (index === -1)
-      return "/";
-  }
-  return rawPath.slice(index) || "/";
 };
 var mergePath = (base, sub, ...rest) => {
   if (rest.length)
@@ -57789,6 +57804,10 @@ var compose2 = (middleware, onError, onNotFound) => {
   };
 };
 
+// /zveltio-extension/node_modules/hono/dist/helper/route/index.js
+var matchedRoutes = (c) => c.req[GET_MATCH_RESULT][0].map(([[, route]]) => route);
+var routePath = (c, index) => matchedRoutes(c).at(index ?? c.req.routeIndex)?.path ?? "";
+
 // /zveltio-extension/node_modules/hono/dist/router.js
 var METHODS = [
   "get",
@@ -57807,6 +57826,12 @@ var UnsupportedPathError = class extends Error {
 var COMPOSED_HANDLER = "__COMPOSED_HANDLER";
 
 // /zveltio-extension/node_modules/hono/dist/utils/mount.js
+var countTrailingSlashes = (path) => {
+  let index = path.length;
+  while (index > 0 && path.charCodeAt(index - 1) === 47)
+    index--;
+  return path.length - index;
+};
 var getPathPrefixLength = (c, pathPrefix, routePath) => {
   if (!/[:*]/.test(pathPrefix))
     return pathPrefix.length;
@@ -57815,6 +57840,8 @@ var getPathPrefixLength = (c, pathPrefix, routePath) => {
   const paramNames = /* @__PURE__ */ new Set;
   let length = 0;
   for (const part of splitRoutingPath(pathPrefix)) {
+    if (part[0] === ":" && part.endsWith("}?"))
+      throw new Error(`mount(): Optional regular expression parameters are not supported in "${routePath}".`);
     const pattern = getPattern(part);
     if (pattern && pattern !== "*") {
       const name = pattern[1];
@@ -57836,8 +57863,20 @@ var getPathPrefixLength = (c, pathPrefix, routePath) => {
 var createMountedRequest = (c, pathPrefix, routePath) => {
   if (/[^/]\*$/.test(routePath))
     throw new Error(`mount(): Wildcard must follow "/" in "${routePath}".`);
-  const url = new URL(c.req.raw.url);
-  url.pathname = stripPathPrefix(url.pathname, c.req.path, getPathPrefixLength(c, pathPrefix, routePath));
+  const prefixLength = getPathPrefixLength(c, pathPrefix, routePath);
+  const path = c.req.path.slice(prefixLength) || "/";
+  if (prefixLength > c.req.path.length || path[0] !== "/" || /\/(?:\.|%2e){1,2}(?:\/|$)/i.test(path))
+    throw new HTTPException(400, { message: "Invalid mounted path" });
+  const rawUrl = c.req.raw.url;
+  if (/^[^/?#]*\/\/[^/?#\\]*[?#\\]/.test(rawUrl))
+    throw new HTTPException(400, { message: "Invalid mounted path" });
+  const rawPathEnd = rawUrl.search(/[?#]/);
+  const rawTrailingSlashes = countTrailingSlashes(rawPathEnd === -1 ? rawUrl : rawUrl.slice(0, rawPathEnd));
+  if (rawTrailingSlashes > 1 && countTrailingSlashes(c.req.path) === rawTrailingSlashes - 1)
+    throw new HTTPException(400, { message: "Invalid mounted path" });
+  const url = new URL(rawUrl);
+  url.pathname = path.replace(/[\\\t\n\r]/g, encodeURIComponent);
+  if (path.includes("%")) {}
   return new Request(url, c.req.raw);
 };
 
@@ -57973,8 +58012,10 @@ var Hono = class Hono {
       } catch {}
       return [c.env, executionContext];
     };
-    const mergedPath = mergePath(this._basePath, path);
-    const defaultReplaceRequest = (c) => createMountedRequest(c, mergedPath.replace(/\/$/, ""), mergePath(mergedPath, "*"));
+    const defaultReplaceRequest = (c) => {
+      const mountedRoutePath = routePath(c);
+      return createMountedRequest(c, mountedRoutePath.replace(/\/?\*$/, ""), mountedRoutePath);
+    };
     const handler = async (c, next) => {
       const res = await applicationHandler(replaceRequest ? replaceRequest(c.req.raw) : defaultReplaceRequest(c), ...getOptions(c));
       if (res)
@@ -58600,4 +58641,4 @@ var engine_default = extension;
 export {
   engine_default as default
 };
-// @zveltio-bundled hono@4.13.17
+// @zveltio-bundled hono@4.13.18

@@ -1,0 +1,57 @@
+{
+  "name": "ansvsa_req_update_details",
+  "displayName": "Detalii cerere: actualizare date",
+  "fields": [
+    {
+      "name": "request",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "ansvsa_external_requests"
+      }
+    },
+    {
+      "name": "entity",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "ansvsa_entities"
+      }
+    },
+    {
+      "name": "update_type",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "old_data_json",
+      "type": "json"
+    },
+    {
+      "name": "new_data_json",
+      "type": "json"
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_req_update_details_request",
+      "type": "m2o",
+      "field": "request",
+      "target": "ansvsa_external_requests",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "ansvsa_req_update_details_entity",
+      "type": "m2o",
+      "field": "entity",
+      "target": "ansvsa_entities",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

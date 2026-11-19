@@ -1,0 +1,90 @@
+{
+  "name": "hd_tickets",
+  "displayName": "Tickets",
+  "fields": [
+    {
+      "name": "subject",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "customer",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "hd_customers"
+      }
+    },
+    {
+      "name": "category",
+      "type": "m2o",
+      "options": {
+        "related_collection": "hd_categories"
+      }
+    },
+    {
+      "name": "ticket_status",
+      "type": "enum",
+      "options": {
+        "values": [
+          "new",
+          "open",
+          "pending",
+          "resolved",
+          "closed"
+        ]
+      }
+    },
+    {
+      "name": "priority",
+      "type": "enum",
+      "options": {
+        "values": [
+          "low",
+          "normal",
+          "high",
+          "urgent"
+        ]
+      }
+    },
+    {
+      "name": "assignee",
+      "type": "text"
+    },
+    {
+      "name": "body",
+      "type": "richtext",
+      "required": true
+    },
+    {
+      "name": "first_response_at",
+      "type": "datetime"
+    },
+    {
+      "name": "resolved_at",
+      "type": "datetime"
+    }
+  ],
+  "relations": [
+    {
+      "name": "hd_tickets_customer",
+      "type": "m2o",
+      "field": "customer",
+      "target": "hd_customers",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "hd_tickets_category",
+      "type": "m2o",
+      "field": "category",
+      "target": "hd_categories",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

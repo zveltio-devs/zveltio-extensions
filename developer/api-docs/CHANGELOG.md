@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.1 (2026-11-16)
+
+- build: repacked with hono 4.13.18 (security: GHSA-92p4-j3wq-jmqx, GHSA-39q9-qp46-w8xg, GHSA-h25j-2p75-qj33) and kysely 0.29.9, in lockstep with the engine; no behaviour change
+
 ## 2.2.0 (2026-11-12)
 
 - feat: the Studio page is a `zveltio.view/2` view (ADR 0042): it names its collections and actions instead of URLs, and Studio draws it from the specification

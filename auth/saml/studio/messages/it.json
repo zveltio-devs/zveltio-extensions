@@ -10,7 +10,6 @@
   "auth.saml.ui.acs_callback_url": "URL ACS (callback)",
   "auth.saml.ui.acs_placeholder": "https://<engine>/ext/auth/saml/callback",
   "auth.saml.ui.audience": "Audience attesa (predefinita: issuer)",
-  "auth.saml.ui.audience_check": "Verifica l'audience dell'asserzione",
   "auth.saml.ui.email_attribute": "Attributo e-mail",
   "auth.saml.ui.https_your_idp_com_sso_saml": "https://your-idp.com/sso/saml",
   "auth.saml.ui.idp_certificate_pem": "Certificato IDP (PEM)",

@@ -1,0 +1,80 @@
+{
+  "name": "ansvsa_holdings",
+  "displayName": "Exploatații animale",
+  "fields": [
+    {
+      "name": "holding_code",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "entity",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_entities"
+      }
+    },
+    {
+      "name": "county",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_counties"
+      }
+    },
+    {
+      "name": "locality",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_localities"
+      }
+    },
+    {
+      "name": "species",
+      "type": "text"
+    },
+    {
+      "name": "animal_count",
+      "type": "integer"
+    },
+    {
+      "name": "latitude",
+      "type": "number"
+    },
+    {
+      "name": "longitude",
+      "type": "number"
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_holdings_entity",
+      "type": "m2o",
+      "field": "entity",
+      "target": "ansvsa_entities",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "ansvsa_holdings_county",
+      "type": "m2o",
+      "field": "county",
+      "target": "ansvsa_counties",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "ansvsa_holdings_locality",
+      "type": "m2o",
+      "field": "locality",
+      "target": "ansvsa_localities",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

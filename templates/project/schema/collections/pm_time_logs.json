@@ -1,0 +1,44 @@
+{
+  "name": "pm_time_logs",
+  "displayName": "Time logs",
+  "fields": [
+    {
+      "name": "task",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "pm_tasks"
+      }
+    },
+    {
+      "name": "user",
+      "type": "text"
+    },
+    {
+      "name": "logged_at",
+      "type": "datetime",
+      "required": true
+    },
+    {
+      "name": "hours",
+      "type": "number",
+      "required": true
+    },
+    {
+      "name": "note",
+      "type": "text"
+    }
+  ],
+  "relations": [
+    {
+      "name": "pm_time_logs_task",
+      "type": "m2o",
+      "field": "task",
+      "target": "pm_tasks",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

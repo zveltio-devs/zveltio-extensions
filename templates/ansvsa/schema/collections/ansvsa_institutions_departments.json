@@ -1,0 +1,51 @@
+{
+  "name": "ansvsa_institutions_departments",
+  "displayName": "Departamente instituție",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "institution",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_institutions"
+      }
+    },
+    {
+      "name": "parent_department",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_institutions_departments"
+      }
+    },
+    {
+      "name": "chief_user",
+      "type": "text"
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_institutions_departments_institution",
+      "type": "m2o",
+      "field": "institution",
+      "target": "ansvsa_institutions",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "ansvsa_institutions_departments_parent_department",
+      "type": "m2o",
+      "field": "parent_department",
+      "target": "ansvsa_institutions_departments",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

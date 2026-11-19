@@ -1,0 +1,69 @@
+{
+  "name": "inv_invoices",
+  "displayName": "Invoices",
+  "fields": [
+    {
+      "name": "number",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "customer",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "inv_customers"
+      }
+    },
+    {
+      "name": "issue_date",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "due_date",
+      "type": "date"
+    },
+    {
+      "name": "invoice_status",
+      "type": "enum",
+      "options": {
+        "values": [
+          "draft",
+          "sent",
+          "paid",
+          "overdue",
+          "void"
+        ]
+      }
+    },
+    {
+      "name": "subtotal",
+      "type": "number"
+    },
+    {
+      "name": "tax",
+      "type": "number"
+    },
+    {
+      "name": "total",
+      "type": "number"
+    },
+    {
+      "name": "notes",
+      "type": "richtext"
+    }
+  ],
+  "relations": [
+    {
+      "name": "inv_invoices_customer",
+      "type": "m2o",
+      "field": "customer",
+      "target": "inv_customers",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

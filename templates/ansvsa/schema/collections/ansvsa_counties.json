@@ -1,0 +1,11 @@
+{
+  "name": "ansvsa_counties",
+  "displayName": "Județe",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    }
+  ]
+}

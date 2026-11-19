@@ -1,0 +1,92 @@
+{
+  "spec": "zveltio.view/2",
+  "title": "templates.inventory.title",
+  "type": "tabs",
+  "items": [
+    {
+      "type": "list",
+      "collection": "inv_suppliers",
+      "title": "templates.inventory.tab.inv_suppliers",
+      "fields": [
+        {
+          "field": "name"
+        },
+        {
+          "field": "contact_email"
+        },
+        {
+          "field": "phone"
+        },
+        {
+          "field": "country"
+        }
+      ],
+      "edit": true,
+      "delete": true,
+      "create": true
+    },
+    {
+      "type": "list",
+      "collection": "inv_locations",
+      "title": "templates.inventory.tab.inv_locations",
+      "fields": [
+        {
+          "field": "name"
+        },
+        {
+          "field": "address"
+        },
+        {
+          "field": "kind"
+        }
+      ],
+      "edit": true,
+      "delete": true,
+      "create": true
+    },
+    {
+      "type": "list",
+      "collection": "inv_products",
+      "title": "templates.inventory.tab.inv_products",
+      "fields": [
+        {
+          "field": "sku"
+        },
+        {
+          "field": "name"
+        },
+        {
+          "field": "description"
+        },
+        {
+          "field": "unit_cost"
+        }
+      ],
+      "edit": true,
+      "delete": true,
+      "create": true
+    },
+    {
+      "type": "list",
+      "collection": "inv_movements",
+      "title": "templates.inventory.tab.inv_movements",
+      "fields": [
+        {
+          "field": "kind"
+        },
+        {
+          "field": "quantity"
+        },
+        {
+          "field": "moved_at"
+        },
+        {
+          "field": "reference"
+        }
+      ],
+      "edit": true,
+      "delete": true,
+      "create": true
+    }
+  ]
+}

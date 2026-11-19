@@ -44,7 +44,7 @@ function createIdp() {
   cert.sign(keys.privateKey, forge.md.sha256.create());
   const keyPem = forge.pki.privateKeyToPem(keys.privateKey);
 
-  const response = (email: string) => {
+  const response = (email: string, audience = SP) => {
     const at = new Date().toISOString();
     const later = new Date(Date.now() + 5 * 60_000).toISOString();
     const aid = `_a${crypto.randomUUID().replaceAll('-', '')}`;
@@ -55,7 +55,7 @@ function createIdp() {
       `<saml:Assertion ID="${aid}" Version="2.0" IssueInstant="${at}"><saml:Issuer>https://idp.test</saml:Issuer>` +
       `<saml:Subject><saml:NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress">${email}</saml:NameID>` +
       `<saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer"><saml:SubjectConfirmationData NotOnOrAfter="${later}" Recipient="${ACS}"/></saml:SubjectConfirmation></saml:Subject>` +
-      `<saml:Conditions NotBefore="${at}" NotOnOrAfter="${later}"><saml:AudienceRestriction><saml:Audience>${SP}</saml:Audience></saml:AudienceRestriction></saml:Conditions>` +
+      `<saml:Conditions NotBefore="${at}" NotOnOrAfter="${later}"><saml:AudienceRestriction><saml:Audience>${audience}</saml:Audience></saml:AudienceRestriction></saml:Conditions>` +
       `<saml:AuthnStatement AuthnInstant="${at}" SessionIndex="${aid}"><saml:AuthnContext><saml:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:Password</saml:AuthnContextClassRef></saml:AuthnContext></saml:AuthnStatement>` +
       `<saml:AttributeStatement><saml:Attribute Name="email"><saml:AttributeValue>${email}</saml:AttributeValue></saml:Attribute></saml:AttributeStatement>` +
       `</saml:Assertion></samlp:Response>`;
@@ -202,6 +202,31 @@ d('auth/saml — an assertion is a session the engine accepts', () => {
     const aid = /<saml:Assertion ID="([^"]+)"/.exec(Buffer.from(assertion, 'base64').toString())?.[1] ?? '';
     const failed = await audited('auth.login_failed', aid);
     expect([failed.length, failed[0]?.provider, failed[0]?.reason]).toEqual([1, 'saml', 'assertion already used']);
+  });
+
+  // DR-10 slice B: `audience_check` was a Console field any tenant admin could
+  // turn off; a stored `false` now changes nothing, and only the operator's
+  // ZVELTIO_ALLOW_SAML_ANY_AUDIENCE does (ctx.config.allowSamlAnyAudience).
+  it('a stored audience_check=false is ignored: an assertion for another service is refused', async () => {
+    const setCheck = (on: boolean) =>
+      e.harness.asTenant(e.db, DEFAULT, (trx: any) =>
+        e.sql`UPDATE zvd_saml_settings SET audience_check = ${on} WHERE tenant_id = ${DEFAULT}::uuid`.execute(trx),
+      );
+    const email = `ivan-${tag}@saml.test`;
+    await account(email);
+    await setCheck(false);
+    try {
+      const refused = await acs(email, idp.response(email, 'another-service'));
+      expect(refused.status).toBe(401);
+      expect(((await refused.json()) as { error: string }).error).toContain('audience');
+      expect(refused.headers.get('set-cookie')).toBeNull();
+
+      process.env.ZVELTIO_ALLOW_SAML_ANY_AUDIENCE = '1';
+      expect((await acs(email, idp.response(email, 'another-service'))).status).toBe(302);
+    } finally {
+      delete process.env.ZVELTIO_ALLOW_SAML_ANY_AUDIENCE;
+      await setCheck(true);
+    }
   });
 
   it('GET /api/sign-in/providers lists the identity provider, for any front end', async () => {

@@ -1,0 +1,35 @@
+{
+  "name": "ansvsa_req_veterinary_manufacture_details",
+  "displayName": "Detalii cerere: fabricație produse veterinare",
+  "fields": [
+    {
+      "name": "request",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "ansvsa_external_requests"
+      }
+    },
+    {
+      "name": "activity_description",
+      "type": "textarea",
+      "required": true
+    },
+    {
+      "name": "details",
+      "type": "json"
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_req_veterinary_manufacture_details_request",
+      "type": "m2o",
+      "field": "request",
+      "target": "ansvsa_external_requests",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

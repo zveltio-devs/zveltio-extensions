@@ -1,0 +1,47 @@
+{
+  "name": "templates/inventory",
+  "displayName": "Asset Inventory Starter",
+  "category": "templates",
+  "description": "Starter app: suppliers, locations, products and stock movements as four collections. Was the built-in Asset Inventory template.",
+  "version": "1.0.0",
+  "zveltioMinVersion": "3.0.0-beta.112",
+  "zveltioMaxVersion": "4.0.0",
+  "package": "@zveltio/ext-template-inventory",
+  "i18nPrefixes": [
+    "templates.inventory"
+  ],
+  "collections": [
+    "inv_suppliers",
+    "inv_locations",
+    "inv_products",
+    "inv_movements"
+  ],
+  "studio": {
+    "pages": [
+      {
+        "path": "/admin/templates/inventory",
+        "label": "Asset Inventory Starter",
+        "icon": "Package",
+        "schema": "schemas/inventory.json"
+      }
+    ],
+    "navGroup": "operations"
+  },
+  "contributes": {
+    "engine": true,
+    "studio": true,
+    "fieldTypes": []
+  },
+  "engine": {
+    "entry": "engine/index.js",
+    "format": "esm",
+    "target": "bun",
+    "bundled": true,
+    "bundlePeers": false
+  },
+  "integrity": {
+    "engineSha256": "8ceb1b1852c15c655474bb3322dbb3976a0d69de41e8542eaf259bc41ef4d546",
+    "sourceSha256": "dc568cafbc48d447e3773c2cfb45e75b766457c48604c09507e69c4d5a7788fc",
+    "schemaSha256": "09dfda58adfe9925b30a6cce5e86f304bebc5abf4f22a427f90b96ee272780ec"
+  }
+}

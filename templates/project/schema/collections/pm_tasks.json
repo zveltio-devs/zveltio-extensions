@@ -1,0 +1,72 @@
+{
+  "name": "pm_tasks",
+  "displayName": "Tasks",
+  "fields": [
+    {
+      "name": "title",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "description",
+      "type": "richtext"
+    },
+    {
+      "name": "project",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "pm_projects"
+      }
+    },
+    {
+      "name": "task_status",
+      "type": "enum",
+      "options": {
+        "values": [
+          "todo",
+          "in_progress",
+          "blocked",
+          "review",
+          "done"
+        ]
+      }
+    },
+    {
+      "name": "priority",
+      "type": "enum",
+      "options": {
+        "values": [
+          "low",
+          "medium",
+          "high",
+          "urgent"
+        ]
+      }
+    },
+    {
+      "name": "assignee",
+      "type": "text"
+    },
+    {
+      "name": "due_date",
+      "type": "date"
+    },
+    {
+      "name": "estimate_hours",
+      "type": "number"
+    }
+  ],
+  "relations": [
+    {
+      "name": "pm_tasks_project",
+      "type": "m2o",
+      "field": "project",
+      "target": "pm_projects",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

@@ -9,7 +9,7 @@ import type { ExtensionJob, JobHost, JobTcpStream } from '@zveltio/sdk/extension
 import { Imap, encodeMailbox, type Fetched, type Folder } from './lib/imap.js';
 import { sendMail, SmtpError } from './lib/smtp.js';
 import { buildMessage, decodeTransfer, htmlText, parseListed, partText, splitParts, type Address, type Parsed, type PartRef } from './lib/mime.js';
-import { ACCOUNTS, ATTACHMENTS, CONTACTS, DRAFTS, FILTERS, FOLDERS, IDENTITIES, MESSAGES, SLOT } from './mail.js';
+import { ACCOUNTS, ATTACHMENTS, CONTACTS, DRAFTS, FILTERS, FOLDERS, IDENTITIES, MESSAGES, SLOT, STALE_MS } from './mail.js';
 
 type Row = Record<string, any>;
 
@@ -32,6 +32,8 @@ const isPrecondition = (err: unknown) => /precondition/i.test(message(err)) || (
 /** The job's collection calls, counted against the run's budget. */
 class Run {
   calls = 0;
+  /** Bytes read over the run's earlier connections (`syncAll` syncs several accounts). */
+  bytes = 0;
   constructor(readonly host: JobHost) {}
   private get c() {
     this.calls++;
@@ -294,7 +296,7 @@ async function syncFolder(run: Run, imap: Imap, acct: Row, folder: Row, filters:
   if (lastUid === 0) fresh = fresh.slice(-FIRST_SYNC);
   const rules = folder.type === 'inbox' ? filters : [];
   for (const m of fresh) {
-    if (run.spent || imap.bytesIn > BYTE_BUDGET) {
+    if (run.spent || run.bytes + imap.bytesIn > BYTE_BUDGET) {
       more = true;
       break;
     }
@@ -333,17 +335,19 @@ async function syncFolder(run: Run, imap: Imap, acct: Row, folder: Row, filters:
 
 // ── Jobs ─────────────────────────────────────────────────────────────────────
 
-/** Read every folder of one account. Queued by the `sync` action, which moved the account to `queued`. */
-const sync: ExtensionJob = async (input, host) => {
-  const run = new Run(host);
-  const acct = await run.read(ACCOUNTS, (input as { account_id: string }).account_id);
-  if (!acct) return;
+/** Move the account from `from` to `syncing`; false when another run took it first. */
+async function claim(run: Run, acct: Row, from: string): Promise<boolean> {
   try {
-    await run.update(ACCOUNTS, acct.id, { sync_status: 'syncing' }, { sync_status: ['queued'] });
+    await run.update(ACCOUNTS, acct.id, { sync_status: 'syncing' }, { sync_status: [from] });
+    return true;
   } catch (err) {
-    if (isPrecondition(err)) return; // another run took it, or it was never queued
+    if (isPrecondition(err)) return false;
     throw err;
   }
+}
+
+/** Read every folder of an account this run claimed, and leave it `idle` or `error`. */
+async function syncAccount(run: Run, acct: Row): Promise<void> {
   let imap: Imap | null = null;
   try {
     if (!acct.is_active) throw new Error('The account is inactive.');
@@ -352,7 +356,7 @@ const sync: ExtensionJob = async (input, host) => {
     const filters = (await run.rows(FILTERS, { account_id: acct.id, is_active: true }, { sort: 'sort_order', order: 'asc' }));
     let more = false;
     for (const f of folders) {
-      if (run.spent || imap.bytesIn > BYTE_BUDGET) {
+      if (run.spent || run.bytes + imap.bytesIn > BYTE_BUDGET) {
         more = true;
         break;
       }
@@ -362,7 +366,45 @@ const sync: ExtensionJob = async (input, host) => {
   } catch (err) {
     await run.update(ACCOUNTS, acct.id, { sync_status: 'error', sync_error: message(err), sync_more: false });
   } finally {
+    run.bytes += imap?.bytesIn ?? 0;
     await imap?.logout();
+  }
+}
+
+/** Read every folder of one account. Queued by the `sync` action, which moved the account to `queued`. */
+const sync: ExtensionJob = async (input, host) => {
+  const run = new Run(host);
+  const acct = await run.read(ACCOUNTS, (input as { account_id: string }).account_id);
+  // Not there, or another run took it, or it was never queued.
+  if (!acct || !(await claim(run, acct, 'queued'))) return;
+  await syncAccount(run, acct);
+};
+
+/** Accounts one `syncAll` run syncs: each opens one IMAP stream, and a run may open four. */
+export const ACCOUNTS_PER_RUN = 4;
+
+/**
+ * The accounts a scheduled sync takes, least recently synced first (never synced
+ * before all): active, and not being synced, unless that run died (`STALE_MS`).
+ */
+export function dueAccounts(accounts: Row[], now: number): Row[] {
+  const busy = (a: Row) =>
+    (a.sync_status === 'queued' || a.sync_status === 'syncing') && now - Date.parse(String(a.updated_at ?? '')) < STALE_MS;
+  const last = (a: Row) => (a.last_sync_at ? Date.parse(String(a.last_sync_at)) : 0);
+  return accounts.filter((a) => a.is_active && !busy(a)).sort((a, b) => last(a) - last(b));
+}
+
+/**
+ * The engine's clock (the manifest's `schedule`, every five minutes, in every
+ * tenant where Mail is active): sync the accounts least recently synced, as
+ * many as one run's streams and budget allow; the next run takes the rest.
+ */
+const syncAll: ExtensionJob = async (_input, host) => {
+  const run = new Run(host);
+  const due = dueAccounts(await run.rows(ACCOUNTS, { is_active: true }), Date.now());
+  for (const acct of due.slice(0, ACCOUNTS_PER_RUN)) {
+    if (run.spent || run.bytes > BYTE_BUDGET) break;
+    if (await claim(run, acct, String(acct.sync_status))) await syncAccount(run, acct);
   }
 };
 
@@ -597,4 +639,4 @@ const fetchAttachment: ExtensionJob = async (input, host) => {
   }
 };
 
-export default { sync, send, apply, fetchAttachment };
+export default { sync, syncAll, send, apply, fetchAttachment };

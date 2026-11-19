@@ -1,0 +1,53 @@
+{
+  "name": "ansvsa_req_suspension_details",
+  "displayName": "Detalii cerere: suspendare",
+  "fields": [
+    {
+      "name": "request",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "ansvsa_external_requests"
+      }
+    },
+    {
+      "name": "entity",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "ansvsa_entities"
+      }
+    },
+    {
+      "name": "reason_for_suspension",
+      "type": "textarea",
+      "required": true
+    },
+    {
+      "name": "cessation_date",
+      "type": "date"
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_req_suspension_details_request",
+      "type": "m2o",
+      "field": "request",
+      "target": "ansvsa_external_requests",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "ansvsa_req_suspension_details_entity",
+      "type": "m2o",
+      "field": "entity",
+      "target": "ansvsa_entities",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

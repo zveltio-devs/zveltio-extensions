@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.1 (2026-11-16)
+
+- build: repacked with hono 4.13.18 (security: GHSA-92p4-j3wq-jmqx, GHSA-39q9-qp46-w8xg, GHSA-h25j-2p75-qj33) and kysely 0.29.9, in lockstep with the engine; no behaviour change
+
 ## 2.1.0 (2026-11-13)
 
 - The ANAF OAuth callback (`GET /oauth/callback`) is a declared route (ADR 0039): the manifest's `routes` names it, public, and the engine serves it with the plain handler `oauthCallback`. Same URL, state and cookie checks, and answers. The settings are read in the request's tenant transaction, so another tenant's state is not found (same 400 as before). `/oauth/start` and the downloads stay the caller's routes

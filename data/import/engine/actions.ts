@@ -62,6 +62,8 @@ interface ImportInput {
   collection: string;
   rows?: unknown[];
   text?: string;
+  /** A stored file the request hands in `$files.read` (ADR 0052). */
+  file?: string;
   format?: Format;
   delimiter?: string;
   filename?: string;
@@ -78,9 +80,19 @@ interface ImportInput {
  */
 const importRows: ExtensionAction = async (input, host) => {
   const { collection, ...opts } = input as ImportInput;
-  if ((opts.rows === undefined) === (opts.text === undefined)) bad('Send either rows or text, not both.');
+  const sources = [opts.rows, opts.text, opts.file].filter((s) => s !== undefined).length;
+  if (sources !== 1) bad('Send exactly one of rows, text or file.');
+  let text = opts.text;
+  let filename = opts.filename;
+  if (opts.file !== undefined) {
+    // Read as the caller, only if the request handed it (`$files.read`); else 403 `file_not_granted`.
+    if (!host.files) throw new Error('This engine cannot hand an action its files (ADR 0052).');
+    const file = await host.files.read(opts.file);
+    text = new TextDecoder().decode(file.bytes);
+    filename ??= file.name;
+  }
   const format: Format = opts.rows ? 'json' : (opts.format ?? 'csv');
-  const rows = opts.rows ?? parseText(opts.text as string, format, opts.delimiter ?? ',');
+  const rows = opts.rows ?? parseText(text as string, format, opts.delimiter ?? ',');
   if (rows.length === 0) bad('No rows to import.');
   if (rows.length > MAX_ROWS) bad('Import limited to 10,000 rows per call.');
   if (!rows.every(isPlainObject)) bad('Every row must be an object.');
@@ -124,7 +136,7 @@ const importRows: ExtensionAction = async (input, host) => {
   const job = await host.collections.insert(JOBS, {
     target_collection: collection,
     format,
-    filename: opts.filename ?? null,
+    filename: filename ?? null,
     imported_rows: ids.length,
     record_ids: ids,
   });

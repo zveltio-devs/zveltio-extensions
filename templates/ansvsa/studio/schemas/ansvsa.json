@@ -1,0 +1,221 @@
+{
+  "spec": "zveltio.view/2",
+  "title": "templates.ansvsa.title",
+  "type": "tabs",
+  "items": [
+    {
+      "type": "list",
+      "collection": "ansvsa_entities",
+      "title": "templates.ansvsa.tab.ansvsa_entities",
+      "fields": [
+        {
+          "field": "name"
+        },
+        {
+          "field": "entity_type"
+        },
+        {
+          "field": "trade_registry_number"
+        },
+        {
+          "field": "tax_identification_number"
+        }
+      ],
+      "edit": true,
+      "delete": true,
+      "create": true
+    },
+    {
+      "type": "list",
+      "collection": "ansvsa_establishment_units",
+      "title": "templates.ansvsa.tab.ansvsa_establishment_units",
+      "fields": [
+        {
+          "field": "establishment_type"
+        },
+        {
+          "field": "address_number"
+        },
+        {
+          "field": "extra_address_info"
+        },
+        {
+          "field": "phone"
+        }
+      ],
+      "edit": true,
+      "delete": true,
+      "create": true
+    },
+    {
+      "type": "list",
+      "collection": "ansvsa_external_requests",
+      "title": "templates.ansvsa.tab.ansvsa_external_requests",
+      "fields": [
+        {
+          "field": "external_user"
+        },
+        {
+          "field": "request_status"
+        },
+        {
+          "field": "submitted_at"
+        },
+        {
+          "field": "approval_date"
+        }
+      ],
+      "edit": true,
+      "delete": true,
+      "create": true
+    },
+    {
+      "type": "list",
+      "collection": "ansvsa_inspection_plans",
+      "title": "templates.ansvsa.tab.ansvsa_inspection_plans",
+      "fields": [
+        {
+          "field": "name"
+        },
+        {
+          "field": "year"
+        },
+        {
+          "field": "plan_type"
+        }
+      ],
+      "edit": true,
+      "delete": true,
+      "create": true
+    },
+    {
+      "type": "list",
+      "collection": "ansvsa_inspections",
+      "title": "templates.ansvsa.tab.ansvsa_inspections",
+      "fields": [
+        {
+          "field": "inspection_type"
+        },
+        {
+          "field": "planned_date"
+        },
+        {
+          "field": "performed_date"
+        },
+        {
+          "field": "inspector"
+        }
+      ],
+      "edit": true,
+      "delete": true,
+      "create": true
+    },
+    {
+      "type": "list",
+      "collection": "ansvsa_finding_reports",
+      "title": "templates.ansvsa.tab.ansvsa_finding_reports",
+      "fields": [
+        {
+          "field": "report_number"
+        },
+        {
+          "field": "report_date"
+        },
+        {
+          "field": "inspector"
+        }
+      ],
+      "edit": true,
+      "delete": true,
+      "create": true
+    },
+    {
+      "type": "list",
+      "collection": "ansvsa_samples",
+      "title": "templates.ansvsa.tab.ansvsa_samples",
+      "fields": [
+        {
+          "field": "sample_code"
+        },
+        {
+          "field": "product_name"
+        },
+        {
+          "field": "sample_type"
+        },
+        {
+          "field": "sampled_at"
+        }
+      ],
+      "edit": true,
+      "delete": true,
+      "create": true
+    },
+    {
+      "type": "list",
+      "collection": "ansvsa_sanctions",
+      "title": "templates.ansvsa.tab.ansvsa_sanctions",
+      "fields": [
+        {
+          "field": "sanction_type"
+        },
+        {
+          "field": "legal_basis"
+        },
+        {
+          "field": "amount"
+        },
+        {
+          "field": "currency"
+        }
+      ],
+      "edit": true,
+      "delete": true,
+      "create": true
+    },
+    {
+      "type": "list",
+      "collection": "ansvsa_certificates",
+      "title": "templates.ansvsa.tab.ansvsa_certificates",
+      "fields": [
+        {
+          "field": "certificate_number"
+        },
+        {
+          "field": "certificate_type"
+        },
+        {
+          "field": "issued_date"
+        },
+        {
+          "field": "valid_until"
+        }
+      ],
+      "edit": true,
+      "delete": true,
+      "create": true
+    },
+    {
+      "type": "list",
+      "collection": "ansvsa_complaints",
+      "title": "templates.ansvsa.tab.ansvsa_complaints",
+      "fields": [
+        {
+          "field": "complaint_number"
+        },
+        {
+          "field": "complainant_name"
+        },
+        {
+          "field": "complainant_contact"
+        },
+        {
+          "field": "subject"
+        }
+      ],
+      "edit": true,
+      "delete": true,
+      "create": true
+    }
+  ]
+}

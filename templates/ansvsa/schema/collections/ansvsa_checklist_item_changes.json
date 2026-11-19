@@ -1,0 +1,57 @@
+{
+  "name": "ansvsa_checklist_item_changes",
+  "displayName": "Jurnal modificări cerințe checklist",
+  "fields": [
+    {
+      "name": "item",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "ansvsa_checklist_items"
+      }
+    },
+    {
+      "name": "item_code",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "changed_by",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "changed_at",
+      "type": "datetime",
+      "required": true
+    },
+    {
+      "name": "field_changed",
+      "type": "text"
+    },
+    {
+      "name": "old_value",
+      "type": "text"
+    },
+    {
+      "name": "new_value",
+      "type": "text"
+    },
+    {
+      "name": "reason",
+      "type": "textarea"
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_checklist_item_changes_item",
+      "type": "m2o",
+      "field": "item",
+      "target": "ansvsa_checklist_items",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

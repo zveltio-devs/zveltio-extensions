@@ -1,0 +1,41 @@
+{
+  "name": "ansvsa_sanctions_confiscated_items",
+  "displayName": "Bunuri confiscate",
+  "fields": [
+    {
+      "name": "complementary_measure",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "ansvsa_sanctions_complementary"
+      }
+    },
+    {
+      "name": "product_name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "quantity",
+      "type": "number",
+      "required": true
+    },
+    {
+      "name": "unit_of_measure",
+      "type": "text",
+      "required": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_sanctions_confiscated_items_complementary_measure",
+      "type": "m2o",
+      "field": "complementary_measure",
+      "target": "ansvsa_sanctions_complementary",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

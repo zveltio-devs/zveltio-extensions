@@ -56,7 +56,7 @@ for end-user applications. Import them directly:
 | `content` | `document-templates`, `documents`, `drafts`, `media`, `pages`, `pdf-viewer` |
 | `crm` | CRM module |
 | `data` | `export`, `import` |
-| `developer` | `api-docs`, `byod`, `database`, `graphql` |
+| `developer` | `api-docs`, `byod`, `database` |
 | `ecommerce` | `store` |
 | `finance` | `accounting`, `banking`, `expenses`, `invoicing`, `quotes`, `subscriptions` |
 | `forms` | `forms` |
@@ -68,9 +68,10 @@ for end-user applications. Import them directly:
 | `projects` | `helpdesk`, `management` |
 | `sms` | `sms` |
 | `storage` | `cloud` |
+| `templates` | `ansvsa`, `helpdesk`, `inventory`, `invoicing`, `project` (starter apps: collections and a page, no code) |
 | `workflow` | `approvals`, `checklists` |
 
-**Catalog size:** 52 official extensions across 22 categories.
+**Catalog size:** 57 official extensions across 23 categories.
 
 Admin Studio pages are **SDUI schemas** unless listed in [STUDIO-DEFERRED.md](./STUDIO-DEFERRED.md).
 
@@ -95,3 +96,15 @@ bun run typecheck
 ```
 
 Extensions depend on `@zveltio/sdk` (for `ZveltioExtension` type) and are loaded at runtime by the Zveltio engine.
+
+## Licence
+
+The first-party extensions in this repository are licensed under the GNU Affero
+General Public License v3.0 only ([LICENSE](LICENSE)), copyright © 2026 Liviu
+Marian Iordache. A commercial licence is available for those who cannot accept the
+AGPL. Your own extensions are not affected: an extension that uses only the
+Zveltio extension interface may be under any licence (Zveltio Extension
+Exception). Scope, exception and FAQ:
+[zveltio/LICENSING.md](https://github.com/zveltio-devs/zveltio/blob/master/LICENSING.md).
+Contributions are accepted under the
+[Contributor License Agreement](https://github.com/zveltio-devs/zveltio/blob/master/CLA.md).

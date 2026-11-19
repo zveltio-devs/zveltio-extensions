@@ -5,7 +5,6 @@
   "auth.ldap.section.enable": "LDAP-Authentifizierung aktivieren",
   "auth.ldap.section.search": "Sucheinstellungen",
   "auth.ldap.section.server": "Serververbindung",
-  "auth.ldap.section.tls": "TLS-Zertifikat überprüfen",
   "auth.ldap.subtitle": "Einstellungen für die Verzeichnisauthentifizierung",
   "auth.ldap.title": "LDAP",
   "auth.ldap.toast.connectionOk": "Verbindung erfolgreich!",

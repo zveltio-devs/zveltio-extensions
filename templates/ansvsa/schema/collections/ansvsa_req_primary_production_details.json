@@ -1,0 +1,51 @@
+{
+  "name": "ansvsa_req_primary_production_details",
+  "displayName": "Detalii cerere: producție primară",
+  "fields": [
+    {
+      "name": "request",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "ansvsa_external_requests"
+      }
+    },
+    {
+      "name": "activity_type",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "area_0_3_1_ha",
+      "type": "boolean"
+    },
+    {
+      "name": "area_over_1_ha",
+      "type": "boolean"
+    },
+    {
+      "name": "cultivation_outdoor",
+      "type": "boolean"
+    },
+    {
+      "name": "cultivation_protected",
+      "type": "boolean"
+    },
+    {
+      "name": "product_type_json",
+      "type": "json"
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_req_primary_production_details_request",
+      "type": "m2o",
+      "field": "request",
+      "target": "ansvsa_external_requests",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

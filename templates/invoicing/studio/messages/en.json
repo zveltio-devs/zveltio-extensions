@@ -1,0 +1,7 @@
+{
+  "templates.invoicing.tab.inv_customers": "Customers",
+  "templates.invoicing.tab.inv_invoices": "Invoices",
+  "templates.invoicing.tab.inv_line_items": "Line items",
+  "templates.invoicing.tab.inv_payments": "Payments",
+  "templates.invoicing.title": "Invoicing Starter"
+}

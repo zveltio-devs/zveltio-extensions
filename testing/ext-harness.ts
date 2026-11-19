@@ -1214,8 +1214,11 @@ export async function onEngine(engineDir: string): Promise<{
       await sql`DELETE FROM zv_extension_registry WHERE name = ${name}`.execute(db);
       // dropTestCollection leaves the relation rows; a later apply of the same
       // collections would then build foreign keys onto columns not there yet.
+      // It leaves the row rules too: a later apply would keep a declared rule
+      // the files no longer declare, as if an operator had added it.
       if (manifest.collections?.length) {
         await sql`DELETE FROM zvd_relations WHERE source_collection IN (${sql.join(manifest.collections)})`.execute(db);
+        await sql`DELETE FROM zvd_rls_policies WHERE collection IN (${sql.join(manifest.collections)})`.execute(db);
       }
       for (const c of [...(manifest.collections ?? [])].reverse()) await harness.dropTestCollection(db, c);
       await seatHarnessGod();

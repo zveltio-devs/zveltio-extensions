@@ -1,0 +1,23 @@
+{
+  "name": "ansvsa_risk_classes",
+  "displayName": "Clase de risc",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "code",
+      "type": "text"
+    },
+    {
+      "name": "inspection_frequency_months",
+      "type": "integer"
+    },
+    {
+      "name": "description",
+      "type": "textarea"
+    }
+  ]
+}

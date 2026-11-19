@@ -1,0 +1,95 @@
+{
+  "spec": "zveltio.view/2",
+  "title": "templates.invoicing.title",
+  "type": "tabs",
+  "items": [
+    {
+      "type": "list",
+      "collection": "inv_customers",
+      "title": "templates.invoicing.tab.inv_customers",
+      "fields": [
+        {
+          "field": "name"
+        },
+        {
+          "field": "email"
+        },
+        {
+          "field": "tax_id"
+        },
+        {
+          "field": "billing_address"
+        }
+      ],
+      "edit": true,
+      "delete": true,
+      "create": true
+    },
+    {
+      "type": "list",
+      "collection": "inv_invoices",
+      "title": "templates.invoicing.tab.inv_invoices",
+      "fields": [
+        {
+          "field": "number"
+        },
+        {
+          "field": "issue_date"
+        },
+        {
+          "field": "due_date"
+        },
+        {
+          "field": "invoice_status"
+        }
+      ],
+      "edit": true,
+      "delete": true,
+      "create": true
+    },
+    {
+      "type": "list",
+      "collection": "inv_line_items",
+      "title": "templates.invoicing.tab.inv_line_items",
+      "fields": [
+        {
+          "field": "description"
+        },
+        {
+          "field": "quantity"
+        },
+        {
+          "field": "unit_price"
+        },
+        {
+          "field": "amount"
+        }
+      ],
+      "edit": true,
+      "delete": true,
+      "create": true
+    },
+    {
+      "type": "list",
+      "collection": "inv_payments",
+      "title": "templates.invoicing.tab.inv_payments",
+      "fields": [
+        {
+          "field": "received_at"
+        },
+        {
+          "field": "amount"
+        },
+        {
+          "field": "method"
+        },
+        {
+          "field": "reference"
+        }
+      ],
+      "edit": true,
+      "delete": true,
+      "create": true
+    }
+  ]
+}

@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.0.0 (2026-11-14)
+
+- feat!: the publish routes are actions (ADR 0039, ADR 0047): `POST /:id/publish` is `POST /ext/content/drafts/actions/publishDraft` (`{ id }`), `POST /bulk-publish` is `bulkPublish` (`{ draft_ids }`, 1 to 200 uuids) and `POST /schedule/process` is `publishDue` (`{}`). Each needs `execute` on `content_drafts`, granted to `tenant_member` at install, and answers `{ result }` with 200: `publishDraft` `{ draft_id, collection, record_id }`, `bulkPublish` `{ published }`, `publishDue` `{ published, skipped }` (no `success` key any more). The three list `"*"` in `writes`, because the target is the collection the draft names: they reach it only as the caller, under their grants, row rules and column rules, as the routes did through `ctx.internals.updateRecord`; install consent shows it as `collections:any:write`, and an engine from 3.0.0-beta.121 is required
+- feat!: refusals are the engine's problem answers with a `code`, not `{ error, draft_id }`: an unknown draft 404 `draft_not_found`, a published one 409 `already_published`, a scheduled draft not approved 409 `not_approved`, a draft with no content the caller can read 409 `nothing_to_publish` (each names the draft in its `detail`); a refused write to the target answers the data API's own status, `code` and `errors` (403, 404, 422), without naming the draft. `publishDue` reports a skipped draft as `{ draft_id, status, code }` (was `{ draft_id, status, error }` with the route's body). Unknown keys in the input are refused with 400 (the route's validator dropped them)
+- feat!: a batch still publishes every draft or none: an action is the request's transaction, and the first refusal throws and rolls back every target write and every `published_at` the call made. `publishDue` still skips a draft refused before it wrote anything and throws on any other failure
+- feat!: no Hono route and no `ctx.internals` left; the bundle carries neither hono nor zod
+- feat: the page is a `view/2` list of the unpublished drafts, with publish, approve and reject (the note prompted), snapshot (the description prompted) per row, publish of the selected drafts, publish of the due drafts, and the data API's delete. It called the publish route and the action routes by address
+
 ## 2.1.1 (2026-11-09)
 
 - build: repacked with hono 4.13.17 and kysely 0.29.8, in lockstep with the engine; no behaviour change

@@ -1,0 +1,36 @@
+{
+  "name": "ansvsa_notifiable_diseases",
+  "displayName": "Boli notificabile",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "code",
+      "type": "text"
+    },
+    {
+      "name": "category",
+      "type": "enum",
+      "options": {
+        "values": [
+          "A",
+          "B",
+          "C",
+          "D",
+          "E"
+        ]
+      }
+    },
+    {
+      "name": "species_affected",
+      "type": "text"
+    },
+    {
+      "name": "description",
+      "type": "textarea"
+    }
+  ]
+}

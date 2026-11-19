@@ -1,0 +1,75 @@
+{
+  "name": "inv_movements",
+  "displayName": "Stock movements",
+  "fields": [
+    {
+      "name": "product",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "inv_products"
+      }
+    },
+    {
+      "name": "location",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "inv_locations"
+      }
+    },
+    {
+      "name": "kind",
+      "type": "enum",
+      "required": true,
+      "options": {
+        "values": [
+          "receipt",
+          "issue",
+          "adjustment",
+          "transfer"
+        ]
+      }
+    },
+    {
+      "name": "quantity",
+      "type": "number",
+      "required": true
+    },
+    {
+      "name": "moved_at",
+      "type": "datetime",
+      "required": true
+    },
+    {
+      "name": "reference",
+      "type": "text"
+    },
+    {
+      "name": "note",
+      "type": "text"
+    }
+  ],
+  "relations": [
+    {
+      "name": "inv_movements_product",
+      "type": "m2o",
+      "field": "product",
+      "target": "inv_products",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "inv_movements_location",
+      "type": "m2o",
+      "field": "location",
+      "target": "inv_locations",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

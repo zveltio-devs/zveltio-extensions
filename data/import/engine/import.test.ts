@@ -101,6 +101,27 @@ d('data/import — all or nothing, as the caller', () => {
     expect(await labels()).toEqual([]);
   });
 
+  it('reads the CSV file the request hands it, as the caller, and refuses one it was not handed', async () => {
+    const form = new FormData();
+    form.append('file', new File(['label,qty\nf1,1\nf2,2\n'], 'stock.csv', { type: 'text/csv' }));
+    const up = await e.engineApp.request('/api/storage/upload', { method: 'POST', headers: { cookie: member.cookie }, body: form });
+    expect(up.status).toBe(201);
+    const fileId = ((await up.json()) as { file: { id: string } }).file.id;
+
+    const unhanded = await run('importRows', { collection: C, file: fileId });
+    expect(unhanded.status).toBe(403);
+    expect((await unhanded.json()).code).toBe('file_not_granted');
+
+    const res = await run('importRows', { collection: C, file: fileId, $files: { read: [fileId] } });
+    expect(res.status).toBe(200);
+    expect((await res.json()).result.imported_rows).toBe(2);
+    expect(await labels()).toEqual(['f1', 'f2']);
+    const [job] = (await jobs()).filter((j: Any) => j.filename === 'stock.csv');
+    expect(job).toMatchObject({ format: 'csv', created_by: member.userId });
+    expect((await run('importRows', { collection: C, file: fileId, text: 'x', $files: { read: [fileId] } })).status).toBe(400);
+    await e.sql`DELETE FROM ${e.sql.table(`zvd_${C}`)}`.execute(e.db);
+  });
+
   it('NDJSON text is parsed as NDJSON', async () => {
     const res = await run('importRows', { collection: C, text: '{"label":"j1"}\n{"label":"j2","qty":2}\n', format: 'ndjson' });
     expect(res.status).toBe(200);
@@ -120,7 +141,7 @@ d('data/import — all or nothing, as the caller', () => {
     expect(res.status).toBe(200);
     expect((await res.json()).result.imported_rows).toBe(2);
     expect(await labels()).toEqual(['alpha', 'beta']);
-    const [job] = (await jobs()).filter((j: Any) => j.format === 'csv');
+    const [job] = (await jobs()).filter((j: Any) => j.filename === 'items.csv');
     expect(job).toMatchObject({ format: 'csv', filename: 'items.csv', created_by: member.userId });
     expect(Number(job.imported_rows)).toBe(2);
     expect((await e.sql`SELECT qty FROM ${e.sql.table(`zvd_${C}`)} ORDER BY label`.execute(e.db)).rows.map((r: Any) => r.qty && Number(r.qty))).toEqual([1, null]);

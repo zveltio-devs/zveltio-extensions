@@ -1,0 +1,42 @@
+{
+  "name": "ansvsa_fee_schedule",
+  "displayName": "Nomenclator tarife",
+  "fields": [
+    {
+      "name": "fee_name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "activity",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_approval_activities"
+      }
+    },
+    {
+      "name": "amount",
+      "type": "money"
+    },
+    {
+      "name": "currency",
+      "type": "text"
+    },
+    {
+      "name": "legal_basis",
+      "type": "text"
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_fee_schedule_activity",
+      "type": "m2o",
+      "field": "activity",
+      "target": "ansvsa_approval_activities",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

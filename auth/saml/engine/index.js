@@ -33525,7 +33525,7 @@ async function validateSamlResponse(saml, body) {
 }
 
 // engine/routes.ts
-async function getSamlConfig(collections) {
+async function getSamlConfig(collections, ctx) {
   const { records } = await collections.list("saml_settings", { limit: 1 });
   const row = records[0];
   if (!row)
@@ -33539,10 +33539,20 @@ async function getSamlConfig(collections) {
     privateKey: typeof row.private_key === "string" && row.private_key !== "" ? row.private_key : undefined,
     signatureAlgorithm: row.signature_algorithm || "sha256",
     wantAuthnResponseSigned: row.want_authn_response_signed !== false,
-    audience: row.audience_check === false ? false : row.audience || undefined,
+    audience: audienceCheck(ctx, row.audience_check) ? row.audience || undefined : false,
     mapEmail: row.map_email || "email",
     mapName: row.map_name || "displayName"
   };
+}
+var warnedStoredAudienceCheck = false;
+function audienceCheck(ctx, stored) {
+  if (ctx.config?.allowSamlAnyAudience === true)
+    return false;
+  if (stored === false && !warnedStoredAudienceCheck) {
+    warnedStoredAudienceCheck = true;
+    console.warn("[saml] saml_settings.audience_check=false is ignored since auth/saml 3.0.0: the assertion " + "audience is checked. Set the audience your identity provider sends in the SAML settings, " + "or ZVELTIO_ALLOW_SAML_ANY_AUDIENCE=1 on the engine (every tenant; removed in 3.1.0).");
+  }
+  return true;
 }
 var kept;
 function keepContext(ctx) {
@@ -33554,7 +33564,7 @@ function context() {
   return kept;
 }
 var answer = (body, status) => Response.json(body, { status });
-var readConfig = (collections) => context().internals.asSystem(["saml_settings"], () => getSamlConfig(collections));
+var readConfig = (collections) => context().internals.asSystem(["saml_settings"], () => getSamlConfig(collections, context()));
 var landing = (raw) => typeof raw === "string" && raw.startsWith("/") && !raw.startsWith("//") ? raw : "/admin";
 var login = async (request, { host }) => {
   const config = await readConfig(host.collections);
@@ -33669,4 +33679,4 @@ var engine_default = extension;
 export {
   engine_default as default
 };
-// @zveltio-bundled kysely@0.29.8
+// @zveltio-bundled kysely@0.29.9

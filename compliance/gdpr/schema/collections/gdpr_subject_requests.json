@@ -1,6 +1,7 @@
 {
   "name": "gdpr_subject_requests",
   "writtenBy": "actions",
+  "rowRules": [{ "role": "tenant_member", "field": "created_by", "op": "eq", "value": "user_id" }],
   "fields": [
     {
       "name": "request_type",

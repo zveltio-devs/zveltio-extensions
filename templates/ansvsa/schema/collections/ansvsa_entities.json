@@ -1,0 +1,115 @@
+{
+  "name": "ansvsa_entities",
+  "displayName": "Operatori economici",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "entity_type",
+      "type": "enum",
+      "options": {
+        "values": [
+          "PJ",
+          "PF"
+        ]
+      }
+    },
+    {
+      "name": "legal_entity_type",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_legal_entity_types"
+      }
+    },
+    {
+      "name": "trade_registry_number",
+      "type": "text"
+    },
+    {
+      "name": "tax_identification_number",
+      "type": "text"
+    },
+    {
+      "name": "county",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_counties"
+      }
+    },
+    {
+      "name": "locality",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_localities"
+      }
+    },
+    {
+      "name": "street",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_streets"
+      }
+    },
+    {
+      "name": "building_number",
+      "type": "text"
+    },
+    {
+      "name": "extra_address_info",
+      "type": "text"
+    },
+    {
+      "name": "phone",
+      "type": "phone"
+    },
+    {
+      "name": "email",
+      "type": "email"
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_entities_legal_entity_type",
+      "type": "m2o",
+      "field": "legal_entity_type",
+      "target": "ansvsa_legal_entity_types",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "ansvsa_entities_county",
+      "type": "m2o",
+      "field": "county",
+      "target": "ansvsa_counties",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "ansvsa_entities_locality",
+      "type": "m2o",
+      "field": "locality",
+      "target": "ansvsa_localities",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "ansvsa_entities_street",
+      "type": "m2o",
+      "field": "street",
+      "target": "ansvsa_streets",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

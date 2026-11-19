@@ -16,6 +16,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { join } from 'node:path';
 // @ts-ignore — asn1 ships no types; it is ldapts' own BER codec.
 import { Ber, BerReader, BerWriter } from 'asn1';
+// @ts-ignore — node-forge ships no types in this repository.
+import forge from 'node-forge';
 import { onEngine } from '../../../testing/ext-harness';
 
 const ENGINE = join(import.meta.dir, '../../../../zveltio/packages/engine/src');
@@ -45,12 +47,29 @@ const result = (code: number) => (w: any) => {
   w.writeString('');
 };
 
-/** Simple bind, search, unbind — what `ldapAuthenticate` sends. */
-function startDirectory(users: DirectoryUser[]) {
+/** A self-signed certificate for 127.0.0.1: a directory nobody vouches for. */
+function selfSigned() {
+  const keys = forge.pki.rsa.generateKeyPair(2048);
+  const cert = forge.pki.createCertificate();
+  cert.publicKey = keys.publicKey;
+  cert.serialNumber = '01';
+  cert.validity.notBefore = new Date(Date.now() - 86_400_000);
+  cert.validity.notAfter = new Date(Date.now() + 86_400_000);
+  const name = [{ name: 'commonName', value: '127.0.0.1' }];
+  cert.setSubject(name);
+  cert.setIssuer(name);
+  cert.setExtensions([{ name: 'subjectAltName', altNames: [{ type: 7, ip: '127.0.0.1' }] }]);
+  cert.sign(keys.privateKey, forge.md.sha256.create());
+  return { key: forge.pki.privateKeyToPem(keys.privateKey), cert: forge.pki.certificateToPem(cert) };
+}
+
+/** Simple bind, search, unbind — what `ldapAuthenticate` sends; over TLS with `tls`. */
+function startDirectory(users: DirectoryUser[], tls?: { key: string; cert: string }) {
   const dnOf = (u: DirectoryUser) => `uid=${u.uid},dc=test`;
   const server = Bun.listen({
     hostname: '127.0.0.1',
     port: 0,
+    ...(tls ? { tls } : {}),
     socket: {
       data(socket, chunk) {
         const r = new BerReader(Buffer.from(chunk));
@@ -92,7 +111,7 @@ function startDirectory(users: DirectoryUser[]) {
     },
   });
   return {
-    url: `ldap://127.0.0.1:${server.port}`,
+    url: `${tls ? 'ldaps' : 'ldap'}://127.0.0.1:${server.port}`,
     stop: () => server.stop(true),
   };
 }
@@ -106,6 +125,8 @@ d('auth/ldap — a directory sign-in is a session the engine accepts', () => {
   // directories let users edit their own. Its address is the god's, read below.
   const mallory = { uid: `mallory${tag}`, password: 'pw-mallory', mail: '' };
   const directory = startDirectory([alice, bob, carol, mallory]);
+  // The same directory behind a self-signed certificate (firm D).
+  const ldaps = startDirectory([alice], selfSigned());
   const DEFAULT = '00000000-0000-0000-0000-000000000001';
   // Firm A points at the directory, B at nothing listening, C holds a bind
   // password the instance's key cannot decrypt.
@@ -113,6 +134,7 @@ d('auth/ldap — a directory sign-in is a session the engine accepts', () => {
   const A = firm('a');
   const B = firm('b');
   const C = firm('c');
+  const D = firm('d');
   let e: Awaited<ReturnType<typeof onEngine>>;
   let god = '';
   let getSession: (cookie: string) => Promise<string | undefined>;
@@ -123,7 +145,15 @@ d('auth/ldap — a directory sign-in is a session the engine accepts', () => {
             VALUES (${tenant}::uuid, 'tenant', true, ${url}, ${SERVICE_DN}, ${bindPassword}, 'dc=test', false)`.execute(trx),
     );
 
+  // What the extension tells the operator (see the `tls_verify` test).
+  const warnings: string[] = [];
+  const warn = console.warn;
+
   beforeAll(async () => {
+    console.warn = (...args: unknown[]) => {
+      warnings.push(args.map(String).join(' '));
+      warn(...args);
+    };
     e = await onEngine(import.meta.dir);
     const { encryptField } = await import(join(ENGINE, 'lib/data/field-crypto.js'));
     const { getAuth } = await import(join(ENGINE, 'lib/auth.js'));
@@ -131,7 +161,7 @@ d('auth/ldap — a directory sign-in is a session the engine accepts', () => {
       (await getAuth().api.getSession({ headers: new Headers({ cookie: setCookie.split(';')[0] ?? '' }) }))?.user?.id;
     god = await e.harness.createGodSession(e.engineApp, e.db);
     mallory.mail = (await e.sql`SELECT email FROM "user" WHERE role = 'god'`.execute(e.db)).rows[0].email;
-    for (const t of [A, B, C]) {
+    for (const t of [A, B, C, D]) {
       await e.sql`INSERT INTO zv_tenants (id, slug, name, status) VALUES (${t.id}::uuid, ${t.slug}, ${t.slug}, 'active')`.execute(e.db);
     }
     await e.harness.asEveryTenant(e.db, (trx: any) => e.sql`DELETE FROM zvd_ldap_settings`.execute(trx));
@@ -140,13 +170,16 @@ d('auth/ldap — a directory sign-in is a session the engine accepts', () => {
     await seed(A.id, directory.url, sealed);
     await seed(B.id, 'ldap://127.0.0.1:1', sealed);
     await seed(C.id, directory.url, 'enc:v1:not-a-ciphertext');
+    await seed(D.id, ldaps.url, sealed);
   }, 120_000);
 
   afterAll(async () => {
     directory.stop();
+    ldaps.stop();
+    console.warn = warn;
     if (!e) return;
     await e.done();
-    await e.sql`DELETE FROM zv_tenants WHERE id IN (${A.id}::uuid, ${B.id}::uuid, ${C.id}::uuid)`.execute(e.db);
+    await e.sql`DELETE FROM zv_tenants WHERE id IN (${A.id}::uuid, ${B.id}::uuid, ${C.id}::uuid, ${D.id}::uuid)`.execute(e.db);
   });
 
   const account = async (mail: string, banned = false) => {
@@ -258,6 +291,25 @@ d('auth/ldap — a directory sign-in is a session the engine accepts', () => {
     expect([200, 403]).toContain((await login(alice, A.slug)).status);
     const failed = await login({ ...alice, password: 'wrong' }, A.slug);
     expect(failed.status).toBe(401);
+  });
+
+  // DR-10 slice B: `tls_verify` was a Console field any tenant admin could turn
+  // off. Every row here stores `false`; it no longer changes anything, and only
+  // the operator's ZVELTIO_ALLOW_UNVERIFIED_LDAPS does (ctx.config).
+  it('a stored tls_verify=false is ignored: a self-signed directory is refused', async () => {
+    const refused = await login(alice, D.slug);
+    expect(refused.status).toBe(401);
+    expect(((await refused.json()) as { error: string }).error).toMatch(/certificate/i);
+    expect(warnings.filter((w) => w.includes('tls_verify=false is ignored'))).toHaveLength(1);
+    expect(warnings.find((w) => w.includes('tls_verify=false'))).toContain('ZVELTIO_ALLOW_UNVERIFIED_LDAPS=1');
+
+    process.env.ZVELTIO_ALLOW_UNVERIFIED_LDAPS = '1';
+    try {
+      // The bind and search ran; the engine then refuses a non-member (403).
+      expect([200, 403]).toContain((await login(alice, D.slug)).status);
+    } finally {
+      delete process.env.ZVELTIO_ALLOW_UNVERIFIED_LDAPS;
+    }
   });
 
   it('answers 500 "unreadable" for a bind password the key cannot decrypt, not "not configured"', async () => {

@@ -1,0 +1,56 @@
+{
+  "name": "ansvsa_risk_assessment_sheets",
+  "displayName": "Fișe de evaluare a riscului",
+  "fields": [
+    {
+      "name": "report",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "ansvsa_finding_reports"
+      }
+    },
+    {
+      "name": "risk_class",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_risk_classes"
+      }
+    },
+    {
+      "name": "risk_class_established",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "deficiencies_notes",
+      "type": "textarea"
+    },
+    {
+      "name": "evaluation_result_json",
+      "type": "json"
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_risk_assessment_sheets_report",
+      "type": "m2o",
+      "field": "report",
+      "target": "ansvsa_finding_reports",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    },
+    {
+      "name": "ansvsa_risk_assessment_sheets_risk_class",
+      "type": "m2o",
+      "field": "risk_class",
+      "target": "ansvsa_risk_classes",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "name": "ansvsa_registered_unit_statuses",
+  "displayName": "Statusuri unitate înregistrată",
+  "fields": [
+    {
+      "name": "status_code",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "status_description",
+      "type": "text"
+    }
+  ]
+}

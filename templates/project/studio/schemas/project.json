@@ -1,0 +1,86 @@
+{
+  "spec": "zveltio.view/2",
+  "title": "templates.project.title",
+  "type": "tabs",
+  "items": [
+    {
+      "type": "list",
+      "collection": "pm_projects",
+      "title": "templates.project.tab.pm_projects",
+      "fields": [
+        {
+          "field": "name"
+        },
+        {
+          "field": "project_status"
+        },
+        {
+          "field": "owner"
+        },
+        {
+          "field": "start_date"
+        }
+      ],
+      "edit": true,
+      "delete": true,
+      "create": true
+    },
+    {
+      "type": "list",
+      "collection": "pm_tasks",
+      "title": "templates.project.tab.pm_tasks",
+      "fields": [
+        {
+          "field": "title"
+        },
+        {
+          "field": "task_status"
+        },
+        {
+          "field": "priority"
+        },
+        {
+          "field": "assignee"
+        }
+      ],
+      "edit": true,
+      "delete": true,
+      "create": true
+    },
+    {
+      "type": "list",
+      "collection": "pm_comments",
+      "title": "templates.project.tab.pm_comments",
+      "fields": [
+        {
+          "field": "author"
+        }
+      ],
+      "edit": true,
+      "delete": true,
+      "create": true
+    },
+    {
+      "type": "list",
+      "collection": "pm_time_logs",
+      "title": "templates.project.tab.pm_time_logs",
+      "fields": [
+        {
+          "field": "user"
+        },
+        {
+          "field": "logged_at"
+        },
+        {
+          "field": "hours"
+        },
+        {
+          "field": "note"
+        }
+      ],
+      "edit": true,
+      "delete": true,
+      "create": true
+    }
+  ]
+}

@@ -2,13 +2,14 @@
   "name": "data/import",
   "displayName": "Data Import",
   "category": "data",
-  "description": "Import collection data as rows, CSV, JSON or NDJSON text through the data API, as the importing user",
+  "description": "Import collection data from CSV, JSON or NDJSON files through the data API, as the importing user",
   "version": "3.0.0",
-  "zveltioMinVersion": "3.0.0-beta.121",
+  "zveltioMinVersion": "3.0.0-beta.129",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-import",
   "permissions": [
-    "data:write"
+    "data:write",
+    "files"
   ],
   "collections": [
     "data_import_jobs",
@@ -40,8 +41,8 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "521aa60125d5331986c96b1424c4427ffe606ac214a6897e99967eabe58343f7",
-    "sourceSha256": "3be076e6e5b45c548aa509aadc25299212f3c87f81b316d3504ead9a5b8c8ce5",
+    "engineSha256": "fb6fc194ce2b4a64a8e49fada7b63beb9e1474f35a4cc296137aa7e97e76c503",
+    "sourceSha256": "15ee39501d523cdab3d05112ca4ab8d4d3342b2975f64f668ddf70846580bf5a",
     "schemaSha256": "0060c4c59b859f1e6599f9ab40060e0f682f642c50b9c8e736e6924792327fb8"
   },
   "actions": [
@@ -73,6 +74,10 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 104857600
+          },
+          "file": {
+            "type": "string",
+            "format": "uuid"
           },
           "format": {
             "type": "string",

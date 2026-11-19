@@ -1,0 +1,27 @@
+{
+  "name": "inv_locations",
+  "displayName": "Locations",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "address",
+      "type": "text"
+    },
+    {
+      "name": "kind",
+      "type": "enum",
+      "options": {
+        "values": [
+          "warehouse",
+          "shop",
+          "office",
+          "transit"
+        ]
+      }
+    }
+  ]
+}

@@ -1,5 +1,14 @@
 # Changelog
 
+## 4.0.0 (2026-11-17)
+
+- fix!: LDAPS certificate verification can no longer be turned off from the Console (ADR 0058 decision 4, DR-10). Any tenant admin could save `tls_verify: false`, and the directory was then not authenticated: whoever sits on the path reads the bind password and every user's password. The field leaves the form and a stored `false` is ignored, logged once with what to do. Only the operator turns it off, for every tenant, with `ZVELTIO_ALLOW_UNVERIFIED_LDAPS=1` on the engine (`ctx.config.allowUnverifiedLdaps`; a dated mode, removed in 3.1.0); an engine without that member verifies
+- **Upgrade:** a directory with a self-signed certificate stops signing in. Trust its CA on the engine with `NODE_EXTRA_CA_CERTS=/path/to/ca.pem`, which keeps verification on, or set `ZVELTIO_ALLOW_UNVERIFIED_LDAPS=1` until it has a trusted certificate. The `tls_verify` column stays; nothing reads it
+
+## 3.0.2 (2026-11-16)
+
+- build: repacked with hono 4.13.18 (security: GHSA-92p4-j3wq-jmqx, GHSA-39q9-qp46-w8xg, GHSA-h25j-2p75-qj33) and kysely 0.29.9, in lockstep with the engine; no behaviour change
+
 ## 3.0.1 (2026-11-12)
 
 - fix: a person the tenant does not admit (`not_a_member`) or a sign-in through an extension without `auth:session` (`capability_required`) is answered like an account the provider has no claim to: 403 with the extension's message. Before, the engine's problem response passed through and the request rolled back. Needs engine 3.0.0-beta.113

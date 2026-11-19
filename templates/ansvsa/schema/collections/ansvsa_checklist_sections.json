@@ -1,0 +1,36 @@
+{
+  "name": "ansvsa_checklist_sections",
+  "displayName": "Secțiuni checklist",
+  "fields": [
+    {
+      "name": "unit_type",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "ansvsa_unit_types"
+      }
+    },
+    {
+      "name": "title",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "order_index",
+      "type": "integer",
+      "required": true
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_checklist_sections_unit_type",
+      "type": "m2o",
+      "field": "unit_type",
+      "target": "ansvsa_unit_types",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

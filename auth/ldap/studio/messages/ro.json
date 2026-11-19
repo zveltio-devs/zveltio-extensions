@@ -5,7 +5,6 @@
   "auth.ldap.section.enable": "Activează autentificarea LDAP",
   "auth.ldap.section.search": "Setări de căutare",
   "auth.ldap.section.server": "Conexiune la server",
-  "auth.ldap.section.tls": "Verifică certificatul TLS",
   "auth.ldap.subtitle": "Setări autentificare director",
   "auth.ldap.title": "LDAP",
   "auth.ldap.toast.connectionOk": "Conexiune reușită!",

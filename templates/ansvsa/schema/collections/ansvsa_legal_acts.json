@@ -1,0 +1,39 @@
+{
+  "name": "ansvsa_legal_acts",
+  "displayName": "Acte normative",
+  "fields": [
+    {
+      "name": "act_type",
+      "type": "m2o",
+      "options": {
+        "related_collection": "ansvsa_legal_act_types"
+      }
+    },
+    {
+      "name": "act_number",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "act_date",
+      "type": "date",
+      "required": true
+    },
+    {
+      "name": "act_name",
+      "type": "text"
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_legal_acts_act_type",
+      "type": "m2o",
+      "field": "act_type",
+      "target": "ansvsa_legal_act_types",
+      "targetField": "id",
+      "onDelete": "SET NULL",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

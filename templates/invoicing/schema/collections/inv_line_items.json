@@ -1,0 +1,45 @@
+{
+  "name": "inv_line_items",
+  "displayName": "Line items",
+  "fields": [
+    {
+      "name": "invoice",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "inv_invoices"
+      }
+    },
+    {
+      "name": "description",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "quantity",
+      "type": "number",
+      "required": true
+    },
+    {
+      "name": "unit_price",
+      "type": "number",
+      "required": true
+    },
+    {
+      "name": "amount",
+      "type": "number"
+    }
+  ],
+  "relations": [
+    {
+      "name": "inv_line_items_invoice",
+      "type": "m2o",
+      "field": "invoice",
+      "target": "inv_invoices",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

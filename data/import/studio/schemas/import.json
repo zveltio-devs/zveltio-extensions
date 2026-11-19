@@ -16,8 +16,8 @@
     {
       "action": "importRows",
       "label": "data.import.action.import",
-      "input": { "format": "json" },
-      "prompt": ["collection", "text"]
+      "prompt": ["collection", "format"],
+      "files": { "prompt": { "input": "file", "label": "common.col.file" } }
     }
   ],
   "rowActions": [

@@ -1,0 +1,55 @@
+{
+  "name": "ansvsa_appeals",
+  "displayName": "Contestații",
+  "fields": [
+    {
+      "name": "sanction",
+      "type": "m2o",
+      "required": true,
+      "options": {
+        "related_collection": "ansvsa_sanctions"
+      }
+    },
+    {
+      "name": "submitted_date",
+      "type": "date"
+    },
+    {
+      "name": "grounds",
+      "type": "textarea"
+    },
+    {
+      "name": "appeal_status",
+      "type": "enum",
+      "options": {
+        "values": [
+          "DEPUSA",
+          "IN_ANALIZA",
+          "ADMISA",
+          "ADMISA_PARTIAL",
+          "RESPINSA"
+        ]
+      }
+    },
+    {
+      "name": "resolution_date",
+      "type": "date"
+    },
+    {
+      "name": "resolution",
+      "type": "textarea"
+    }
+  ],
+  "relations": [
+    {
+      "name": "ansvsa_appeals_sanction",
+      "type": "m2o",
+      "field": "sanction",
+      "target": "ansvsa_sanctions",
+      "targetField": "id",
+      "onDelete": "RESTRICT",
+      "onUpdate": "CASCADE",
+      "metadata": {}
+    }
+  ]
+}

@@ -1,4 +1,12 @@
-import { ActionRefusal, type ExtensionAction } from '@zveltio/sdk/extension';
+import { ActionRefusal, type ExtensionAction, type RefusalStatus } from '@zveltio/sdk/extension';
+
+// Every read and write here is the data API's, as the caller (`host.collections`).
+// Publishing writes the draft into its target record: the publish actions list
+// `"*"` in `writes`, because the target is whatever collection the draft names,
+// so they reach it only as the caller (ADR 0047) — where the caller may update
+// that record, with its validation, column rules, hooks, revisions and webhooks.
+// Nothing here decides who may publish what. An action is one transaction: a
+// throw rolls back everything the call wrote, so a batch publishes all or none.
 
 type Row = Record<string, unknown>;
 type Host = Parameters<ExtensionAction>[1];
@@ -6,6 +14,21 @@ type Host = Parameters<ExtensionAction>[1];
 const DRAFTS = 'content_drafts';
 const DECISIONS = 'content_draft_decisions';
 const SNAPSHOTS = 'content_draft_snapshots';
+const MAX_BATCH = 200;
+
+/**
+ * Columns a draft never writes into the target record: who owns it, which
+ * tenant holds it, its identity and the engine's derived columns.
+ */
+const PROTECTED_DRAFT_FIELDS = new Set(['id', 'tenant_id', 'created_at', 'created_by', 'updated_at', 'updated_by', 'search_vector', 'embedding']);
+
+/** Refusals raised before the draft they name wrote anything: the transaction is intact. */
+const beforeAnyWrite = new WeakSet<object>();
+function refuse(status: RefusalStatus, code: string, message: string): never {
+  const err = new ActionRefusal(status, code, message);
+  beforeAnyWrite.add(err);
+  throw err;
+}
 
 async function loadDraft(host: Host, id: string): Promise<Row> {
   const draft = await host.collections.read(DRAFTS, id);
@@ -95,4 +118,79 @@ const snapshotDraft: ExtensionAction = async (input, host) => {
   }
 };
 
-export const draftActions = { reviewDraft, snapshotDraft };
+/**
+ * `scheduled` publishes only an approved draft, and only what was approved
+ * (`approved_data`, written by `reviewDraft`): nobody looks at a scheduled
+ * draft when it goes out, so its content must be one a reviewer decided on.
+ * An explicit publish writes the draft as it stands, which its caller sees.
+ */
+async function publish(host: Host, id: string, scheduled = false): Promise<Row> {
+  const draft = await host.collections.read(DRAFTS, id);
+  if (!draft) refuse(404, 'draft_not_found', `No such draft: ${id}.`);
+  if (draft.published_at != null) refuse(409, 'already_published', `Draft ${id} is already published.`);
+  if (scheduled && draft.review_status !== 'approved') {
+    refuse(409, 'not_approved', `Draft ${id} is scheduled but not approved.`);
+  }
+  const parse = (v: unknown) => (typeof v === 'string' ? JSON.parse(v) : v) as Row | null;
+  const approved = parse(draft.approved_data);
+  const from = scheduled
+    ? { target: approved?.target_collection, record: approved?.record_id, raw: parse(approved?.data) }
+    : { target: draft.target_collection, record: draft.record_id, raw: parse(draft.draft_data) };
+  if (!from.raw || from.target == null || from.record == null) {
+    refuse(409, 'nothing_to_publish', `Draft ${id} has no content to publish that you can read.`);
+  }
+  const data = Object.fromEntries(Object.entries(from.raw).filter(([k]) => !PROTECTED_DRAFT_FIELDS.has(k)));
+  const target = String(from.target);
+  try {
+    await host.collections.update(target, String(from.record), data);
+  } catch (err) {
+    // 403, 404 and 422 are answered before the data API writes; anything else
+    // (a constraint the database raised) has aborted the transaction.
+    const status = (err as { status?: unknown } | null)?.status;
+    if (typeof err === 'object' && err && (status === 403 || status === 404 || status === 422)) beforeAnyWrite.add(err);
+    throw err;
+  }
+  await host.collections.update(DRAFTS, id, { published_at: new Date().toISOString() });
+  return { draft_id: id, collection: target, record_id: from.record };
+}
+
+const publishDraft: ExtensionAction = async (input, host) => publish(host, (input as { id: string }).id);
+
+/** Every draft or none: the first refusal fails the call, and the transaction keeps nothing. */
+const bulkPublish: ExtensionAction = async (input, host) => {
+  const published: Row[] = [];
+  for (const id of new Set((input as { draft_ids: string[] }).draft_ids)) published.push(await publish(host, id));
+  return { published };
+};
+
+/** Publish every approved draft the caller can see whose `scheduled_at` has passed. */
+const publishDue: ExtensionAction = async (_input, host) => {
+  const due = (await host.collections.list(DRAFTS, {
+    filter: {
+      scheduled_at: { lte: new Date().toISOString() },
+      published_at: { null: true },
+      review_status: { eq: 'approved' },
+    },
+    sort: 'scheduled_at',
+    order: 'asc',
+    limit: MAX_BATCH,
+  })) as { records: Row[] };
+  // One draft that can no longer go out (its record deleted, a rule changed)
+  // is reported and skipped, or it would hold back every draft due after it.
+  // Only a refusal raised before the draft wrote anything is skipped; one the
+  // database raised has aborted the transaction, and is thrown like any other.
+  const published: Row[] = [];
+  const skipped: Row[] = [];
+  for (const draft of due.records) {
+    try {
+      published.push(await publish(host, String(draft.id), true));
+    } catch (err) {
+      if (!beforeAnyWrite.has(err as object)) throw err;
+      const { status, code } = err as { status: number; code: string };
+      skipped.push({ draft_id: draft.id, status, code });
+    }
+  }
+  return { published, skipped };
+};
+
+export const draftActions = { reviewDraft, snapshotDraft, publishDraft, bulkPublish, publishDue };

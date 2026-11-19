@@ -3,8 +3,8 @@
   "displayName": "Data Migrators",
   "category": "integrations",
   "description": "Import your data from HubSpot, Notion and Airtable into Zveltio collections, through the data API as the importing user",
-  "version": "2.0.1",
-  "zveltioMinVersion": "3.0.0-beta.103",
+  "version": "3.0.0",
+  "zveltioMinVersion": "3.0.0-beta.121",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-migrators",
   "permissions": [
@@ -107,6 +107,48 @@
       "enqueues": [
         "fetch"
       ]
+    },
+    {
+      "name": "importFetch",
+      "permission": {
+        "resource": "migrator_runs",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "fetch_id",
+          "target_collection"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "fetch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target_collection": {
+            "type": "string",
+            "pattern": "^(zvd_)?[a-z_][a-z0-9_]*$",
+            "maxLength": 63
+          },
+          "mapping": {
+            "type": "object",
+            "maxProperties": 500,
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 63
+            }
+          }
+        }
+      },
+      "reads": [
+        "migrator_fetches",
+        "migrator_runs"
+      ],
+      "writes": [
+        "migrator_runs",
+        "*"
+      ]
     }
   ],
   "jobs": [
@@ -177,8 +219,8 @@
     }
   ],
   "integrity": {
-    "engineSha256": "62c65e6211b33f82d73baf360f305c5edb1d23b52b00878e450db79af0011d99",
-    "sourceSha256": "8e5deca24e43989dae0b712a9d42d5e64e0cf898c9dbbe7c3bcb98db7d6770b9",
+    "engineSha256": "ce1d41419f5ea324a3ad3a13b9c1c119d4acc683a0f3068517e8e182c41e9a30",
+    "sourceSha256": "b6b8b5f216ff670e9d256de28a6e1b3722e7cc3c4ff2101dce13e3a9f2efecdd",
     "schemaSha256": "39d7d5a7147c9978ae1cb396f15244587b211a96d646cf80c773b8e8ca0de0b0",
     "jobsSha256": "7fa330571e26ec7746437b3b4da5a17003232d186a32c31aaf9c0f8515510201"
   }

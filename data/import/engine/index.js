@@ -126,10 +126,20 @@ function detailOf(err) {
 }
 var importRows = async (input, host) => {
   const { collection, ...opts } = input;
-  if (opts.rows === undefined === (opts.text === undefined))
-    bad("Send either rows or text, not both.");
+  const sources = [opts.rows, opts.text, opts.file].filter((s) => s !== undefined).length;
+  if (sources !== 1)
+    bad("Send exactly one of rows, text or file.");
+  let text = opts.text;
+  let filename = opts.filename;
+  if (opts.file !== undefined) {
+    if (!host.files)
+      throw new Error("This engine cannot hand an action its files (ADR 0052).");
+    const file = await host.files.read(opts.file);
+    text = new TextDecoder().decode(file.bytes);
+    filename ??= file.name;
+  }
   const format = opts.rows ? "json" : opts.format ?? "csv";
-  const rows = opts.rows ?? parseText(opts.text, format, opts.delimiter ?? ",");
+  const rows = opts.rows ?? parseText(text, format, opts.delimiter ?? ",");
   if (rows.length === 0)
     bad("No rows to import.");
   if (rows.length > MAX_ROWS)
@@ -173,7 +183,7 @@ var importRows = async (input, host) => {
   const job = await host.collections.insert(JOBS, {
     target_collection: collection,
     format,
-    filename: opts.filename ?? null,
+    filename: filename ?? null,
     imported_rows: ids.length,
     record_ids: ids
   });
