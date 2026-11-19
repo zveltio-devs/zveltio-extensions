@@ -44,6 +44,11 @@
       "name": "entries_count",
       "type": "integer",
       "writtenBy": "actions"
+    },
+    {
+      "name": "file_name",
+      "type": "text",
+      "writtenBy": "actions"
     }
   ],
   "validation": [

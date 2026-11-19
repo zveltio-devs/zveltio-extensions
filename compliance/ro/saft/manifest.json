@@ -3,12 +3,13 @@
   "displayName": "SAF-T RO",
   "category": "compliance/ro",
   "description": "Romanian SAF-T (D406) — build the audit file XML from the finance/accounting ledger",
-  "version": "2.0.0",
-  "zveltioMinVersion": "3.0.0-beta.96",
+  "version": "2.1.0",
+  "zveltioMinVersion": "3.0.0-beta.129",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-ro-saft",
   "permissions": [
-    "data:write"
+    "data:write",
+    "files"
   ],
   "i18nPrefixes": [
     "compliance.ro.saft"
@@ -37,9 +38,9 @@
     "bundlePeers": false
   },
   "integrity": {
-    "engineSha256": "031e51c86c660144d681a458bf8ebda45eae836be293ac71a039990413e76174",
-    "sourceSha256": "007940686e82a6f46794384463b2bdefd0c2222e35216a9ba110d8bd3d9d9a79",
-    "schemaSha256": "d67fc6048d6e3706ce1ba6520c721f2f299838c7e5bab6b5985835ca37aee865"
+    "engineSha256": "b595ac804a46b32a58184595ee67113d255213f6a0023d603921b34d4e0c6968",
+    "sourceSha256": "bf9cdd79570105b2117cc53cf73ba3acf32330572e618b12baea4cbce674ac94",
+    "schemaSha256": "809455b6d30d82d260b3c08149aea494e7146a95804799e0bb0cf54d1bcaa5a6"
   },
   "dependencies": [
     {
@@ -82,6 +83,30 @@
         "saft_exports",
         "saft_files"
       ]
+    },
+    {
+      "name": "download",
+      "permission": {
+        "resource": "saft_exports",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "saft_files"
+      ],
+      "writes": []
     }
   ]
 }

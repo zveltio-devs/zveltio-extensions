@@ -94,3 +94,42 @@ describe('generate', () => {
     await expect(saftActions.generate({ id: 'x1' }, fakeHost(t))).rejects.toMatchObject({ code: 'period_reversed' });
   });
 });
+
+describe('download', () => {
+  const withFiles = (t: Record<string, Row[]>) => {
+    const host = fakeHost(t) as Record<string, unknown>;
+    const put: { bytes: Uint8Array; contentType?: string }[] = [];
+    host.files = {
+      read: async () => {
+        throw new Error('not handed');
+      },
+      put: async (bytes: Uint8Array, o?: { contentType?: string }) => {
+        put.push({ bytes, contentType: o?.contentType });
+        return { id: 'f1', name: 'x.xml', size: bytes.byteLength, type: 'application/xml' };
+      },
+    };
+    return { host: host as never, put };
+  };
+
+  it('puts the generated XML as the caller and returns { file }', async () => {
+    const t: Record<string, Row[]> = ledger();
+    const { host, put } = withFiles(t);
+    await saftActions.generate({ id: 'x1' }, host);
+    expect(t.saft_exports[0].file_name).toBe('SAFT_18547290_2026-01-01_2026-01-31.xml');
+
+    expect(await saftActions.download({ id: 'x1' }, host)).toEqual({ file: 'f1' });
+    expect(put).toHaveLength(1);
+    expect(new TextDecoder().decode(put[0].bytes)).toBe(t.saft_files[0].xml as string);
+    expect(put[0].contentType).toBe('application/xml');
+  });
+
+  it('refuses an export never generated, storing nothing', async () => {
+    const { host, put } = withFiles(ledger());
+    await expect(saftActions.download({ id: 'x1' }, host)).rejects.toMatchObject({ code: 'not_generated' });
+    expect(put).toHaveLength(0);
+  });
+
+  it('refuses on an engine without host.files', async () => {
+    await expect(saftActions.download({ id: 'x1' }, fakeHost(ledger()))).rejects.toThrow('no host.files');
+  });
+});
