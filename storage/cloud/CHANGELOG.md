@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.0.0 (2026-11-19)
+
+- feat!: a new version is the action `addFileVersion` (`{ file_id, file, note? }`), handed the uploaded file in `$files.read` (ADR 0052): upload it first through `/api/storage/upload`, as the caller, then run the action. The action checks the file was handed and that the caller may read it, and records it after version 1. The route `POST /files/:id/versions` (multipart) is gone
+- feat!: pruning past 20 versions removes history rows only: an action cannot delete a stored file, so a pruned version's file stays the caller's own, in their files and quota. 2.x also deleted it
+- feat!: a refused version leaves the uploaded file in place (the upload is its own request); 2.x stored and recorded in one transaction
+- feat: the Studio page is a `zveltio.view/2` page (versions, favorites, retention policies); Upload a new version asks for the file and runs `addFileVersion`. The Drive uploads into the open folder and then runs the action
+- requires engine 3.0.0-beta.129
+
 ## 2.0.1 (2026-11-16)
 
 - build: repacked with hono 4.13.18 (security: GHSA-92p4-j3wq-jmqx, GHSA-39q9-qp46-w8xg, GHSA-h25j-2p75-qj33) and kysely 0.29.9, in lockstep with the engine; no behaviour change

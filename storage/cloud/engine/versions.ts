@@ -10,7 +10,7 @@ type Row = Record<string, unknown>;
 
 export const VERSIONS = 'cloud_file_versions';
 
-/** Versions kept per file; older ones are pruned when a new one is uploaded. */
+/** Versions kept per file; older rows are pruned when a new one is added. */
 export const KEEP_VERSIONS = 20;
 
 /** The file's newest 500 versions the caller can read (the data API's page), newest first. */
@@ -65,4 +65,34 @@ const restoreVersion: ExtensionAction = async (input, host) => {
   return row;
 };
 
-export const cloudActions = { restoreVersion };
+/** A refusal the engine threw (a status below 500): the caller may not, so it is left as it is. */
+const refused = (err: unknown) => {
+  const status = (err as { status?: unknown }).status;
+  return typeof status === 'number' && status < 500;
+};
+
+/**
+ * A new version of `file_id`: the stored file the request hands in `$files.read`
+ * and as `file` (ADR 0052) — a front end uploads it as the caller first. Reading
+ * it through `host.files` is the check that it was handed and that the caller may
+ * read it; no bytes move. Past KEEP_VERSIONS the oldest rows go, each only as far
+ * as the caller may delete it; their files stay the caller's own.
+ */
+const addFileVersion: ExtensionAction = async (input, host) => {
+  const { file_id, file, note } = input as { file_id: string; file: string; note?: string };
+  // Present from engine 3.0.0-beta.123; the manifest asks for later.
+  if (!host.files) throw new Error('This engine gives actions no host.files.');
+  await host.files.read(file);
+  const { row, versions } = await addVersion(host.collections, file_id, file, note || null);
+  for (const old of versions.slice(KEEP_VERSIONS).reverse()) {
+    try {
+      await host.collections.delete(VERSIONS, String(old.id));
+    } catch (err) {
+      if (refused(err)) break;
+      throw err;
+    }
+  }
+  return row;
+};
+
+export const cloudActions = { restoreVersion, addFileVersion };

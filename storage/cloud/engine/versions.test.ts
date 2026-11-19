@@ -1,7 +1,8 @@
-// A new version is a stored file and a history row, committed together, as the
-// caller (ADR 0034) — on the engine's real `/ext/*` chain (`onEngine`). Each
-// member holds per-user grants on `cloud_file_versions`, so the engine's rules,
-// not this extension, decide what is written and what is pruned.
+// A new version is a stored file the caller uploaded and hands the action
+// (`$files.read`, ADR 0052), recorded as a history row as the caller — on the
+// engine's real `/ext/*` chain (`onEngine`). Each member holds per-user grants on
+// `cloud_file_versions`, so the engine's rules, not this extension, decide what
+// is written and what is pruned.
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { onEngine } from '../../../testing/ext-harness';
 
@@ -19,8 +20,8 @@ d('storage/cloud — file versions', () => {
     const member = (actions: string[]) =>
       e.harness.createMemberSession(e.engineApp, e.db, { grants: [{ collection: V, actions }] });
     who.writer = await member(['read', 'create', 'execute']);
-    who.pruner = await member(['read', 'create', 'delete']);
-    who.reader = await member(['read']);
+    who.pruner = await member(['read', 'create', 'delete', 'execute']);
+    who.reader = await member(['read', 'execute']);
   }, 120_000);
 
   afterAll(async () => {
@@ -32,15 +33,21 @@ d('storage/cloud — file versions', () => {
     await e.done();
   });
 
-  const upload = async (u: { cookie: string }, path: string, name: string) => {
-    const form = new FormData();
-    form.append('file', new File([`bytes of ${name}`], name, { type: 'text/plain' }));
-    return e.app.request(`${BASE}${path}`, { method: 'POST', headers: { cookie: u.cookie }, body: form });
+  const act = (u: { cookie: string }, action: string, body: unknown) =>
+    e.app.request(`${BASE}/actions/${action}`, {
+      method: 'POST',
+      headers: { cookie: u.cookie, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  /** Upload `name` as `u`, then hand it to `addFileVersion` as a version of `fileId`. */
+  const upload = async (u: { cookie: string }, fileId: string, name: string, hand = true) => {
+    const file = await original(u, name);
+    return act(u, 'addFileVersion', { file_id: fileId, file, ...(hand ? { $files: { read: [file] } } : {}) });
   };
   /** A file of `u`'s, through the engine's own `/api/storage/upload`. */
-  const original = async (u: { cookie: string }) => {
+  const original = async (u: { cookie: string }, name = `${tag}-orig.txt`) => {
     const form = new FormData();
-    form.append('file', new File(['v1'], `${tag}-orig.txt`, { type: 'text/plain' }));
+    form.append('file', new File([`bytes of ${name}`], name, { type: 'text/plain' }));
     const res = await e.engineApp.request('/api/storage/upload', {
       method: 'POST',
       headers: { cookie: u.cookie },
@@ -63,10 +70,10 @@ d('storage/cloud — file versions', () => {
       e.sql`SELECT id FROM zv_media_files WHERE original_name = ${name}`.execute(trx),
     ).then((r: any) => r.rows.length as number);
 
-  it('stores the version as a private file of the caller and records it after version 1', async () => {
+  it('records the handed file as the version after version 1, as the caller', async () => {
     const fileId = await original(who.writer);
-    const res = await upload(who.writer, `/files/${fileId}/versions`, `${tag}-v2.txt`);
-    expect(res.status).toBe(201);
+    const res = await upload(who.writer, fileId, `${tag}-v2.txt`);
+    expect(res.status).toBe(200);
     const rows = await history(fileId);
     expect(rows.map((r) => r.version)).toEqual([1, 2]);
     expect(rows[0]!.version_file_id).toBe(fileId);
@@ -74,22 +81,25 @@ d('storage/cloud — file versions', () => {
     expect(await fileRow(rows[1]!.version_file_id)).toEqual({ created_by: who.writer.userId, visibility: 'personal' });
   });
 
-  it('rolls the stored file back when the history row is refused', async () => {
-    const name = `${tag}-refused.txt`;
-    const res = await upload(who.reader, `/files/${crypto.randomUUID()}/versions`, name);
+  it('refuses a file the request did not hand it, and records nothing', async () => {
+    const fileId = await original(who.writer);
+    const res = await upload(who.writer, fileId, `${tag}-unhanded.txt`, false);
     expect(res.status).toBe(403);
-    expect(await named(name)).toBe(0);
+    expect((await res.json()).code).toBe('file_not_granted');
+    expect(await history(fileId)).toEqual([]);
+  });
+
+  it('records nothing when the caller may not create a history row', async () => {
+    const fileId = crypto.randomUUID();
+    expect((await upload(who.reader, fileId, `${tag}-refused.txt`)).status).toBe(403);
+    expect(await history(fileId)).toEqual([]);
   });
 
   it('restores an older version as a new one pointing at its file', async () => {
     const fileId = await original(who.writer);
-    await upload(who.writer, `/files/${fileId}/versions`, `${tag}-r2.txt`);
+    await upload(who.writer, fileId, `${tag}-r2.txt`);
     const [v1] = await history(fileId);
-    const res = await e.app.request(`${BASE}/actions/restoreVersion`, {
-      method: 'POST',
-      headers: { cookie: who.writer.cookie, 'content-type': 'application/json' },
-      body: JSON.stringify({ version_id: v1!.id }),
-    });
+    const res = await act(who.writer, 'restoreVersion', { version_id: v1!.id });
     expect(res.status).toBe(200);
     const rows = await history(fileId);
     expect(rows.map((r) => [r.version, r.version_file_id])).toEqual([
@@ -103,7 +113,7 @@ d('storage/cloud — file versions', () => {
     for (const u of [who.writer, who.pruner]) {
       const fileId = await original(u);
       for (let i = 2; i <= 22; i++) {
-        expect((await upload(u, `/files/${fileId}/versions`, `${tag}-${u.userId}-p${i}.txt`)).status).toBe(201);
+        expect((await upload(u, fileId, `${tag}-${u.userId}-p${i}.txt`)).status).toBe(200);
       }
       const rows = await history(fileId);
       if (u === who.writer) {
@@ -112,10 +122,9 @@ d('storage/cloud — file versions', () => {
         continue;
       }
       expect(rows.map((r) => r.version)).toEqual(Array.from({ length: 20 }, (_, i) => i + 3));
-      // Version 1 is the file itself, which stays; version 2's file is gone.
+      // Only rows go: an action cannot delete a stored file, so a pruned version's stays the caller's.
       expect(await fileRow(fileId)).toBeDefined();
-      expect(await named(`${tag}-${u.userId}-p2.txt`)).toBe(0);
-      expect(await named(`${tag}-${u.userId}-p3.txt`)).toBe(1);
+      expect(await named(`${tag}-${u.userId}-p2.txt`)).toBe(1);
     }
   }, 120_000);
 });
