@@ -16,7 +16,7 @@
  */
 
 import { describe, expect, test } from 'bun:test';
-import { safeHtml } from './sanitize.js';
+import { safeFrameSrc, safeHref, safeHtml } from './sanitize.js';
 
 /** These run under bun, where there is no `window`, so this IS the server branch. */
 describe('safeHtml — the no-DOM branch', () => {
@@ -57,5 +57,22 @@ describe('safeHtml — the no-DOM branch', () => {
       expect(safeHtml(v as unknown)).toBe('');
     }
     expect(safeHtml('')).toBe('');
+  });
+});
+
+/** Svelte does not filter `href`, and the engine scrubs only the HTML fields. */
+describe('safeHref / safeFrameSrc — author-typed URLs', () => {
+  test('same-site paths and web links pass unchanged', () => {
+    for (const ok of ['/about', '#top', '?q=1', './a', '../b', 'https://x.ro/p', 'mailto:a@b.ro', 'tel:+40'])
+      expect(safeHref(ok)).toBe(ok);
+  });
+  test('script URLs and other-site paths become #', () => {
+    for (const bad of ['javascript:alert(1)', ' JavaScript:alert(1)', 'data:text/html,<b>', 'vbscript:x', '//evil.ro', '/\\evil.ro', '', undefined, 42])
+      expect(safeHref(bad)).toBe('#');
+  });
+  test('an iframe frames http(s) only', () => {
+    expect(safeFrameSrc('https://www.youtube.com/embed/x')).toBe('https://www.youtube.com/embed/x');
+    expect(safeFrameSrc('javascript:alert(1)')).toBeNull();
+    expect(safeFrameSrc('data:text/html,<script>')).toBeNull();
   });
 });
