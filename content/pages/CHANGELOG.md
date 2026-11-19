@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.3.2 (2026-11-19)
+
+- A collection list that failed to load showed `HTTP 4xx` instead of the engine's message: it read the legacy `error` field, and the engine answers with a problem document whose message is `detail`. It now reads `detail`, then `error`
+- requires engine 3.0.0-beta.111 (unchanged)
+
 ## 2.3.1 (2026-11-19)
 
 - Security: the public renderer put author-typed link targets (`cta_url`, `button_url`, a button's `href`/`url`, an image's `link`) straight into `href`, and a video block's `url` into `<iframe src>`. Svelte does not filter either and the engine scrubs only the HTML fields, so `javascript:…` ran in a visitor's browser. Each now goes through `safeHref` (same-site paths, `#`, `?`, http(s), mailto, tel; anything else becomes `#`; `//host` and `/\host` refused) or `safeFrameSrc` (http(s) only, else no frame), both exported from `client/sanitize.ts`
