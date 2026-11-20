@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.1 (2026-11-20)
+
+- docs: `SETUP.md` says a tenant administrator mints the SCIM key in Studio (ADR 0046). No code change; the version moves because the registry keeps a published version's archive immutable and 3.0.0 is stored without this text
+
 ## 3.0.0 (2026-11-12)
 
 - feat!: the directory is the engine's (ADR 0039 decision 9). SCIM maps the protocol onto `host.identity`'s `provision`, `update`, `setActive`, `remove`, `list` and `get`; the extension no longer holds `auth:users` and calls no directory internal (`provisionUser`, `listTenantUsers`, `updateUserProfile`, `setUserActive`, `liftOwnBan`, `addTenantMember`, `removeTenantMember`, `setTenantMembershipEnd`, `revokeUserSessions`, `deleteUser`), uses no `ctx.internals` and writes no SQL. Needs engine 3.0.0-beta.114
