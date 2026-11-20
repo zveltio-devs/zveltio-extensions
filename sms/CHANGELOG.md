@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.1 (2026-11-20)
+
+- test: `engine/routes.test.ts` posts to `/webhook/twilio` through the harness. No code change; the version moves because the registry keeps a published version's archive immutable and 2.2.0 is stored without this test
+
 ## 2.2.0 (2026-11-12)
 
 - feat: the Studio page is a `zveltio.view/2` view (ADR 0042): it names its collections and actions instead of URLs, and Studio draws it from the specification

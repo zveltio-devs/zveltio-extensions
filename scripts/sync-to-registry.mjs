@@ -197,6 +197,7 @@ for (const ext of extensions) {
   const zipArgs = [
     '-r', '-q', zipPath, '.',
     '-x', 'node_modules/*', '-x', '.git/*', '-x', 'dist/*', '-x', '*.log', '-x', '.DS_Store',
+    // check-version-bumped.ts mirrors this list: keep the two in step.
     // Served by the registry from the metadata phase; in the archive it would
     // change the bytes of versions engines already pinned (installed_sha256).
     '-x', 'CHANGELOG.md',
