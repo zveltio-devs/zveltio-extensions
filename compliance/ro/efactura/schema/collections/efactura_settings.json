@@ -44,11 +44,18 @@
     },
     {
       "name": "oauth_state",
-      "type": "secret"
+      "type": "secret",
+      "writtenBy": "actions"
     },
     {
       "name": "oauth_state_expires_at",
-      "type": "datetime"
+      "type": "datetime",
+      "writtenBy": "actions"
+    },
+    {
+      "name": "oauth_started_by",
+      "type": "text",
+      "writtenBy": "actions"
     },
     {
       "name": "access_token",

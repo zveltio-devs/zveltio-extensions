@@ -3,8 +3,8 @@
   "displayName": "e-Factura RO",
   "category": "compliance/ro",
   "description": "Romanian e-Invoice (e-Factura): build the UBL XML (CIUS-RO), submit it to ANAF, follow its state and keep ANAF's signed answer",
-  "version": "2.1.1",
-  "zveltioMinVersion": "3.0.0-beta.111",
+  "version": "3.0.0",
+  "zveltioMinVersion": "3.0.0-beta.130",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-ro-efactura",
   "permissions": [
@@ -22,6 +22,12 @@
         "label": "e-Factura RO",
         "icon": "receipt",
         "schema": "schemas/efactura.json"
+      },
+      {
+        "path": "/admin/compliance/ro/efactura/connection",
+        "label": "e-Factura RO: ANAF",
+        "icon": "key-round",
+        "schema": "schemas/connection.json"
       }
     ],
     "navGroup": "compliance"
@@ -260,6 +266,72 @@
       ]
     },
     {
+      "name": "startSignIn",
+      "permission": {
+        "resource": "efactura_settings",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "efactura_settings"
+      ],
+      "writes": [
+        "efactura_settings"
+      ]
+    },
+    {
+      "name": "finishSignIn",
+      "permission": {
+        "resource": "efactura_settings",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "state"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "state": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{48}$"
+          }
+        }
+      },
+      "reads": [
+        "efactura_settings"
+      ],
+      "writes": [
+        "efactura_settings"
+      ],
+      "enqueues": [
+        "connect"
+      ]
+    },
+    {
       "name": "syncMessages",
       "permission": {
         "resource": "efactura_messages",
@@ -354,10 +426,7 @@
         "limit": 0,
         "backoff": true
       },
-      "timeoutSeconds": 120,
-      "fromPublicRoutes": [
-        "/oauth/callback"
-      ]
+      "timeoutSeconds": 120
     },
     {
       "name": "submit",
