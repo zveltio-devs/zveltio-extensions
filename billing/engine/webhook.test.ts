@@ -136,7 +136,7 @@ d(`${NAME}: Stripe webhook -> applyEvent job`, () => {
     await jobs.unregisterJobs(NAME);
     await sql`DELETE FROM zv_extension_registry WHERE name = ${NAME}`.execute(db);
     await sql`DELETE FROM pgboss.job WHERE name = ${jobs.jobQueueName(NAME, 'applyEvent')}`.execute(db).catch(() => {});
-    await h.asEveryTenant(db, (trx: Any) =>
+    await h.asAuditOwner(db, (trx: Any) =>
       sql`DELETE FROM zv_audit_log WHERE tenant_id IN (${A.id}::uuid, ${B.id}::uuid, ${C.id}::uuid, ${D.id}::uuid)`.execute(trx),
     );
     await sql`DELETE FROM zvd_relations WHERE source_collection IN (${sql.join(COLLECTIONS)})`.execute(db);
