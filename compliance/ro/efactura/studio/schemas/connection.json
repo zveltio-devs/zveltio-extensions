@@ -39,7 +39,7 @@
     {
       "action": "finishSignIn",
       "label": "compliance.ro.efactura.btn.finishSignIn",
-      "tone": "primary",
+      "tone": "success",
       "input": {
         "id": { "$record": "id" },
         "code": { "$param": "code" },

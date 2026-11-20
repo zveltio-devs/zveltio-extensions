@@ -226,3 +226,28 @@ describe('the ANAF actions queue their job', () => {
     ]);
   });
 });
+
+describe('startSignIn / finishSignIn', () => {
+  const settings = (extra: Row = {}): Row => ({ id: 's1', client_id: 'cid', callback_url: 'https://x.test/cb', ...extra });
+
+  it('starts nothing without the client id and callback URL', async () => {
+    const { host } = fakeHost({ efactura_settings: [settings({ callback_url: null })] });
+    await expect(A.startSignIn({ id: 's1' }, host)).rejects.toMatchObject({ status: 422 });
+  });
+
+  it('refuses an expired state, or one with no starter, before writing anything', async () => {
+    const state = 'a'.repeat(48);
+    const past = new Date(Date.now() - 1000).toISOString();
+    const future = new Date(Date.now() + 60_000).toISOString();
+    for (const extra of [
+      { oauth_state: state, oauth_state_expires_at: past, oauth_started_by: 'u1' },
+      { oauth_state: state, oauth_state_expires_at: future, oauth_started_by: null },
+    ]) {
+      const t = { efactura_settings: [settings(extra)] };
+      const { host, queued } = fakeHost(t);
+      await expect(A.finishSignIn({ id: 's1', code: 'c', state }, host)).rejects.toMatchObject({ status: 409 });
+      expect(queued).toEqual([]);
+      expect(t.efactura_settings[0].oauth_state).toBe(state);
+    }
+  });
+});
