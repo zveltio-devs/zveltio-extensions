@@ -143,6 +143,15 @@ jobs:
         # before an administrator updates. A bump without one shows nothing.
         run: bun scripts/check-changelogs.ts
 
+      - name: An extension whose archive changes gets a new version
+        # The registry refuses other contents under a stored version (409
+        # VERSION_EXISTS), and the archive carries tests and docs too: a test
+        # edited under sms 2.2.0 failed every Sync to Registry run for days.
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: origin/${{ github.base_ref }}
+        run: bun scripts/check-version-bumped.ts
+
       - name: A route that decides something asks who is asking
         # The gate existed in scripts/ and nothing ran it, so the class it was
         # written for could come back unobserved: `permissionGate(ctx, 'leave')`
