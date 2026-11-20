@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.0.0 (2026-11-20)
+
+- feat!: the binary download routes are gone: `GET /invoices/:id/pdf`, `GET /invoices/:id/archive` and `GET /messages/:id/archive` answer 404. The documents are the actions `download` (`{ id, document: "xml" | "pdf" | "archive" }`) and `messageArchive` (`{ id }`), which store the document as the caller's own file, named by the request's `$files.write`, and answer `{ file }` (ADR 0052); a document not stored yet is refused 404 `not_stored`. `GET /oauth/callback` is the only route left
+- feat: a draft is entered with the action `createInvoice`: the header and the lines a person types (description, quantity, unit, unit price, VAT rate); each line's VAT and total and the invoice's sums are computed, not typed. A draft is no longer edited in place: delete it and enter it again, or generate the XML from it as it is
+- feat: the e-Factura page is a view/2 page (`studio/schemas/efactura.json`): tabs **Invoices** (generate XML, XML, send, check status, render PDF, PDF, ANAF archive, storno, delete a draft through the new action `deleteDraft`, which refuses 409 any other status) and **Messages** (sync from ANAF, fetch archive, ANAF archive); **New invoice** is a view/2 action form (`studio/schemas/invoice-new.json`). The status filter of the 3.x list is gone; the list searches and sorts
+- requires engine 3.0.0-beta.130, as before
+
 ## 3.0.0 (2026-11-20)
 
 - feat!: "Connect to ANAF" is the action `startSignIn`, which answers `{ "redirect": <ANAF authorize URL> }` (ADR 0061 d1); `GET /oauth/start` and its `zv_efactura_oauth` cookie are gone. A view/2 front end follows the redirect; a link to `/oauth/start` answers 404

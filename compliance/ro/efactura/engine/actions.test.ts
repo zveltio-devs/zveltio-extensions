@@ -251,3 +251,83 @@ describe('startSignIn / finishSignIn', () => {
     }
   });
 });
+
+describe('createInvoice', () => {
+  it('computes each line and the sums from what was typed, gross line totals', async () => {
+    const { host } = fakeHost({ efactura_invoices: [] });
+    const row = (await A.createInvoice(
+      {
+        invoice_number: 'F-9',
+        invoice_date: '2026-11-20',
+        seller_name: 'S',
+        seller_cui: '1',
+        buyer_name: 'B',
+        lines: [
+          { description: 'Work', quantity: 2, unit_price: 50, vat_rate: 19 },
+          { description: 'Book', unit_price: 10.05, vat_rate: 5 },
+        ],
+      },
+      host,
+    )) as Row;
+    expect(row.lines).toEqual([
+      { description: 'Work', quantity: 2, unit: 'H87', unit_price: 50, vat_rate: 19, vat_amount: 19, line_total: 119 },
+      { description: 'Book', quantity: 1, unit: 'H87', unit_price: 10.05, vat_rate: 5, vat_amount: 0.5, line_total: 10.55 },
+    ]);
+    expect([row.subtotal, row.vat_total, row.total]).toEqual([110.05, 19.5, 129.55]);
+    expect(row.invoice_number).toBe('F-9');
+  });
+});
+
+describe('download / messageArchive', () => {
+  const withFiles = (tables: Record<string, Row[]>) => {
+    const { host } = fakeHost(tables);
+    const put: { bytes: string; contentType?: string }[] = [];
+    (host as Row).files = {
+      put: async (bytes: Uint8Array, o: { contentType?: string } = {}) => {
+        put.push({ bytes: new TextDecoder().decode(bytes), contentType: o.contentType });
+        return { id: `file-${put.length}` };
+      },
+    };
+    return { host, put };
+  };
+  const b64 = (s: string) => Buffer.from(s).toString('base64');
+
+  it('hands the XML as text and the PDF and archive decoded, as { file }', async () => {
+    const t = withFiles({ efactura_files: [{ id: 'f1', invoice_id: 'i1', xml: '<Invoice/>', pdf: b64('%PDF-1.4') }] });
+    expect(await A.download({ id: 'i1', document: 'xml' }, t.host)).toEqual({ file: 'file-1' });
+    expect(await A.download({ id: 'i1', document: 'pdf' }, t.host)).toEqual({ file: 'file-2' });
+    expect(t.put).toEqual([
+      { bytes: '<Invoice/>', contentType: 'application/xml' },
+      { bytes: '%PDF-1.4', contentType: 'application/pdf' },
+    ]);
+  });
+
+  it('refuses 404 a document not stored yet, and stores nothing', async () => {
+    const t = withFiles({ efactura_files: [{ id: 'f1', invoice_id: 'i1', xml: '<Invoice/>' }] });
+    await expect(A.download({ id: 'i1', document: 'archive' }, t.host)).rejects.toMatchObject({ status: 404 });
+    await expect(A.download({ id: 'i2', document: 'xml' }, t.host)).rejects.toMatchObject({ status: 404 });
+    expect(t.put).toEqual([]);
+  });
+
+  it("hands a message's archive once fetched, 404 before", async () => {
+    const t = withFiles({ efactura_messages: [{ id: 'm1', archive: b64('PK') }, { id: 'm2', archive: null }] });
+    expect(await A.messageArchive({ id: 'm1' }, t.host)).toEqual({ file: 'file-1' });
+    expect(t.put).toEqual([{ bytes: 'PK', contentType: 'application/zip' }]);
+    await expect(A.messageArchive({ id: 'm2' }, t.host)).rejects.toMatchObject({ status: 404 });
+    await expect(A.messageArchive({ id: 'm3' }, t.host)).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe('deleteDraft', () => {
+  it('deletes a draft and refuses 409 a generated or filed invoice', async () => {
+    const tables = { efactura_invoices: [draft(), draft({ id: 'i2', status: 'accepted' })] };
+    const deleted: string[] = [];
+    const { host } = fakeHost(tables);
+    (host as Row).collections.delete = async (_c: string, id: string) => {
+      deleted.push(id);
+    };
+    expect(await A.deleteDraft({ id: 'i1' }, host)).toEqual({ deleted: 'i1' });
+    await expect(A.deleteDraft({ id: 'i2' }, host)).rejects.toMatchObject({ status: 409 });
+    expect(deleted).toEqual(['i1']);
+  });
+});

@@ -62,6 +62,7 @@
   "compliance.ro.efactura.btn.connect": "Connect to ANAF",
   "compliance.ro.efactura.btn.fetchArchive": "Fetch archive",
   "compliance.ro.efactura.btn.pdf": "PDF",
+  "compliance.ro.efactura.btn.xml": "XML",
   "compliance.ro.efactura.btn.renderPdf": "Render PDF",
   "compliance.ro.efactura.btn.storno": "Storno",
   "compliance.ro.efactura.btn.syncMessages": "Fetch ANAF messages",
