@@ -1,0 +1,57 @@
+{
+  "spec": "zveltio.view/2",
+  "id": "efactura.new",
+  "title": "compliance.ro.efactura.btn.newInvoice",
+  "type": "form",
+  "action": "createInvoice",
+  "fields": [
+    {
+      "field": "invoice_number",
+      "label": "common.col.number"
+    },
+    {
+      "field": "invoice_date",
+      "label": "common.col.date"
+    },
+    {
+      "field": "due_date",
+      "label": "common.col.dueDate"
+    },
+    {
+      "field": "currency",
+      "label": "common.col.currency"
+    },
+    {
+      "field": "seller_name",
+      "label": "compliance.ro.efactura.form.sellerName"
+    },
+    {
+      "field": "seller_cui",
+      "label": "compliance.ro.efactura.form.sellerCui"
+    },
+    {
+      "field": "seller_address",
+      "label": "compliance.ro.efactura.form.sellerAddress"
+    },
+    {
+      "field": "seller_iban",
+      "label": "common.col.iban"
+    },
+    {
+      "field": "buyer_name",
+      "label": "compliance.ro.efactura.form.buyerName"
+    },
+    {
+      "field": "buyer_cui",
+      "label": "compliance.ro.efactura.form.buyerCui"
+    },
+    {
+      "field": "buyer_address",
+      "label": "compliance.ro.efactura.form.buyerAddress"
+    },
+    {
+      "field": "lines",
+      "label": "compliance.ro.efactura.section.lines"
+    }
+  ]
+}

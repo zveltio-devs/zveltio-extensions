@@ -1,5 +1,5 @@
 import { ActionRefusal, type ExtensionAction } from '@zveltio/sdk/extension';
-import { FILES, INVOICES, MESSAGES, SETTINGS, authorizeUrl } from './anaf.js';
+import { FILES, INVOICES, MESSAGES, SETTINGS, authorizeUrl, fromBase64 } from './anaf.js';
 import { type InvoiceData, generateUBLXML } from './ubl-generator.js';
 
 // The engine runs every action as the caller, through the data API, in the
@@ -353,7 +353,87 @@ const downloadMessage: ExtensionAction = async (input, host) => {
   return { job: await host.enqueue('downloadMessage', { id }) };
 };
 
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * A draft entered by hand. A line carries what a person types; its VAT and its
+ * total (with VAT, as `fromInvoice` stores it), and the invoice's sums, are
+ * computed here, so they cannot disagree.
+ */
+const createInvoice: ExtensionAction = async (input, host) => {
+  const { lines: typed, ...head } = input as Row & { lines: Row[] };
+  const ls = typed.map((l) => {
+    const quantity = num(l.quantity ?? 1);
+    const vat_rate = num(l.vat_rate);
+    const net = round2(quantity * num(l.unit_price));
+    const vat_amount = round2((net * vat_rate) / 100);
+    return {
+      description: String(l.description),
+      quantity,
+      unit: String(l.unit || 'H87'),
+      unit_price: num(l.unit_price),
+      vat_rate,
+      vat_amount,
+      line_total: round2(net + vat_amount),
+    };
+  });
+  const vat_total = round2(ls.reduce((s, l) => s + l.vat_amount, 0));
+  const total = round2(ls.reduce((s, l) => s + l.line_total, 0));
+  return host.collections.insert(INVOICES, { ...head, lines: ls, subtotal: round2(total - vat_total), vat_total, total });
+};
+
+/**
+ * Delete a draft, and only a draft: a filed invoice keeps its record, its XML
+ * and ANAF's answer. The status is checked on the locked row.
+ */
+const deleteDraft: ExtensionAction = async (input, host) => {
+  const { id } = input as { id: string };
+  const inv = await invoice(host, id);
+  if (inv.status !== 'draft') throw new ActionRefusal(409, 'not_draft', 'Only a draft is deleted; a filed invoice is corrected by a storno.');
+  await host.collections.update(INVOICES, id, { status: 'draft' }, { expect: { status: ['draft'] } });
+  await host.collections.delete(INVOICES, id);
+  return { deleted: id };
+};
+
+const DOCUMENTS = {
+  xml: { field: 'xml', type: 'application/xml', missing: 'Generate the XML first.' },
+  pdf: { field: 'pdf', type: 'application/pdf', missing: 'Render the PDF first.' },
+  archive: { field: 'archive', type: 'application/zip', missing: "ANAF's answer is not downloaded yet." },
+} as const;
+
+/**
+ * A stored document of the invoice, as the one file the request's
+ * `$files.write` names: the result `{ file }` is what a front end offers to
+ * save. The XML is kept as text, the PDF and ANAF's archive as base64.
+ */
+const download: ExtensionAction = async (input, host) => {
+  const { id, document } = input as { id: string; document: keyof typeof DOCUMENTS };
+  const doc = DOCUMENTS[document];
+  // Present from engine 3.0.0-beta.123; the manifest asks for later.
+  if (!host.files) throw new Error('This engine gives actions no host.files.');
+  const value = (await fileOf(host, id))?.[doc.field];
+  if (typeof value !== 'string' || value === '') throw new ActionRefusal(404, 'not_stored', doc.missing);
+  const bytes = document === 'xml' ? new TextEncoder().encode(value) : fromBase64(value);
+  return { file: (await host.files.put(bytes, { contentType: doc.type })).id };
+};
+
+/** ANAF's archive of one message (`downloadMessage` fetches it), as `{ file }`. */
+const messageArchive: ExtensionAction = async (input, host) => {
+  const { id } = input as { id: string };
+  if (!host.files) throw new Error('This engine gives actions no host.files.');
+  const m = await host.collections.read(MESSAGES, id);
+  if (!m) throw new ActionRefusal(404, 'message_not_found', 'No such message.');
+  if (typeof m.archive !== 'string' || m.archive === '') {
+    throw new ActionRefusal(404, 'not_stored', 'Fetch the archive from ANAF first.');
+  }
+  return { file: (await host.files.put(fromBase64(m.archive), { contentType: 'application/zip' })).id };
+};
+
 export const efacturaActions = {
+  createInvoice,
+  deleteDraft,
+  download,
+  messageArchive,
   generateXml,
   submit,
   checkStatus,

@@ -1,6 +1,6 @@
 import type { ZveltioExtension } from '@zveltio/sdk/extension';
 import { efacturaActions } from './actions.js';
-import { efacturaRoutes, oauthCallback } from './routes.js';
+import { oauthCallback } from './routes.js';
 
 // The invoices, their files, ANAF's messages and the connection are collections
 // this extension declares in `schema/collections/` (manifest `collections`); the
@@ -15,9 +15,7 @@ const extension: ZveltioExtension = {
   actions: efacturaActions,
   routes: { oauthCallback },
 
-  async register(app, ctx) {
-    app.route('/', efacturaRoutes(ctx));
-  },
+  async register() {},
 };
 
 export default extension;

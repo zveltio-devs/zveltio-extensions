@@ -3,7 +3,7 @@
   "displayName": "e-Factura RO",
   "category": "compliance/ro",
   "description": "Romanian e-Invoice (e-Factura): build the UBL XML (CIUS-RO), submit it to ANAF, follow its state and keep ANAF's signed answer",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "zveltioMinVersion": "3.0.0-beta.130",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-ro-efactura",
@@ -22,6 +22,12 @@
         "label": "e-Factura RO",
         "icon": "receipt",
         "schema": "schemas/efactura.json"
+      },
+      {
+        "path": "/admin/compliance/ro/efactura/new",
+        "label": "compliance.ro.efactura.btn.newInvoice",
+        "icon": "file-plus",
+        "schema": "schemas/invoice-new.json"
       },
       {
         "path": "/admin/compliance/ro/efactura/connection",
@@ -65,6 +71,141 @@
     }
   ],
   "actions": [
+    {
+      "name": "createInvoice",
+      "permission": {
+        "resource": "efactura_invoices",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "invoice_number",
+          "invoice_date",
+          "seller_name",
+          "seller_cui",
+          "buyer_name",
+          "lines"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "invoice_number": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          },
+          "invoice_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "seller_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "seller_cui": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 20
+          },
+          "seller_address": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "seller_iban": {
+            "type": "string",
+            "maxLength": 34
+          },
+          "buyer_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "buyer_cui": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "buyer_address": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "lines": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": [
+                "description",
+                "unit_price"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "description": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "quantity": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "unit": {
+                  "type": "string",
+                  "maxLength": 10
+                },
+                "unit_price": {
+                  "type": "number"
+                },
+                "vat_rate": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                }
+              }
+            }
+          }
+        }
+      },
+      "reads": [
+        "efactura_invoices"
+      ],
+      "writes": [
+        "efactura_invoices"
+      ]
+    },
+    {
+      "name": "deleteDraft",
+      "permission": {
+        "resource": "efactura_invoices",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "efactura_invoices"
+      ],
+      "writes": [
+        "efactura_invoices"
+      ]
+    },
     {
       "name": "generateXml",
       "permission": {
@@ -389,6 +530,63 @@
       "enqueues": [
         "downloadMessage"
       ]
+    },
+    {
+      "name": "download",
+      "permission": {
+        "resource": "efactura_invoices",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id",
+          "document"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "document": {
+            "type": "string",
+            "enum": [
+              "xml",
+              "pdf",
+              "archive"
+            ]
+          }
+        }
+      },
+      "reads": [
+        "efactura_files"
+      ],
+      "writes": []
+    },
+    {
+      "name": "messageArchive",
+      "permission": {
+        "resource": "efactura_messages",
+        "action": "execute"
+      },
+      "input": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "reads": [
+        "efactura_messages"
+      ],
+      "writes": []
     }
   ],
   "jobs": [
@@ -605,8 +803,8 @@
     }
   ],
   "integrity": {
-    "engineSha256": "e585b40b82da747c904387f4cd25561a3312499adfac9e4788ed544ca0c06dd4",
-    "sourceSha256": "91108a4cb8668b94ae7e246165fdbafd0256219e274655b158d71a9bbd96292e",
+    "engineSha256": "96aadc5ceb81acb750a0843e57033b02852ddc52348c1589c520540b24a99c5a",
+    "sourceSha256": "5e0d0c77c603159f2abfd1bbcbd2878a8f443d3e47ca67407f7020d2e25e7649",
     "schemaSha256": "f520983414adaec844057a34190b69320b7a9da234a509e24037242213df8b66",
     "jobsSha256": "28e4bc4dd91a11d21702cf30820cbc4676b8595853e4f0f41156c386e9561565"
   }
