@@ -61,7 +61,7 @@ The secret is usually shown only once. Save it immediately, somewhere safe.
 
 ## Step 3 — Fill it in inside Zveltio
 
-Open **e-Factura RO** from the menu, tab **ANAF connection**, and press **New** (or **Edit** on the existing row).
+Open **e-Factura RO: ANAF** from the menu (the **ANAF connection** page), fill in the form and press **Save**.
 
 | Field | What to enter |
 |---|---|
@@ -100,10 +100,16 @@ Press **Connect to ANAF**. You are sent to their portal, where you sign with the
 certificate — **which has to be physically attached to the computer you are
 pressing from**, not to the server. Your browser makes the signature, not Zveltio.
 
-After signing, ANAF brings you back to a page that says the sign-in was received.
-Close it and reload e-Factura: the connection row shows when the token expires,
-and **Last error** says what went wrong if it did not work. A sign-in must be
-finished within ten minutes of pressing the button.
+After signing, ANAF brings you back to the **ANAF connection** page. Press
+**Finish connecting**: the connection row then shows when the token expires, and
+**Last error** says what went wrong if it did not work. A sign-in must be finished
+within ten minutes of pressing the button, by the **same person** who pressed
+**Connect to ANAF**: a sign-in someone else started, or a link to ANAF's answer
+someone sends you, connects nothing.
+
+A front end other than Studio registers its own page with ANAF as the callback
+address instead; that page hands ANAF's `code` and `state` to the
+`finishSignIn` action.
 
 ---
 
