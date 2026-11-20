@@ -76,5 +76,6 @@
   "compliance.ro.efactura.status.submitting": "Submitting",
   "compliance.ro.efactura.tab.invoices": "Invoices",
   "compliance.ro.efactura.tab.messages": "ANAF messages",
-  "compliance.ro.efactura.ui.storno_reason": "Storno reason"
+  "compliance.ro.efactura.ui.storno_reason": "Storno reason",
+  "compliance.ro.efactura.btn.finishSignIn": "Zakończ łączenie"
 }

@@ -1,8 +1,7 @@
-// The sign-in legs and the downloads, over a fake context: `host(c)` an
-// in-memory data API, `asSystem` and `enqueue` recorded; the callback is the
-// declared handler, called with a fake host. What the engine's
-// `/ext` chain does around them (the session, the tenant, the public-route
-// gate) is the contract test's; this proves the state handshake.
+// ANAF's callback and the downloads, over a fake context: `host(c)` an
+// in-memory data API; the callback is the declared handler, called with a fake
+// host. The sign-in itself (`startSignIn`, `finishSignIn`) is proved against a
+// real engine in `oauth.test.ts`.
 import { describe, expect, it } from 'bun:test';
 import { join } from 'node:path';
 
@@ -72,59 +71,33 @@ const own = () => ({
   callback_url: 'https://erp.example.ro/ext/compliance/ro/efactura/oauth/callback',
 });
 
-async function started(t: ReturnType<typeof setup>) {
-  const res = await t.app.request('/oauth/start');
-  expect(res.status).toBe(302);
-  const to = new URL(res.headers.get('location')!);
-  expect(to.origin + to.pathname).toBe('https://logincert.anaf.ro/anaf-oauth2/v1/authorize');
-  expect(to.searchParams.get('client_id')).toBe('cid');
-  expect(to.searchParams.get('redirect_uri')).toBe(own().callback_url);
-  expect(res.headers.get('set-cookie')).toContain('HttpOnly');
-  return to.searchParams.get('state')!;
-}
-const jar = (state: string, extra: Record<string, string> = {}) => ({ headers: { cookie: `zv_efactura_oauth=${state}`, ...extra } });
-
-describe('the ANAF sign-in', () => {
-  it('a state started here is spent once and queues connect with the code', async () => {
+describe('the ANAF callback', () => {
+  it('forwards code and state to the finish page, and reads or queues nothing', async () => {
     const t = setup([own()]);
-    const state = await started(t);
-    expect(state).toMatch(/^[0-9a-f]{48}$/);
-    const back = await t.callback(`?code=c0de&state=${state}`, jar(state));
-    expect(back.status).toBe(200);
-    expect(t.queued).toEqual([{ job: 'connect', input: { settings_id: 's1', code: 'c0de' } }]);
-    expect(t.asSystem).toEqual([['efactura_settings']]);
-    expect(t.rows[0].oauth_state).toBeNull();
-    // Replayed: the state is gone.
-    expect((await t.callback(`?code=c0de&state=${state}`, jar(state))).status).toBe(400);
-    expect(t.queued).toHaveLength(1);
+    const back = await t.callback('?code=c0de&state=ab12');
+    expect(back.status).toBe(302);
+    expect(back.headers.get('location')).toBe(
+      'https://erp.example.ro/admin/compliance/ro/efactura/connection?code=c0de&state=ab12',
+    );
+    expect(t.queued).toEqual([]);
+    expect(t.asSystem).toEqual([]);
   });
 
-  it('declares the callback public, answered by oauthCallback', async () => {
+  it("answers ANAF's refusal as text", async () => {
+    const res = await setup([own()]).callback('?error=access_denied');
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain('access_denied');
+  });
+
+  it('declares the callback public, answered by oauthCallback; /oauth/start is gone', async () => {
     const manifest = await Bun.file(join(import.meta.dir, '..', 'manifest.json')).json();
     expect(manifest.routes).toEqual([
       { method: 'GET', path: '/oauth/callback', access: 'public', handler: 'oauthCallback' },
     ]);
     expect(manifest.publicRoutes).toBeUndefined();
+    expect(manifest.jobs.find((j: Row) => j.name === 'connect').fromPublicRoutes).toBeUndefined();
     expect(Object.keys(ext.routes)).toEqual(['oauthCallback']);
-  });
-
-  it('refuses a forged, expired or other-tenant state', async () => {
-    const t = setup([own()]);
-    const state = await started(t);
-    const forged = '0'.repeat(48);
-    expect((await t.callback(`?code=x&state=${forged}`, jar(forged))).status).toBe(400);
-    expect((await t.callback(`?code=x&state=${state}`, jar(state, { 'x-tenant': 't2' }))).status).toBe(400);
-    // Another browser (no cookie, or another sign-in's) cannot finish this one: login CSRF.
-    expect((await t.callback(`?code=x&state=${state}`)).status).toBe(400);
-    expect((await t.callback(`?code=x&state=${state}`, jar(forged))).status).toBe(400);
-    t.rows[0].oauth_state_expires_at = new Date(Date.now() - 1000).toISOString();
-    expect((await t.callback(`?code=x&state=${state}`, jar(state))).status).toBe(400);
-    expect(t.queued).toHaveLength(0);
-  });
-
-  it("starts nothing for another tenant's row, or without the client and callback", async () => {
-    expect((await setup([{ ...own(), tenant_id: 't2' }]).app.request('/oauth/start')).status).toBe(400);
-    expect((await setup([{ ...own(), callback_url: null }]).app.request('/oauth/start')).status).toBe(400);
+    expect((await setup([own()]).app.request('/oauth/start')).status).toBe(404);
   });
 });
 

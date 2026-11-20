@@ -1,44 +1,14 @@
 import { Hono, type Context } from 'hono';
-import { setCookie } from 'hono/cookie';
-import type { ExtensionContext, HostCollections, RouteHandler } from '@zveltio/sdk/extension';
-import { FILES, MESSAGES, SETTINGS, authorizeUrl, fromBase64 } from './anaf.js';
+import type { ExtensionContext, RouteHandler } from '@zveltio/sdk/extension';
+import { FILES, MESSAGES, fromBase64 } from './anaf.js';
 
-// What a route still does: the two legs of the ANAF sign-in, which are browser
-// navigations, and the binary downloads (PDF, ANAF archive) the data API serves
-// only as base64 text. Everything else is the data API and the actions. The
-// callback, whose URL and query ANAF dictates, is a declared public route
-// (ADR 0039); the rest are the caller's.
+// What a route still does: ANAF's redirect back from its sign-in page, whose URL
+// ANAF dictates (a declared public route, ADR 0039), and the binary downloads
+// (PDF, ANAF archive) the data API serves only as base64 text, the caller's.
+// Starting and finishing the sign-in are the actions `startSignIn` and
+// `finishSignIn`; everything else is the data API and the actions.
 
 type Row = Record<string, any>;
-
-/** How long a sign-in started with /oauth/start may take to come back. */
-const STATE_TTL_MS = 10 * 60_000;
-/** The state is also kept in the browser that started the sign-in, so only it can finish one. */
-const STATE_COOKIE = 'zv_efactura_oauth';
-
-/**
- * The OWN tenant's settings row. The list admits the caller's read reach (every
- * firm for a god), so the tenant match keeps a god in firm B off firm A's
- * connection. `scope` is unique: one row per tenant.
- */
-async function ownSettings(c: Context, collections: HostCollections): Promise<Row | null> {
-  const tenant = (c.get('tenant') as { id?: string } | null | undefined)?.id;
-  if (!tenant) return null;
-  // `tenant_id` is not a filter field, so the match is here, page by page.
-  for (let page = 1; ; page++) {
-    const { records } = await collections.list(SETTINGS, { sort: 'id', limit: 100, page, count: 'none' });
-    const own = (records as Row[]).find((r) => r.tenant_id === tenant);
-    if (own) return own;
-    if ((records as Row[]).length < 100) return null;
-  }
-}
-
-function sameText(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let d = 0;
-  for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return d === 0;
-}
 
 const safeName = (v: unknown) => String(v ?? 'document').replace(/[^\w.-]/g, '_');
 
@@ -62,31 +32,6 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
     return (records as Row[])[0];
   };
 
-  // GET /oauth/start — the "Connect to ANAF" button. As the caller: who may
-  // update the settings row may start a sign-in. The state it stores comes back
-  // on the callback, so only a sign-in started here completes.
-  app.get('/oauth/start', async (c) => {
-    const { collections } = host(c);
-    const s = await ownSettings(c, collections);
-    if (!s?.client_id || !s.callback_url) {
-      return c.json({ error: 'Save the ANAF client id, secret and callback URL first.' }, 400);
-    }
-    const bytes = crypto.getRandomValues(new Uint8Array(24));
-    const state = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
-    await collections.update(SETTINGS, s.id, {
-      oauth_state: state,
-      oauth_state_expires_at: new Date(Date.now() + STATE_TTL_MS).toISOString(),
-    });
-    setCookie(c, STATE_COOKIE, state, {
-      path: c.req.path.replace(/\/start$/, ''),
-      httpOnly: true,
-      sameSite: 'Lax',
-      secure: String(s.callback_url).startsWith('https:'),
-      maxAge: STATE_TTL_MS / 1000,
-    });
-    return c.redirect(authorizeUrl(String(s.client_id), String(s.callback_url), state), 302);
-  });
-
   // The binary downloads, as the caller: the collections' rules decide.
   app.get('/invoices/:id/pdf', async (c) =>
     binary(c, (await fileOf(c))?.pdf, 'application/pdf', `${safeName(c.req.param('id'))}.pdf`),
@@ -104,60 +49,29 @@ export function efacturaRoutes(ctx: ExtensionContext): Hono {
   return app;
 }
 
-/**
- * `ctx.internals.asSystem`, kept from `register`: a declared handler is handed
- * the request and its `host` only, and reading the settings is more than the
- * anonymous caller may.
- */
-let asSystem: ExtensionContext['internals']['asSystem'] | undefined;
-
-export function keepInternals(ctx: ExtensionContext): void {
-  asSystem = ctx.internals.asSystem;
-}
-
-const text = (body: string, status = 200) =>
-  new Response(body, { status, headers: { 'Content-Type': 'text/plain; charset=UTF-8' } });
-
-function cookie(request: Request, name: string): string | undefined {
-  for (const part of (request.headers.get('cookie') ?? '').split(';')) {
-    const at = part.indexOf('=');
-    if (at > 0 && part.slice(0, at).trim() === name) return decodeURIComponent(part.slice(at + 1).trim());
-  }
-  return undefined;
-}
+/** The Studio page that finishes a sign-in: it hands `code` and `state` to `finishSignIn`. */
+export const FINISH_PAGE = '/admin/compliance/ro/efactura/connection';
 
 /**
  * GET /oauth/callback — a declared public route: ANAF sends the browser back
- * here with `code` and `state`. The settings are read as the system
- * (`data:system`, audited) in the request's tenant transaction, which admits
- * that tenant's row only; a matching, unexpired state is spent and the `connect`
- * job trades the code for tokens.
+ * here with `code` and `state`. It decides nothing: it forwards both to the
+ * page where the person, signed in, runs `finishSignIn`, which spends the state
+ * only for whoever started the sign-in. A front end other than Studio registers
+ * its own page with ANAF as the callback URL instead.
  */
-export const oauthCallback: RouteHandler = async (request, { host }) => {
+export const oauthCallback: RouteHandler = async (request) => {
   const query = new URL(request.url).searchParams;
   const refused = query.get('error');
-  if (refused) return text(`ANAF refused the sign-in: ${refused.slice(0, 200)}`, 400);
-  const code = query.get('code');
-  const state = query.get('state');
-  if (!code || !state) return text('The ANAF answer has no code or state.', 400);
-  // Login CSRF: a callback URL someone else started is refused in this browser.
-  const mine = cookie(request, STATE_COOKIE);
-  if (!mine || !sameText(mine, state)) return text('This sign-in was not started in this browser. Start it again.', 400);
-  const { enqueue } = host;
-  if (!asSystem || !enqueue) throw new Error('efactura: the ANAF callback needs data:system');
-  const ok = await asSystem(
-    [SETTINGS],
-    async () => {
-      const { records } = await host.collections.list(SETTINGS, { limit: 1, count: 'none' });
-      const s = (records as Row[])[0];
-      const live = s?.oauth_state_expires_at && Date.parse(String(s.oauth_state_expires_at)) > Date.now();
-      if (!s || !live || typeof s.oauth_state !== 'string' || !sameText(s.oauth_state, state)) return false;
-      await host.collections.update(SETTINGS, s.id, { oauth_state: null, oauth_state_expires_at: null });
-      await enqueue('connect', { settings_id: s.id, code });
-      return true;
-    },
-    { reason: 'anaf oauth callback' },
-  );
-  if (!ok) return text('This sign-in was not started here, or it expired. Start it again.', 400);
-  return text('ANAF sign-in received. The connection is being checked: close this tab and reload e-Factura.');
+  if (refused) {
+    return new Response(`ANAF refused the sign-in: ${refused.slice(0, 200)}`, {
+      status: 400,
+      headers: { 'Content-Type': 'text/plain; charset=UTF-8' },
+    });
+  }
+  const next = new URL(FINISH_PAGE, request.url);
+  for (const k of ['code', 'state']) {
+    const v = query.get(k);
+    if (v) next.searchParams.set(k, v);
+  }
+  return new Response(null, { status: 302, headers: { Location: next.toString(), 'Cache-Control': 'no-store' } });
 };

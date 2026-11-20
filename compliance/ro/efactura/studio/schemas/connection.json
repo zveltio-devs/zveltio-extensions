@@ -1,0 +1,56 @@
+{
+  "spec": "zveltio.view/2",
+  "id": "efactura.connection",
+  "title": "efactura.settings.title",
+  "type": "form",
+  "collection": "efactura_settings",
+  "record": "singleton",
+  "sections": [
+    {
+      "title": "efactura.settings.env",
+      "fields": [
+        { "field": "environment", "label": "efactura.settings.environment" },
+        { "field": "seller_cif", "label": "efactura.settings.sellerCif" }
+      ]
+    },
+    {
+      "title": "efactura.settings.oauth",
+      "fields": [
+        { "field": "callback_url", "label": "efactura.settings.callbackUrl" },
+        { "field": "client_id", "label": "efactura.settings.clientId" },
+        { "field": "client_secret", "label": "efactura.settings.clientSecret" }
+      ]
+    },
+    {
+      "title": "efactura.settings.title",
+      "fields": [
+        { "field": "token_expires_at", "label": "compliance.ro.efactura.col.tokenExpires", "readOnly": true },
+        { "field": "last_verified_at", "label": "compliance.ro.efactura.col.lastVerified", "readOnly": true },
+        { "field": "last_error", "label": "compliance.ro.efactura.col.lastError", "readOnly": true }
+      ]
+    }
+  ],
+  "submit": [
+    {
+      "action": "startSignIn",
+      "label": "compliance.ro.efactura.btn.connect",
+      "input": { "id": { "$record": "id" } }
+    },
+    {
+      "action": "finishSignIn",
+      "label": "compliance.ro.efactura.btn.finishSignIn",
+      "tone": "success",
+      "input": {
+        "id": { "$record": "id" },
+        "code": { "$param": "code" },
+        "state": { "$param": "state" }
+      },
+      "when": [{ "field": "oauth_state_expires_at", "op": "not_null" }]
+    },
+    {
+      "action": "verify",
+      "label": "compliance.ro.efactura.btn.verify",
+      "input": { "id": { "$record": "id" } }
+    }
+  ]
+}

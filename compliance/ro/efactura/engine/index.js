@@ -537,6 +537,46 @@ var verify = async (input, host) => {
     throw new ActionRefusal(404, "settings_not_found", "No such settings row.");
   return { job: await host.enqueue("connect", { settings_id: id }) };
 };
+var STATE_TTL_MS = 10 * 60000;
+function sameText(a, b) {
+  if (a.length !== b.length)
+    return false;
+  let d = 0;
+  for (let i = 0;i < a.length; i++)
+    d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return d === 0;
+}
+var startSignIn = async (input, host) => {
+  const { id } = input;
+  const s = await host.collections.read(SETTINGS, id);
+  if (!s)
+    throw new ActionRefusal(404, "settings_not_found", "No such settings row.");
+  if (!s.client_id || !s.callback_url) {
+    throw new ActionRefusal(422, "not_configured", "Save the ANAF client id, secret and callback URL first.");
+  }
+  const state = Array.from(crypto.getRandomValues(new Uint8Array(24)), (b) => b.toString(16).padStart(2, "0")).join("");
+  const written = await host.collections.update(SETTINGS, id, {
+    oauth_state: state,
+    oauth_state_expires_at: new Date(Date.now() + STATE_TTL_MS).toISOString(),
+    oauth_started_by: null
+  });
+  await host.collections.update(SETTINGS, id, { oauth_started_by: written.updated_by });
+  return { redirect: authorizeUrl(String(s.client_id), String(s.callback_url), state) };
+};
+var finishSignIn = async (input, host) => {
+  const { id, code, state } = input;
+  const s = await host.collections.read(SETTINGS, id);
+  const live = s?.oauth_state_expires_at && Date.parse(String(s.oauth_state_expires_at)) > Date.now();
+  const startedBy = s?.oauth_started_by;
+  if (!s || !live || typeof startedBy !== "string" || typeof s.oauth_state !== "string" || !sameText(s.oauth_state, state)) {
+    throw new ActionRefusal(409, "sign_in_unknown", "This sign-in was not started here, or it expired. Start it again.");
+  }
+  const spent = await host.collections.update(SETTINGS, id, { oauth_state: null, oauth_state_expires_at: null, oauth_started_by: null }, { expect: { oauth_started_by: [startedBy] } });
+  if (spent.updated_by !== startedBy) {
+    throw new ActionRefusal(409, "sign_in_not_yours", "This sign-in was started by someone else. Start your own.");
+  }
+  return { job: await host.enqueue("connect", { settings_id: id, code }) };
+};
 var syncMessages = async (input, host) => {
   const { days = 30, filter } = input;
   return { job: await host.enqueue("syncMessages", filter ? { days, filter } : { days }) };
@@ -555,6 +595,8 @@ var efacturaActions = {
   storno,
   fromInvoice,
   verify,
+  startSignIn,
+  finishSignIn,
   syncMessages,
   downloadMessage
 };
@@ -2016,116 +2058,7 @@ var Hono2 = class extends Hono {
   }
 };
 
-// /zveltio-extension/node_modules/hono/dist/utils/cookie.js
-var validCookieNameRegEx = /^[\w!#$%&'*.^`|~+-]+$/;
-var _serialize = (name, value, opt = {}) => {
-  if (!validCookieNameRegEx.test(name))
-    throw new Error("Invalid cookie name");
-  let cookie = `${name}=${value}`;
-  if (/^__secure-/i.test(name) && !opt.secure)
-    throw new Error("__Secure- Cookie must have Secure attributes");
-  if (/^__host-/i.test(name)) {
-    if (!opt.secure)
-      throw new Error("__Host- Cookie must have Secure attributes");
-    if (opt.path !== "/")
-      throw new Error('__Host- Cookie must have Path attributes with "/"');
-    if (opt.domain)
-      throw new Error("__Host- Cookie must not have Domain attributes");
-  }
-  for (const key of [
-    "domain",
-    "path",
-    "sameSite",
-    "priority"
-  ])
-    if (opt[key] && /[;\r\n]/.test(opt[key]))
-      throw new Error(`${key} must not contain ";", "\\r", or "\\n"`);
-  if (opt && typeof opt.maxAge === "number" && opt.maxAge >= 0) {
-    if (opt.maxAge > 34560000)
-      throw new Error("Cookies Max-Age SHOULD NOT be greater than 400 days (34560000 seconds) in duration.");
-    cookie += `; Max-Age=${opt.maxAge | 0}`;
-  }
-  if (opt.domain && opt.prefix !== "host")
-    cookie += `; Domain=${opt.domain}`;
-  if (opt.path)
-    cookie += `; Path=${opt.path}`;
-  if (opt.expires) {
-    if (opt.expires.getTime() - Date.now() > 34560000000)
-      throw new Error("Cookies Expires SHOULD NOT be greater than 400 days (34560000 seconds) in the future.");
-    cookie += `; Expires=${opt.expires.toUTCString()}`;
-  }
-  if (opt.httpOnly)
-    cookie += "; HttpOnly";
-  if (opt.secure)
-    cookie += "; Secure";
-  if (opt.sameSite)
-    cookie += `; SameSite=${opt.sameSite.charAt(0).toUpperCase() + opt.sameSite.slice(1)}`;
-  if (opt.priority)
-    cookie += `; Priority=${opt.priority.charAt(0).toUpperCase() + opt.priority.slice(1)}`;
-  if (opt.partitioned) {
-    if (!opt.secure)
-      throw new Error("Partitioned Cookie must have Secure attributes");
-    cookie += "; Partitioned";
-  }
-  return cookie;
-};
-var serialize = (name, value, opt) => {
-  value = encodeURIComponent(value);
-  return _serialize(name, value, opt);
-};
-
-// /zveltio-extension/node_modules/hono/dist/helper/cookie/index.js
-var generateCookie = (name, value, opt) => {
-  let cookie;
-  if (opt?.prefix === "secure")
-    cookie = serialize("__Secure-" + name, value, {
-      path: "/",
-      ...opt,
-      secure: true
-    });
-  else if (opt?.prefix === "host")
-    cookie = serialize("__Host-" + name, value, {
-      ...opt,
-      path: "/",
-      secure: true,
-      domain: undefined
-    });
-  else
-    cookie = serialize(name, value, {
-      path: "/",
-      ...opt
-    });
-  return cookie;
-};
-var setCookie = (c, name, value, opt) => {
-  const cookie = generateCookie(name, value, opt);
-  c.header("Set-Cookie", cookie, { append: true });
-};
-
 // engine/routes.ts
-var STATE_TTL_MS = 10 * 60000;
-var STATE_COOKIE = "zv_efactura_oauth";
-async function ownSettings(c, collections) {
-  const tenant = c.get("tenant")?.id;
-  if (!tenant)
-    return null;
-  for (let page = 1;; page++) {
-    const { records } = await collections.list(SETTINGS, { sort: "id", limit: 100, page, count: "none" });
-    const own = records.find((r) => r.tenant_id === tenant);
-    if (own)
-      return own;
-    if (records.length < 100)
-      return null;
-  }
-}
-function sameText(a, b) {
-  if (a.length !== b.length)
-    return false;
-  let d = 0;
-  for (let i = 0;i < a.length; i++)
-    d |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return d === 0;
-}
 var safeName = (v) => String(v ?? "document").replace(/[^\w.-]/g, "_");
 function binary(c, base64, type, filename) {
   if (typeof base64 !== "string" || base64 === "")
@@ -2145,27 +2078,6 @@ function efacturaRoutes(ctx) {
     });
     return records[0];
   };
-  app.get("/oauth/start", async (c) => {
-    const { collections } = host(c);
-    const s = await ownSettings(c, collections);
-    if (!s?.client_id || !s.callback_url) {
-      return c.json({ error: "Save the ANAF client id, secret and callback URL first." }, 400);
-    }
-    const bytes = crypto.getRandomValues(new Uint8Array(24));
-    const state = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-    await collections.update(SETTINGS, s.id, {
-      oauth_state: state,
-      oauth_state_expires_at: new Date(Date.now() + STATE_TTL_MS).toISOString()
-    });
-    setCookie(c, STATE_COOKIE, state, {
-      path: c.req.path.replace(/\/start$/, ""),
-      httpOnly: true,
-      sameSite: "Lax",
-      secure: String(s.callback_url).startsWith("https:"),
-      maxAge: STATE_TTL_MS / 1000
-    });
-    return c.redirect(authorizeUrl(String(s.client_id), String(s.callback_url), state), 302);
-  });
   app.get("/invoices/:id/pdf", async (c) => binary(c, (await fileOf(c))?.pdf, "application/pdf", `${safeName(c.req.param("id"))}.pdf`));
   app.get("/invoices/:id/archive", async (c) => binary(c, (await fileOf(c))?.archive, "application/zip", `anaf-${safeName(c.req.param("id"))}.zip`));
   app.get("/messages/:id/archive", async (c) => {
@@ -2174,47 +2086,23 @@ function efacturaRoutes(ctx) {
   });
   return app;
 }
-var asSystem;
-function keepInternals(ctx) {
-  asSystem = ctx.internals.asSystem;
-}
-var text = (body, status = 200) => new Response(body, { status, headers: { "Content-Type": "text/plain; charset=UTF-8" } });
-function cookie(request, name) {
-  for (const part of (request.headers.get("cookie") ?? "").split(";")) {
-    const at = part.indexOf("=");
-    if (at > 0 && part.slice(0, at).trim() === name)
-      return decodeURIComponent(part.slice(at + 1).trim());
-  }
-  return;
-}
-var oauthCallback = async (request, { host }) => {
+var FINISH_PAGE = "/admin/compliance/ro/efactura/connection";
+var oauthCallback = async (request) => {
   const query = new URL(request.url).searchParams;
   const refused = query.get("error");
-  if (refused)
-    return text(`ANAF refused the sign-in: ${refused.slice(0, 200)}`, 400);
-  const code = query.get("code");
-  const state = query.get("state");
-  if (!code || !state)
-    return text("The ANAF answer has no code or state.", 400);
-  const mine = cookie(request, STATE_COOKIE);
-  if (!mine || !sameText(mine, state))
-    return text("This sign-in was not started in this browser. Start it again.", 400);
-  const { enqueue } = host;
-  if (!asSystem || !enqueue)
-    throw new Error("efactura: the ANAF callback needs data:system");
-  const ok = await asSystem([SETTINGS], async () => {
-    const { records } = await host.collections.list(SETTINGS, { limit: 1, count: "none" });
-    const s = records[0];
-    const live = s?.oauth_state_expires_at && Date.parse(String(s.oauth_state_expires_at)) > Date.now();
-    if (!s || !live || typeof s.oauth_state !== "string" || !sameText(s.oauth_state, state))
-      return false;
-    await host.collections.update(SETTINGS, s.id, { oauth_state: null, oauth_state_expires_at: null });
-    await enqueue("connect", { settings_id: s.id, code });
-    return true;
-  }, { reason: "anaf oauth callback" });
-  if (!ok)
-    return text("This sign-in was not started here, or it expired. Start it again.", 400);
-  return text("ANAF sign-in received. The connection is being checked: close this tab and reload e-Factura.");
+  if (refused) {
+    return new Response(`ANAF refused the sign-in: ${refused.slice(0, 200)}`, {
+      status: 400,
+      headers: { "Content-Type": "text/plain; charset=UTF-8" }
+    });
+  }
+  const next = new URL(FINISH_PAGE, request.url);
+  for (const k of ["code", "state"]) {
+    const v = query.get(k);
+    if (v)
+      next.searchParams.set(k, v);
+  }
+  return new Response(null, { status: 302, headers: { Location: next.toString(), "Cache-Control": "no-store" } });
 };
 
 // engine/index.ts
@@ -2225,7 +2113,6 @@ var extension = {
   actions: efacturaActions,
   routes: { oauthCallback },
   async register(app, ctx) {
-    keepInternals(ctx);
     app.route("/", efacturaRoutes(ctx));
   }
 };

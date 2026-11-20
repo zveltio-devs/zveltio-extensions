@@ -1,5 +1,5 @@
 import { ActionRefusal, type ExtensionAction } from '@zveltio/sdk/extension';
-import { FILES, INVOICES, MESSAGES, SETTINGS } from './anaf.js';
+import { FILES, INVOICES, MESSAGES, SETTINGS, authorizeUrl } from './anaf.js';
 import { type InvoiceData, generateUBLXML } from './ubl-generator.js';
 
 // The engine runs every action as the caller, through the data API, in the
@@ -278,6 +278,70 @@ const verify: ExtensionAction = async (input, host) => {
   return { job: await host.enqueue('connect', { settings_id: id }) };
 };
 
+/** How long a sign-in started with `startSignIn` may take to come back. */
+const STATE_TTL_MS = 10 * 60_000;
+
+function sameText(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let d = 0;
+  for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return d === 0;
+}
+
+/**
+ * "Connect to ANAF": a single-use state on the settings row, and the browser
+ * sent to ANAF's authorize page (ADR 0061 d1). Who may update the row may start.
+ * The state is bound to who started: the engine stamps the row's `updated_by`
+ * with the caller, and that is kept in `oauth_started_by`, which only these
+ * actions write (`writtenBy`), so nobody plants a state in someone else's name.
+ */
+const startSignIn: ExtensionAction = async (input, host) => {
+  const { id } = input as { id: string };
+  const s = await host.collections.read(SETTINGS, id);
+  if (!s) throw new ActionRefusal(404, 'settings_not_found', 'No such settings row.');
+  if (!s.client_id || !s.callback_url) {
+    throw new ActionRefusal(422, 'not_configured', 'Save the ANAF client id, secret and callback URL first.');
+  }
+  const state = Array.from(crypto.getRandomValues(new Uint8Array(24)), (b) => b.toString(16).padStart(2, '0')).join('');
+  const written = await host.collections.update(SETTINGS, id, {
+    oauth_state: state,
+    oauth_state_expires_at: new Date(Date.now() + STATE_TTL_MS).toISOString(),
+    oauth_started_by: null,
+  });
+  await host.collections.update(SETTINGS, id, { oauth_started_by: written.updated_by });
+  return { redirect: authorizeUrl(String(s.client_id), String(s.callback_url), state) };
+};
+
+/**
+ * ANAF's redirect, carried back by the front end: `code` and `state` from the
+ * callback URL. The state is spent once, before it expires, and only by the
+ * person who started the sign-in — what the browser cookie of 2.x guaranteed:
+ * a callback link someone else started (login CSRF), or someone else's ANAF
+ * answer to a sign-in you started, connects nothing. Then `connect` trades the
+ * code for tokens.
+ */
+const finishSignIn: ExtensionAction = async (input, host) => {
+  const { id, code, state } = input as { id: string; code: string; state: string };
+  const s = await host.collections.read(SETTINGS, id);
+  const live = s?.oauth_state_expires_at && Date.parse(String(s.oauth_state_expires_at)) > Date.now();
+  const startedBy = s?.oauth_started_by;
+  if (!s || !live || typeof startedBy !== 'string' || typeof s.oauth_state !== 'string' || !sameText(s.oauth_state, state)) {
+    throw new ActionRefusal(409, 'sign_in_unknown', 'This sign-in was not started here, or it expired. Start it again.');
+  }
+  // Spent on the row locked for the write: a second finish of the same state waits, then finds it gone.
+  const spent = await host.collections.update(
+    SETTINGS,
+    id,
+    { oauth_state: null, oauth_state_expires_at: null, oauth_started_by: null },
+    { expect: { oauth_started_by: [startedBy] } },
+  );
+  // The engine stamped `updated_by` with this caller: the person finishing is the one who started.
+  if (spent.updated_by !== startedBy) {
+    throw new ActionRefusal(409, 'sign_in_not_yours', 'This sign-in was started by someone else. Start your own.');
+  }
+  return { job: await host.enqueue('connect', { settings_id: id, code }) };
+};
+
 const syncMessages: ExtensionAction = async (input, host) => {
   const { days = 30, filter } = input as { days?: number; filter?: string };
   return { job: await host.enqueue('syncMessages', filter ? { days, filter } : { days }) };
@@ -297,6 +361,8 @@ export const efacturaActions = {
   storno,
   fromInvoice,
   verify,
+  startSignIn,
+  finishSignIn,
   syncMessages,
   downloadMessage,
 };

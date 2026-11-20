@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.0.0 (2026-11-20)
+
+- feat!: "Connect to ANAF" is the action `startSignIn`, which answers `{ "redirect": <ANAF authorize URL> }` (ADR 0061 d1); `GET /oauth/start` and its `zv_efactura_oauth` cookie are gone. A view/2 front end follows the redirect; a link to `/oauth/start` answers 404
+- feat!: ANAF's callback (`GET /oauth/callback`, same URL to register with ANAF) no longer spends the state or queues `connect`: it forwards `code` and `state` to the Studio page **ANAF connection** (`/admin/compliance/ro/efactura/connection`), where **Finish connecting** runs the action `finishSignIn`. The job `connect` is no longer queued from a public route (`fromPublicRoutes` dropped)
+- fix: the state is bound to the person who started the sign-in, not to a browser: `startSignIn` keeps the caller the engine stamped (`updated_by`) in `oauth_started_by`, and `finishSignIn` spends the state only when the engine stamps the same caller on the spending write. A callback someone else started (login CSRF), or someone else's ANAF answer to a sign-in you started, connects nothing. Single use, ten minutes, the firm's own row, as before
+- fix: `oauth_state`, `oauth_state_expires_at` and the new `oauth_started_by` are written only by this extension's actions (`writtenBy`); before, anyone allowed to edit the settings could set a state through the data API
+- feat: the connection settings are a view/2 page (`studio/schemas/connection.json`): the singleton settings form with **Connect to ANAF**, **Finish connecting** (shown while a sign-in is open) and **Test connection**; the tab left the view/1 page
+- requires engine 3.0.0-beta.130 (the `redirect` action result, ADR 0061)
+
 ## 2.1.1 (2026-11-16)
 
 - build: repacked with hono 4.13.18 (security: GHSA-92p4-j3wq-jmqx, GHSA-39q9-qp46-w8xg, GHSA-h25j-2p75-qj33) and kysely 0.29.9, in lockstep with the engine; no behaviour change
