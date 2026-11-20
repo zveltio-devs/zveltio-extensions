@@ -4,6 +4,7 @@
 // an extension delete any account id it named.)
 import { afterAll, describe, expect, it } from 'bun:test';
 import { Kysely, PostgresDialect, sql } from 'kysely';
+import { join } from 'node:path';
 import { Pool } from 'pg';
 import { mountForTest } from '../../../testing/ext-harness';
 
@@ -63,7 +64,9 @@ d('compliance/gdpr — export goes through the engine, erasure is the engine’s
     // No grant on the extension's collections: those parts are null, the rest still comes.
     expect(body.consents).toBeNull();
     expect(body.subject_requests).toBeNull();
-    await sql`DELETE FROM zv_audit_log WHERE user_id = ${id}`.execute(db);
+    // The trail is append-only (ADR 0060): only the harness's owner helper may clean it.
+    const harness = await import(join(import.meta.dir, '..', '..', '..', '..', 'zveltio', 'packages', 'engine', 'src', 'testing', 'app-harness.js'));
+    await harness.asAuditOwner(db, sql`DELETE FROM zv_audit_log WHERE user_id = ${id}`);
     await sql`DELETE FROM "user" WHERE id = ${id}`.execute(db);
   });
 });

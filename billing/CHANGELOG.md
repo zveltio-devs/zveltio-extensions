@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.3.1 (2026-11-20)
+
+- test: `engine/webhook.test.ts` deletes its audit rows through the harness's `asAuditOwner`; the trail is append-only from engine migration 129 (ADR 0060). No code change; the version moves because the registry keeps a published version's archive immutable
+
 ## 2.3.0 (2026-11-13)
 
 - Stripe's webhook (`POST /webhook/stripe`) is a declared route (ADR 0039): the manifest's `routes` names it, public, and the engine serves it with the plain handler `stripeWebhook`. Same URL, same answers. The handler no longer uses Hono, raw SQL or `ctx.db`: the settings and the event claim go through `host.collections` as the system, the job through `host.enqueue`

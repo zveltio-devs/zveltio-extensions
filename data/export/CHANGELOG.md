@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.3 (2026-11-20)
+
+- test: `engine/export.test.ts` deletes its audit rows through the harness's `asAuditOwner`; the trail is append-only from engine migration 129 (ADR 0060). No code change; the version moves because the registry keeps a published version's archive immutable
+
 ## 2.0.2 (2026-11-16)
 
 - build: repacked with hono 4.13.18 (security: GHSA-92p4-j3wq-jmqx, GHSA-39q9-qp46-w8xg, GHSA-h25j-2p75-qj33) and kysely 0.29.9, in lockstep with the engine; no behaviour change

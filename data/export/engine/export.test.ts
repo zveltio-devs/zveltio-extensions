@@ -6,6 +6,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { sql } from 'kysely';
 import { seatHarnessGod } from '../../../testing/ext-harness';
 
 // biome-ignore lint/suspicious/noExplicitAny: engine modules imported by path, and the packed bundle
@@ -22,6 +23,7 @@ let db: Any;
 let sql: Any;
 let app: Any;
 let dropCollection: (db: Any, name: string) => Promise<void>;
+let asAuditOwner: (db: Any, query: Any) => Promise<unknown>;
 let member = { cookie: '', userId: '' };
 let outsider = { cookie: '', userId: '' };
 
@@ -42,6 +44,7 @@ d('data/export — what the data API gives the caller, and no more', () => {
     const { tenantMiddleware } = (await import(join(ENGINE, 'middleware', 'tenant.js'))) as Any;
     const gate = (await import(join(ENGINE, 'middleware', 'extension-auth-gate.js'))) as Any;
     dropCollection = harness.dropTestCollection;
+    asAuditOwner = harness.asAuditOwner;
 
     let engineApp: Any;
     ({ app: engineApp, db } = await harness.getTestApp());
@@ -80,7 +83,7 @@ d('data/export — what the data API gives the caller, and no more', () => {
     await seatHarnessGod();
     if (!db) return;
     await db.deleteFrom('zvd_column_permissions').where('collection_name', '=', C).execute().catch(() => undefined);
-    await db.deleteFrom('zv_audit_log').where('resource_type', '=', C).execute().catch(() => undefined);
+    await asAuditOwner(db, sql`DELETE FROM zv_audit_log WHERE resource_type = ${C}`);
     await dropCollection(db, C).catch(() => undefined);
   });
 

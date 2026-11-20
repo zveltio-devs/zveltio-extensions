@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.1.1 (2026-11-20)
+
+- test: `engine/self-service.test.ts` deletes its audit rows through the harness's `asAuditOwner`; the trail is append-only from engine migration 129 (ADR 0060). No code change; the version moves because the registry keeps a published version's archive immutable
+
 ## 3.1.0 (2026-11-17)
 
 - feat: `GET /export-my-data` includes the caller's own consents (`consents`) and subject requests (`subject_requests`) in the request's tenant, read as the caller through the data API and filtered on `created_by` (ADR 0058 decision 3; 2.0.0 had dropped them)
