@@ -85,6 +85,18 @@ EXTENSIONS_DIR=/path/to/zveltio-extensions
 
 The engine will load extensions from `$EXTENSIONS_DIR/<category>/<name>/engine/index.ts`.
 
+An unsigned directory never runs, in development or test either (engine ADR 0056
+amendment 2026-11-21). Sign this checkout with a test key of your own, from the
+engine repository, and put the entry it prints on the engine's
+`REGISTRY_PUBLIC_KEYS_JSON`; sign again after each change:
+
+```bash
+zveltio keys generate --id dev-registry          # once
+bun scripts/sign-as-registry.ts ../zveltio-extensions --key-id dev-registry
+```
+
+See the engine's `docs/extensions/signatures.md#a-first-party-source-checkout`.
+
 ## Development
 
 ```bash
