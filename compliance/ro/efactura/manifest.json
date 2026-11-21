@@ -3,7 +3,7 @@
   "displayName": "e-Factura RO",
   "category": "compliance/ro",
   "description": "Romanian e-Invoice (e-Factura): build the UBL XML (CIUS-RO), submit it to ANAF, follow its state and keep ANAF's signed answer",
-  "version": "4.0.0",
+  "version": "4.0.1",
   "zveltioMinVersion": "3.0.0-beta.130",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-ro-efactura",

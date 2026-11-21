@@ -129,7 +129,7 @@ d(`${NAME}: the ANAF sign-in on a real engine`, () => {
     expect(url.searchParams.get('redirect_uri')).toBe('https://x.test/cb');
     expect(url.searchParams.get('state')).toMatch(/^[0-9a-f]{48}$/);
     const s = await settings();
-    expect(s.oauth_state).toStartWith('enc:v1:');
+    expect(s.oauth_state).toMatch(/^enc:v[12]:/);
     expect(s.oauth_started_by).toBe(alice.userId);
   });
 
@@ -157,7 +157,7 @@ d(`${NAME}: the ANAF sign-in on a real engine`, () => {
     // Refused, the request rolled back: Alice's sign-in is still hers to finish.
     const s = await settings();
     expect(s.oauth_started_by).toBe(alice.userId);
-    expect(s.oauth_state).toStartWith('enc:v1:');
+    expect(s.oauth_state).toMatch(/^enc:v[12]:/);
   });
 
   it('a forged or stale state is refused', async () => {

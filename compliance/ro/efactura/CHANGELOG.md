@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.1 (2026-11-21)
+
+- test: the OAuth test accepts the engine's `enc:v2` field envelope (ADR 0059) as well as `enc:v1` for `oauth_state`; no runtime change
+
 ## 4.0.0 (2026-11-20)
 
 - feat!: the binary download routes are gone: `GET /invoices/:id/pdf`, `GET /invoices/:id/archive` and `GET /messages/:id/archive` answer 404. The documents are the actions `download` (`{ id, document: "xml" | "pdf" | "archive" }`) and `messageArchive` (`{ id }`), which store the document as the caller's own file, named by the request's `$files.write`, and answer `{ file }` (ADR 0052); a document not stored yet is refused 404 `not_stored`. `GET /oauth/callback` is the only route left
