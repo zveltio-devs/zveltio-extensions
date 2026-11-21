@@ -115,7 +115,7 @@ d('auth/saml — an assertion is a session the engine accepts', () => {
 
   beforeAll(async () => {
     e = await onEngine(import.meta.dir);
-    const { encryptField } = await import(join(ENGINE, 'lib/data/field-crypto.js'));
+    const { maybeEncrypt } = await import(join(ENGINE, 'lib/data/field-crypto.js'));
     const { getAuth } = await import(join(ENGINE, 'lib/auth.js'));
     getSession = async (setCookie) =>
       (await getAuth().api.getSession({ headers: new Headers({ cookie: setCookie.split(';')[0] ?? '' }) }))?.user?.id;
@@ -126,7 +126,7 @@ d('auth/saml — an assertion is a session the engine accepts', () => {
     }
     await e.harness.asEveryTenant(e.db, (trx: any) => e.sql`DELETE FROM zvd_saml_settings`.execute(trx));
     await seed(DEFAULT, idp.config.issuer, null);
-    await seed(A.id, 'sp-a', await encryptField(spKey));
+    await seed(A.id, 'sp-a', await maybeEncrypt(spKey, true));
     await seed(B.id, 'sp-b', null);
     await seed(C.id, SP, null);
   }, 120_000);

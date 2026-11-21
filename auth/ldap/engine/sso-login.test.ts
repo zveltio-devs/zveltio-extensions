@@ -155,7 +155,7 @@ d('auth/ldap — a directory sign-in is a session the engine accepts', () => {
       warn(...args);
     };
     e = await onEngine(import.meta.dir);
-    const { encryptField } = await import(join(ENGINE, 'lib/data/field-crypto.js'));
+    const { maybeEncrypt } = await import(join(ENGINE, 'lib/data/field-crypto.js'));
     const { getAuth } = await import(join(ENGINE, 'lib/auth.js'));
     getSession = async (setCookie) =>
       (await getAuth().api.getSession({ headers: new Headers({ cookie: setCookie.split(';')[0] ?? '' }) }))?.user?.id;
@@ -165,7 +165,7 @@ d('auth/ldap — a directory sign-in is a session the engine accepts', () => {
       await e.sql`INSERT INTO zv_tenants (id, slug, name, status) VALUES (${t.id}::uuid, ${t.slug}, ${t.slug}, 'active')`.execute(e.db);
     }
     await e.harness.asEveryTenant(e.db, (trx: any) => e.sql`DELETE FROM zvd_ldap_settings`.execute(trx));
-    const sealed = await encryptField(SERVICE_PASSWORD);
+    const sealed = await maybeEncrypt(SERVICE_PASSWORD, true);
     await seed(DEFAULT, directory.url, sealed);
     await seed(A.id, directory.url, sealed);
     await seed(B.id, 'ldap://127.0.0.1:1', sealed);
