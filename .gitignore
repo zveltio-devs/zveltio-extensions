@@ -10,6 +10,10 @@ build/
 *.local
 bun.lock
 
+# A local signature (engine scripts/sign-as-registry.ts): an unsigned checkout
+# never runs, in development either; each developer signs with their own key.
+.zveltio-registry/
+
 # zveltio extension types codegen output (S4-01) — regenerate via:
 #   $ zveltio extension types
 .zveltio/
