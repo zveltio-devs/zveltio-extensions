@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.1 (2026-11-21)
+
+- test: seed the stored secret with the engine's `maybeEncrypt`, which every engine version exports; `encryptField` now takes the row it is bound to (ADR 0059). No runtime change
+
 ## 4.0.0 (2026-11-17)
 
 - fix!: LDAPS certificate verification can no longer be turned off from the Console (ADR 0058 decision 4, DR-10). Any tenant admin could save `tls_verify: false`, and the directory was then not authenticated: whoever sits on the path reads the bind password and every user's password. The field leaves the form and a stored `false` is ignored, logged once with what to do. Only the operator turns it off, for every tenant, with `ZVELTIO_ALLOW_UNVERIFIED_LDAPS=1` on the engine (`ctx.config.allowUnverifiedLdaps`; a dated mode, removed in 3.1.0); an engine without that member verifies

@@ -43,10 +43,10 @@ d('sms — the Twilio status callback is a declared public route', () => {
 
   beforeAll(async () => {
     e = await onEngine(import.meta.dir);
-    const { encryptField } = await import(join(ENGINE, 'lib/data/field-crypto.js'));
+    const { maybeEncrypt } = await import(join(ENGINE, 'lib/data/field-crypto.js'));
     for (const t of [A, B]) {
       await e.sql`INSERT INTO zv_tenants (id, slug, name, status) VALUES (${t.id}::uuid, ${t.slug}, ${t.slug}, 'active')`.execute(e.db);
-      const token = await encryptField(`tok-${t.slug}`);
+      const token = await maybeEncrypt(`tok-${t.slug}`, true);
       await e.harness.asTenant(e.db, t.id, (trx: any) =>
         e.sql`INSERT INTO zvd_sms_settings (tenant_id, scope, twilio_auth_token)
               VALUES (${t.id}::uuid, 'tenant', ${token})`.execute(trx),

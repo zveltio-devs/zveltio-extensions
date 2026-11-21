@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.2 (2026-11-21)
+
+- test: seed the stored secret with the engine's `maybeEncrypt`, which every engine version exports; `encryptField` now takes the row it is bound to (ADR 0059). No runtime change
+
 ## 2.2.1 (2026-11-20)
 
 - test: `engine/routes.test.ts` posts to `/webhook/twilio` through the harness. No code change; the version moves because the registry keeps a published version's archive immutable and 2.2.0 is stored without this test

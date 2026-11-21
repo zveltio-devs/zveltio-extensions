@@ -66,8 +66,8 @@ d('migrators importFetch — all or nothing, as the caller', () => {
     // May run the action and read the target, but not create in it.
     reader = await session([{ collection: C, actions: ['read'] }, ...own]);
     // A secret column holds ciphertext only (ADR 0024): the token goes in sealed.
-    const { encryptField } = (await import(join(ENGINE, 'lib', 'data', 'field-crypto.js'))) as Any;
-    const token = await encryptField('x');
+    const { maybeEncrypt } = (await import(join(ENGINE, 'lib', 'data', 'field-crypto.js'))) as Any;
+    const token = await maybeEncrypt('x', true);
     conn = (
       await sql`INSERT INTO zvd_migrator_connections (source, name, token) VALUES ('notion', 'n', ${token}) RETURNING id`.execute(db)
     ).rows[0].id;

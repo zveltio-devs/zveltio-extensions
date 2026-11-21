@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.1 (2026-11-21)
+
+- test: seed the stored secret with the engine's `maybeEncrypt`, which every engine version exports; `encryptField` now takes the row it is bound to (ADR 0059). No runtime change
+
 ## 3.0.0 (2026-11-17)
 
 - fix!: the SAML assertion audience check can no longer be turned off from the Console (ADR 0058 decision 4, DR-10). Any tenant admin could save `audience_check: false`, and an assertion the identity provider issued for another service then signed a person in here. The field leaves the form and a stored `false` is ignored, logged once with what to do. Only the operator turns the check off, for every tenant, with `ZVELTIO_ALLOW_SAML_ANY_AUDIENCE=1` on the engine (`ctx.config.allowSamlAnyAudience`; a dated mode, removed in 3.1.0); an engine without that member checks

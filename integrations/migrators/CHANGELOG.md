@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.1 (2026-11-21)
+
+- test: seed the stored secret with the engine's `maybeEncrypt`, which every engine version exports; `encryptField` now takes the row it is bound to (ADR 0059). No runtime change
+
 ## 3.0.0 (2026-11-14)
 
 - feat!: the import route is an action (ADR 0039, ADR 0047): `POST /fetches/:id/import` `{ target_collection, mapping? }` is `POST /ext/integrations/migrators/actions/importFetch` `{ fetch_id, target_collection, mapping? }`. It needs `execute` on `migrator_runs`, granted to `tenant_member` at install, and answers `{ result: { run, imported_rows, skipped_fields } }` with 200 (was the same object, unwrapped, with 201). It lists `"*"` in `writes`, because the target is the collection the caller names: it reaches it only as the caller, under their grants, row rules and column rules, as the route did through `ctx.internals.createRecord`; install consent shows it as `collections:any:write`, and an engine from 3.0.0-beta.121 is required
