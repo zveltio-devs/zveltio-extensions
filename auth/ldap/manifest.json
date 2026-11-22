@@ -3,7 +3,7 @@
   "displayName": "LDAP / Active Directory",
   "category": "auth",
   "description": "Authenticate users via LDAP or Active Directory (ldapts)",
-  "version": "4.0.1",
+  "version": "4.0.2",
   "zveltioMinVersion": "3.0.0-beta.113",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-auth-ldap",

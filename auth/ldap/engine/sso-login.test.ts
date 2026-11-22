@@ -340,4 +340,38 @@ d('auth/ldap — a directory sign-in is a session the engine accepts', () => {
     expect(records.length).toBeGreaterThan(0);
     for (const r of records) expect(r).not.toHaveProperty('bind_password');
   });
+
+  // ADR 0059: the engine seals `bind_password` (a `secret` field), so a key
+  // rotation is the engine's. Read under the old key while it is still listed,
+  // resealed by `rotate-keys` under the new one, read with the old one gone.
+  // Last in the file: the run touches the whole database, so it ends by
+  // rotating back to the harness key.
+  it('a field-key rotation keeps the bind password readable, rotate-keys reseals it', async () => {
+    const { rotateKeys } = await import(join(ENGINE, 'lib/rotate-keys.js'));
+    const { fieldKeyId } = await import(join(ENGINE, 'lib/security/keyring.js'));
+    const K0 = process.env.FIELD_ENCRYPTION_KEY ?? '';
+    const K1 = '1'.repeat(64);
+    const stored = async () =>
+      (
+        await e.harness.asTenant(e.db, A.id, (trx: any) =>
+          e.sql`SELECT bind_password AS v FROM zvd_ldap_settings WHERE tenant_id = ${A.id}::uuid`.execute(trx),
+        )
+      ).rows[0].v as string;
+    const bound = (k: string) => (stored()).then((v) => v.startsWith(`enc:v2:${fieldKeyId(k)}:`));
+    try {
+      process.env.FIELD_ENCRYPTION_KEYS = `${K1},${K0}`;
+      expect([200, 403]).toContain((await login(alice, A.slug)).status);
+      await rotateKeys(e.db);
+      expect(await bound(K1)).toBe(true);
+      process.env.FIELD_ENCRYPTION_KEYS = K1;
+      process.env.FIELD_ENCRYPTION_KEY = K1;
+      expect([200, 403]).toContain((await login(alice, A.slug)).status);
+    } finally {
+      process.env.FIELD_ENCRYPTION_KEYS = `${K0},${K1}`;
+      process.env.FIELD_ENCRYPTION_KEY = K0;
+      await rotateKeys(e.db);
+      delete process.env.FIELD_ENCRYPTION_KEYS;
+    }
+    expect(await bound(K0)).toBe(true);
+  });
 });

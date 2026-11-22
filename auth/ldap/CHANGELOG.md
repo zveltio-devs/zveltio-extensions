@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.2 (2026-11-22)
+
+- test: the bind password stays readable through a field-key rotation, and `zveltio rotate-keys` reseals it under the new key (ADR 0059 step 3). No runtime change
+
 ## 4.0.1 (2026-11-21)
 
 - test: seed the stored secret with the engine's `maybeEncrypt`, which every engine version exports; `encryptField` now takes the row it is bound to (ADR 0059). No runtime change
