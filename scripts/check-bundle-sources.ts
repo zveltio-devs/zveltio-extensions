@@ -13,43 +13,18 @@
  * do with the author — bundler output is not stable across Bun versions. This
  * hashes the INPUT instead, exactly as `extension pack` recorded it.
  *
- * Usage: bun scripts/check-bundle-sources.ts
+ * Usage: bun scripts/check-bundle-sources.ts  (needs the engine sibling at ../zveltio)
  */
 
-import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
+// The rule itself, from the engine sibling (CI clones it beside this checkout):
+// what pack records and `extension validate` checks is this same function, so
+// the gate cannot drift from them. It follows the bundle's relative imports out
+// of `engine/` (`content/pages` bundles `../client/icons.ts`).
+import { hashEngineSources } from '../../zveltio/packages/cli/src/lib/bundle-sources.js';
 
 const ROOT = join(import.meta.dir, '..');
-
-/** Must stay byte-identical to `hashEngineSources` in the CLI's pack command. */
-function hashEngineSources(dir: string): string {
-  const engineDir = join(dir, 'engine');
-  const files: string[] = [];
-  const walk = (d: string): void => {
-    for (const entry of readdirSync(d, { withFileTypes: true })) {
-      const full = join(d, entry.name);
-      if (entry.isDirectory()) {
-        if (entry.name === 'migrations' || entry.name === 'node_modules') continue;
-        walk(full);
-        continue;
-      }
-      if (!/\.(ts|tsx|js|mjs|json)$/.test(entry.name)) continue;
-      if (/\.(test|spec)\.[a-z]+$/.test(entry.name)) continue;
-      if (entry.name === 'index.js') continue;
-      files.push(full);
-    }
-  };
-  walk(engineDir);
-  const h = createHash('sha256');
-  for (const f of files.sort()) {
-    h.update(f.slice(engineDir.length).replace(/\\/g, '/'));
-    h.update('\0');
-    h.update(readFileSync(f));
-    h.update('\0');
-  }
-  return h.digest('hex');
-}
 
 function findManifests(base: string, out: string[] = []): string[] {
   for (const entry of readdirSync(base, { withFileTypes: true })) {

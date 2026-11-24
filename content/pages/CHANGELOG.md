@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.3.3 (2026-11-24)
+
+- Re-packed with no source change: the bundle freshness hash now also covers the files the engine bundle imports from outside `engine/` (`client/icons.ts`, `client/motion.ts`), so the recorded hash changes
+- requires engine 3.0.0-beta.111 (unchanged)
+
 ## 2.3.2 (2026-11-19)
 
 - A collection list that failed to load showed `HTTP 4xx` instead of the engine's message: it read the legacy `error` field, and the engine answers with a problem document whose message is `detail`. It now reads `detail`, then `error`
