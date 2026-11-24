@@ -2290,14 +2290,15 @@ var require_tokenize = __commonJS(function(exports, module) {
   var RE_WORD_END = /[\t\n\f\r !"#'():;@[\\\]{}]|\/(?=\*)/g;
   var RE_BAD_BRACKET = /.[\r\n"'(/\\]/;
   var RE_HEX_ESCAPE = /[\da-f]/i;
+  var RE_URL_NAME = /(^|[\t\n\f\r "'(),/:;[\]{}])url$/i;
+  var RE_QUOTED = /[\t\n\f\r ]*["']/y;
   module.exports = function tokenizer(input, options = {}) {
     let css = input.css.valueOf();
     let ignore = options.ignoreErrors;
     let code, content, escape, next, quote;
-    let currentToken, escaped, escapePos, n, prev;
+    let currentToken, escaped, escapePos;
     let length = css.length;
     let pos = 0;
-    let buffer = [];
     let returned = [];
     let lastBadParen = -1;
     function position() {
@@ -2343,9 +2344,8 @@ var require_tokenize = __commonJS(function(exports, module) {
           break;
         }
         case OPEN_PARENTHESES: {
-          prev = buffer.length ? buffer.pop()[1] : "";
-          n = css.charCodeAt(pos + 1);
-          if (prev === "url" && n !== SINGLE_QUOTE && n !== DOUBLE_QUOTE && n !== SPACE && n !== NEWLINE && n !== TAB && n !== FEED && n !== CR) {
+          RE_QUOTED.lastIndex = pos + 1;
+          if (RE_URL_NAME.test(css.substring(pos - 4, pos)) && !RE_QUOTED.test(css)) {
             next = pos;
             do {
               escaped = false;
@@ -2462,7 +2462,6 @@ var require_tokenize = __commonJS(function(exports, module) {
               next = RE_WORD_END.lastIndex - 2;
             }
             currentToken = ["word", css.slice(pos, next + 1), pos, next];
-            buffer.push(currentToken);
             pos = next;
           }
           break;
@@ -2614,8 +2613,9 @@ var require_css_syntax_error = __commonJS(function(exports, module) {
         if (number === this.line) {
           if (line.length > 160) {
             let padding = 20;
+            let endColumn = typeof this.endColumn === "number" ? this.endColumn : this.column;
             let subLineStart = Math.max(0, this.column - padding);
-            let subLineEnd = Math.max(this.column + padding, this.endColumn + padding);
+            let subLineEnd = Math.max(this.column + padding, endColumn + padding);
             let subLine = line.slice(subLineStart, subLineEnd);
             let spacing = aside(gutter.replace(/\d/g, " ")) + line.slice(0, Math.min(this.column - 1, padding - 1)).replace(/[^\t]/g, " ");
             return mark(">") + aside(gutter) + highlight(subLine) + `
@@ -4062,7 +4062,7 @@ var require_document = __commonJS(function(exports, module) {
   Document.default = Document;
 });
 
-// /zveltio-extension/node_modules/postcss/node_modules/nanoid/non-secure/index.cjs
+// /zveltio-extension/node_modules/nanoid/non-secure/index.cjs
 var require_non_secure = __commonJS(function(exports, module) {
   var urlAlphabet = "useandom-26T198340PX75pxJACKVERYMINDBUSHWOLF_GQZbfghjklqvwyzrict";
   var customAlphabet = (alphabet, defaultSize = 21) => {
@@ -4997,53 +4997,93 @@ var require_binary_search = __commonJS(function(exports) {
 
 // /zveltio-extension/node_modules/source-map-js/lib/quick-sort.js
 var require_quick_sort = __commonJS(function(exports) {
-  function SortTemplate(comparator) {
-    function swap(ary, x, y) {
-      var temp = ary[x];
-      ary[x] = ary[y];
-      ary[y] = temp;
-    }
-    function randomIntInRange(low, high) {
-      return Math.round(low + Math.random() * (high - low));
-    }
-    function doQuickSort(ary, comparator, p, r) {
-      if (p < r) {
-        var pivotIndex = randomIntInRange(p, r);
-        var i = p - 1;
-        swap(ary, pivotIndex, r);
-        var pivot = ary[r];
-        for (var j = p;j < r; j++) {
-          if (comparator(ary[j], pivot, false) <= 0) {
-            i += 1;
-            swap(ary, i, j);
-          }
+  function swap(ary, x, y) {
+    var temp = ary[x];
+    ary[x] = ary[y];
+    ary[y] = temp;
+  }
+  function randomIntInRange(low, high) {
+    return Math.round(low + Math.random() * (high - low));
+  }
+  function doQuickSort0(ary, comparator, p, r) {
+    if (p < r) {
+      var pivotIndex = randomIntInRange(p, r);
+      var i = p - 1;
+      swap(ary, pivotIndex, r);
+      var pivot = ary[r];
+      for (var j = p;j < r; j++) {
+        if (comparator(ary[j], pivot, false) <= 0) {
+          i += 1;
+          swap(ary, i, j);
         }
-        swap(ary, i + 1, j);
-        var q = i + 1;
-        doQuickSort(ary, comparator, p, q - 1);
-        doQuickSort(ary, comparator, q + 1, r);
       }
+      swap(ary, i + 1, j);
+      var q = i + 1;
+      doQuickSort0(ary, comparator, p, q - 1);
+      doQuickSort0(ary, comparator, q + 1, r);
     }
-    return doQuickSort;
   }
-  function cloneSort(comparator) {
-    let template = SortTemplate.toString();
-    let templateFn = new Function(`return ${template}`)();
-    return templateFn(comparator);
-  }
-  var isEvalAllowed = function() {
-    try {
-      new Function("return 0")();
-      return true;
-    } catch {
-      return false;
+  function doQuickSort1(ary, comparator, p, r) {
+    if (p < r) {
+      var pivotIndex = randomIntInRange(p, r);
+      var i = p - 1;
+      swap(ary, pivotIndex, r);
+      var pivot = ary[r];
+      for (var j = p;j < r; j++) {
+        if (comparator(ary[j], pivot, false) <= 0) {
+          i += 1;
+          swap(ary, i, j);
+        }
+      }
+      swap(ary, i + 1, j);
+      var q = i + 1;
+      doQuickSort1(ary, comparator, p, q - 1);
+      doQuickSort1(ary, comparator, q + 1, r);
     }
-  }();
+  }
+  function doQuickSort2(ary, comparator, p, r) {
+    if (p < r) {
+      var pivotIndex = randomIntInRange(p, r);
+      var i = p - 1;
+      swap(ary, pivotIndex, r);
+      var pivot = ary[r];
+      for (var j = p;j < r; j++) {
+        if (comparator(ary[j], pivot, false) <= 0) {
+          i += 1;
+          swap(ary, i, j);
+        }
+      }
+      swap(ary, i + 1, j);
+      var q = i + 1;
+      doQuickSort2(ary, comparator, p, q - 1);
+      doQuickSort2(ary, comparator, q + 1, r);
+    }
+  }
+  function doQuickSort3(ary, comparator, p, r) {
+    if (p < r) {
+      var pivotIndex = randomIntInRange(p, r);
+      var i = p - 1;
+      swap(ary, pivotIndex, r);
+      var pivot = ary[r];
+      for (var j = p;j < r; j++) {
+        if (comparator(ary[j], pivot, false) <= 0) {
+          i += 1;
+          swap(ary, i, j);
+        }
+      }
+      swap(ary, i + 1, j);
+      var q = i + 1;
+      doQuickSort3(ary, comparator, p, q - 1);
+      doQuickSort3(ary, comparator, q + 1, r);
+    }
+  }
+  var sortCopies = [doQuickSort0, doQuickSort1, doQuickSort2, doQuickSort3];
+  var nextSortCopy = 0;
   var sortCache = new WeakMap;
   exports.quickSort = function(ary, comparator, start = 0) {
-    let doQuickSort = isEvalAllowed ? sortCache.get(comparator) : SortTemplate(comparator);
+    var doQuickSort = sortCache.get(comparator);
     if (doQuickSort === undefined) {
-      doQuickSort = cloneSort(comparator);
+      doQuickSort = sortCopies[Math.min(nextSortCopy++, sortCopies.length - 1)];
       sortCache.set(comparator, doQuickSort);
     }
     doQuickSort(ary, comparator, start, ary.length - 1);
@@ -5154,7 +5194,7 @@ var require_source_map_consumer = __commonJS(function(exports) {
       var mapping = this._originalMappings[index];
       if (aArgs.column === undefined) {
         var originalLine = mapping.originalLine;
-        while (mapping && mapping.originalLine === originalLine) {
+        while (mapping && mapping.source === needle.source && mapping.originalLine === originalLine) {
           mappings.push({
             line: util.getArg(mapping, "generatedLine", null),
             column: util.getArg(mapping, "generatedColumn", null),
@@ -5164,7 +5204,7 @@ var require_source_map_consumer = __commonJS(function(exports) {
         }
       } else {
         var originalColumn = mapping.originalColumn;
-        while (mapping && mapping.originalLine === line && mapping.originalColumn == originalColumn) {
+        while (mapping && mapping.source === needle.source && mapping.originalLine === line && mapping.originalColumn == originalColumn) {
           mappings.push({
             line: util.getArg(mapping, "generatedLine", null),
             column: util.getArg(mapping, "generatedColumn", null),
@@ -5379,12 +5419,18 @@ var require_source_map_consumer = __commonJS(function(exports) {
     }
     sortGenerated(generatedMappings, subarrayStart);
     this.__generatedMappings = generatedMappings;
+    var sourceBuckets = [];
     for (var i = 0;i < originalMappings.length; i++) {
       if (originalMappings[i] != null) {
         quickSort(originalMappings[i], util.compareByOriginalPositionsNoSource);
+        sourceBuckets.push(originalMappings[i]);
       }
     }
-    this.__originalMappings = [].concat(...originalMappings);
+    var sortedOriginalMappings = [];
+    for (var b = 0;b < sourceBuckets.length; b += 4096) {
+      sortedOriginalMappings = sortedOriginalMappings.concat(...sourceBuckets.slice(b, b + 4096));
+    }
+    this.__originalMappings = sortedOriginalMappings;
   };
   BasicSourceMapConsumer.prototype._findMapping = function SourceMapConsumer_findMapping(aNeedle, aMappings, aLineName, aColumnName, aComparator, aBias) {
     if (aNeedle[aLineName] <= 0) {
@@ -5590,7 +5636,7 @@ var require_source_map_consumer = __commonJS(function(exports) {
       if (cmp) {
         return cmp;
       }
-      return needle.generatedColumn - section.generatedOffset.generatedColumn;
+      return needle.generatedColumn - (section.generatedOffset.generatedColumn - 1);
     });
     var section = this._sections[sectionIndex];
     if (!section) {
@@ -5626,26 +5672,24 @@ var require_source_map_consumer = __commonJS(function(exports) {
       throw new Error('"' + aSource + '" is not in the SourceMap.');
     }
   };
-  IndexedSourceMapConsumer.prototype.generatedPositionFor = function IndexedSourceMapConsumer_generatedPositionFor(aArgs) {
+  IndexedSourceMapConsumer.prototype._findSourceIndex = function(aSource) {
+    this._generatedMappings;
     for (var i = 0;i < this._sections.length; i++) {
-      var section = this._sections[i];
-      if (section.consumer._findSourceIndex(util.getArg(aArgs, "source")) === -1) {
+      var consumer = this._sections[i].consumer;
+      var index = consumer._findSourceIndex(aSource);
+      if (index === -1) {
         continue;
       }
-      var generatedPosition = section.consumer.generatedPositionFor(aArgs);
-      if (generatedPosition) {
-        var ret = {
-          line: generatedPosition.line + (section.generatedOffset.generatedLine - 1),
-          column: generatedPosition.column + (section.generatedOffset.generatedLine === generatedPosition.line ? section.generatedOffset.generatedColumn - 1 : 0)
-        };
-        return ret;
+      var url = util.computeSourceURL(consumer.sourceRoot, consumer._sources.at(index), this._sourceMapURL);
+      if (this._sources.has(url)) {
+        return this._sources.indexOf(url);
       }
     }
-    return {
-      line: null,
-      column: null
-    };
+    return -1;
   };
+  IndexedSourceMapConsumer.prototype._findMapping = BasicSourceMapConsumer.prototype._findMapping;
+  IndexedSourceMapConsumer.prototype.generatedPositionFor = BasicSourceMapConsumer.prototype.generatedPositionFor;
+  IndexedSourceMapConsumer.prototype.computeColumnSpans = BasicSourceMapConsumer.prototype.computeColumnSpans;
   IndexedSourceMapConsumer.prototype._parseMappings = function IndexedSourceMapConsumer_parseMappings(aStr, aSourceRoot) {
     this.__generatedMappings = [];
     this.__originalMappings = [];
@@ -5669,7 +5713,7 @@ var require_source_map_consumer = __commonJS(function(exports) {
         var adjustedMapping = {
           source,
           generatedLine: mapping.generatedLine + (section.generatedOffset.generatedLine - 1),
-          generatedColumn: mapping.generatedColumn + (section.generatedOffset.generatedLine === mapping.generatedLine ? section.generatedOffset.generatedColumn - 1 : 0),
+          generatedColumn: mapping.generatedColumn + (mapping.generatedLine === 1 ? section.generatedOffset.generatedColumn - 1 : 0),
           originalLine: mapping.originalLine,
           originalColumn: mapping.originalColumn,
           name
@@ -5836,7 +5880,7 @@ var require_source_node = __commonJS(function(exports) {
   };
   SourceNode.prototype.replaceRight = function SourceNode_replaceRight(aPattern, aReplacement) {
     var lastChild = this.children[this.children.length - 1];
-    if (lastChild[isSourceNode]) {
+    if (lastChild && lastChild[isSourceNode]) {
       lastChild.replaceRight(aPattern, aReplacement);
     } else if (typeof lastChild === "string") {
       this.children[this.children.length - 1] = lastChild.replace(aPattern, aReplacement);
@@ -6659,9 +6703,11 @@ var require_map_generator = __commonJS(function(exports, module) {
           let endIndex = this.css.indexOf("*/", startIndex + annotation.length);
           if (endIndex === -1)
             break;
-          while (startIndex > cursor && this.css[startIndex - 1] === `
-`) {
-            startIndex--;
+          if (endIndex + 2 === this.css.length || /[\t\n\f\r ]/.test(this.css[endIndex + 2])) {
+            while (startIndex > cursor && (this.css[startIndex - 1] === `
+` || this.css[startIndex - 1] === "\r")) {
+              startIndex--;
+            }
           }
           css += this.css.slice(cursor, startIndex);
           cursor = endIndex + 2;
@@ -8236,7 +8282,7 @@ var require_processor = __commonJS(function(exports, module) {
 
   class Processor {
     constructor(plugins = []) {
-      this.version = "8.5.32";
+      this.version = "8.5.33";
       this.plugins = this.normalize(plugins);
     }
     normalize(plugins) {
@@ -9178,6 +9224,9 @@ var require_sanitize_html = __commonJS(function(exports, module) {
     }
     options = Object.assign({}, sanitizeHtml.defaults, options);
     options.parser = Object.assign({}, htmlParserDefaults, options.parser);
+    if (typeof html === "string" && !options.parser.xmlMode) {
+      html = html.replaceAll("<![CDATA[", "<!&#91;CDATA[");
+    }
     const logger = loggerFor(options);
     const tagAllowed = function(name) {
       return options.allowedTags === false || (options.allowedTags || []).indexOf(name) > -1;
@@ -9554,8 +9603,10 @@ var require_sanitize_html = __commonJS(function(exports, module) {
         }
         if (options.disallowedTagsMode === "completelyDiscard" && !tagAllowed(tag)) {
           text = "";
-        } else if (tag && tagAllowed(tag) && (options.disallowedTagsMode === "discard" || options.disallowedTagsMode === "completelyDiscard") && (tag === "script" || tag === "style")) {
+        } else if (tag && tagAllowed(tag) && (options.disallowedTagsMode === "discard" || options.disallowedTagsMode === "completelyDiscard") && tag === "script") {
           result += text;
+        } else if (tag && tagAllowed(tag) && (options.disallowedTagsMode === "discard" || options.disallowedTagsMode === "completelyDiscard") && tag === "style") {
+          result += stack.some((frame) => [frame.tag, frame.name].some((name) => name === "svg" || name === "math")) ? text.replace(/</g, "\\3c ") : text;
         } else if (tag && tagAllowed(tag) && (options.disallowedTagsMode === "discard" || options.disallowedTagsMode === "completelyDiscard") && (tag === "textarea" || tag === "xmp")) {
           if (tag === "xmp") {
             result += text.replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -9701,7 +9752,7 @@ var require_sanitize_html = __commonJS(function(exports, module) {
           s = s.replace(/"/g, "&quot;");
         }
       }
-      s = s.replace(/&(?![a-zA-Z0-9#]{1,20};)/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      s = s.replace(/&(?![a-zA-Z0-9#]+;)/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
       if (quote) {
         s = s.replace(/"/g, "&quot;");
       }
@@ -9786,22 +9837,20 @@ var require_sanitize_html = __commonJS(function(exports, module) {
       return naughtyHref("meta", url);
     }
     function animatesUrlAttribute(name, attribs) {
-      if (svgAnimationTags.indexOf(localPart(name)) === -1) {
+      if (!nameParts(name).some((part) => svgAnimationTags.includes(part))) {
         return false;
       }
       const schemeCheckedAttributes = options.allowedSchemesAppliedToAttributes || [];
       return Object.keys(attribs || {}).some(function(attributeName) {
-        if (localPart(attributeName) !== "attributename") {
+        if (!nameParts(attributeName).includes("attributename")) {
           return false;
         }
         const target = (attribs[attributeName] || "").trim().toLowerCase();
-        const localName = target.slice(target.lastIndexOf(":") + 1);
-        return alwaysUrlAttributes.indexOf(localName) !== -1 || schemeCheckedAttributes.indexOf(target) !== -1 || schemeCheckedAttributes.indexOf(localName) !== -1;
+        return schemeCheckedAttributes.includes(target) || nameParts(target).some((part) => alwaysUrlAttributes.includes(part) || schemeCheckedAttributes.includes(part));
       });
     }
-    function localPart(name) {
-      const lower = name.toLowerCase();
-      return lower.slice(lower.lastIndexOf(":") + 1);
+    function nameParts(name) {
+      return name.toLowerCase().split(":").map((part) => part.trim());
     }
     function parseUrl(value) {
       value = value.replace(/^(\w+:)?\s*[\\/]\s*[\\/]/, "$1//");

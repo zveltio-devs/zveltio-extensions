@@ -51,7 +51,8 @@ reference.
 ## What costs more here than it looks
 
 - **Editing a packed extension source is not free.** `check-bundle-sources`
-  hashes every non-test `.ts` under `engine/`, so changing even a comment makes
+  hashes every non-test `.ts` under `engine/`, and every file the bundle imports
+  from outside it (`content/pages` bundles `../client/`), so changing even a comment makes
   the committed bundle stale: it needs a repack, and a repack needs the manifest
   version raised, because the registry refuses the same version with different
   bytes.
