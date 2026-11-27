@@ -62,6 +62,9 @@ d(`${NAME}: the ANAF sign-in on a real engine`, () => {
     h = await mod('testing/app-harness.js');
     jobs = await mod('lib/extensions/jobs.js');
     const { finalizeExtensionLoad } = await mod('lib/extensions/register.js');
+    // ADR 0062 d1: an unsigned extension off the engine's inline list would be a
+    // worker, which never starts unsigned; this loads source in process.
+    const { _setInlineForTests } = await mod('lib/extensions/load-phases.js');
     const { buildExtensionInternals } = await mod('lib/extensions/internals.js');
     const { ManifestSchema } = await mod('lib/extensions/manifest-schema.js');
     const { invalidateActivationCache } = await mod('lib/extensions/activation.js');
@@ -105,7 +108,12 @@ d(`${NAME}: the ANAF sign-in on a real engine`, () => {
       ctx,
     };
     const ext = (await import(join(import.meta.dir, 'index.js'))).default;
-    await finalizeExtensionLoad(loader, ext, NAME, EXT_DIR, app, ctx, parsed, new Set());
+    const wasInline = _setInlineForTests(true);
+    try {
+      await finalizeExtensionLoad(loader, ext, NAME, EXT_DIR, app, ctx, parsed, new Set());
+    } finally {
+      _setInlineForTests(wasInline);
+    }
     invalidateActivationCache();
   }, 120_000);
 
