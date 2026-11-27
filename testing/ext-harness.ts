@@ -1170,6 +1170,10 @@ export async function onEngine(engineDir: string): Promise<{
   const { Hono } = (await honoP) as any;
   const harness = await mod('testing/app-harness.js');
   const { finalizeExtensionLoad } = await mod('lib/extensions/register.js');
+  // Since ADR 0062 d1 the engine, not the manifest, decides where an extension
+  // runs, and an unsigned worker never starts. This loads unsigned source in
+  // process, so it takes the test-only override, as the engine's own harness does.
+  const { _setInlineForTests } = await mod('lib/extensions/load-phases.js');
   const { buildExtensionInternals } = await mod('lib/extensions/internals.js');
   const { ManifestSchema } = await mod('lib/extensions/manifest-schema.js');
   const { invalidateActivationCache } = await mod('lib/extensions/activation.js');
@@ -1202,7 +1206,12 @@ export async function onEngine(engineDir: string): Promise<{
     ctx,
   };
   const ext = (await import(join(engineDir, 'index.js'))).default;
-  await finalizeExtensionLoad(loader, ext, name, extDir, app, ctx, parsed, new Set());
+  const wasInline = _setInlineForTests(true);
+  try {
+    await finalizeExtensionLoad(loader, ext, name, extDir, app, ctx, parsed, new Set());
+  } finally {
+    _setInlineForTests(wasInline);
+  }
   invalidateActivationCache();
   return {
     app,
