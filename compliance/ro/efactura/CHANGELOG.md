@@ -1,5 +1,9 @@
 # Changelog
 
+## 4.0.2 (2026-11-28)
+
+- test: the OAuth test loads the extension in process under the engine's test-only override, as engine ADR 0062 d1 makes every extension off the engine's inline list a worker; no runtime change
+
 ## 4.0.1 (2026-11-21)
 
 - test: the OAuth test accepts the engine's `enc:v2` field envelope (ADR 0059) as well as `enc:v1` for `oauth_state`; no runtime change
