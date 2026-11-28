@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.1 (2026-11-28)
+
+- fix: the extension loads again when the engine runs it inline (ADR 0062 d1 inline list). The `receive` job declares no egress, so an inline load runs it from the module (ADR 0022 d1), but only `engine/jobs.js` held it and the load was refused (`manifest job "receive" has no implementation`). The module now exports the same `receive`, as `sms` does with `deliveryStatus`
+
 ## 2.2.0 (2026-11-13)
 
 - The incoming-webhook receiver (`POST /webhooks/receive`) is a declared route (ADR 0039): the manifest's `routes` names it, public, and the engine serves it with the plain handler `receiveWebhook`. Same URL, signature check and answers; no Hono. The webhook is read in the request's tenant transaction, so another tenant's webhook is not found (same 401 as before)

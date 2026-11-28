@@ -312,3 +312,17 @@ describe('receive', () => {
     ]);
   });
 });
+
+// The engine loads this extension inline (ADR 0062 d1 list): a job that
+// declares no egress then runs from the module (ADR 0022 d1), so the packed
+// module must export every such job, or the load is refused.
+describe('inline load', () => {
+  it('the packed module exports each job that declares no egress', async () => {
+    const mod = (await import('./index.js')).default as { jobs?: Record<string, unknown> };
+    for (const j of manifest.jobs as Row[]) {
+      if ((j.egress ?? []).length === 0 && (j.egressSlots ?? []).length === 0) {
+        expect(typeof mod.jobs?.[j.name as string]).toBe('function');
+      }
+    }
+  });
+});
