@@ -109,6 +109,7 @@
         "reason"
       ],
       "pick": {
+        "employee_id": "employees",
         "leave_type_id": "leave_types"
       }
     }
