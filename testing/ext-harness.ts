@@ -731,7 +731,6 @@ async function makeCtx(
       encryptionConfigured: Boolean(process.env.FIELD_ENCRYPTION_KEY),
       crossDomainAuth: false,
       allowInsecureLdap: false,
-      objectStorage: undefined,
     }),
     env: {},
     log: console,
