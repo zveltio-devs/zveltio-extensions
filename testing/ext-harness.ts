@@ -40,7 +40,6 @@ import {
   assertPublicUrl as engineAssertPublicUrl,
   validatePublicUrl as engineValidatePublicUrl,
 } from '@zveltio/engine/lib/security/index.js';
-import { createHmac } from 'crypto';
 import { existsSync, readFileSync } from 'fs';
 import { basename, dirname, join, relative } from 'path';
 
@@ -680,8 +679,6 @@ async function makeCtx(
         harnessEncrypt(plaintext, o?.keyring ?? 'field'),
       decryptSecret: async (value: string, o?: { keyring?: string }) =>
         harnessDecrypt(value, o?.keyring ?? 'field'),
-      deriveTokenHash: async (raw: string) =>
-        createHmac('sha256', process.env.BETTER_AUTH_SECRET ?? '').update(raw).digest('hex'),
       csvCell: harnessCsvCell,
       recordsToCsv: (records: Record<string, unknown>[]) => {
         if (records.length === 0) return '';
