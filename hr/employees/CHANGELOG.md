@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.2.0 (2026-11-28)
+
+- feat: the list filter by status again: quick filters above the rows (`facets`, DR-45), one button per status
+- requires engine 3.0.0-beta.133
+
 ## 2.1.0 (2026-11-12)
 
 - feat: the Studio page is a `zveltio.view/2` view (ADR 0042): it names its collections and actions instead of URLs, and Studio draws it from the specification

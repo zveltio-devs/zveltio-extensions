@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.3.0 (2026-11-28)
+
+- feat: the list filter by status again: quick filters above the rows (`facets`, DR-45), one button per status
+- requires engine 3.0.0-beta.133
+
 ## 2.2.2 (2026-11-21)
 
 - test: seed the stored secret with the engine's `maybeEncrypt`, which every engine version exports; `encryptField` now takes the row it is bound to (ADR 0059). No runtime change

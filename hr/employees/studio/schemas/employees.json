@@ -41,6 +41,9 @@
     }
   ],
   "sort": "last_name",
+  "facets": [
+    "status"
+  ],
   "search": true,
   "rowActions": [
     {
