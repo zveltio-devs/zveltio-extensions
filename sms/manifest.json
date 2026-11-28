@@ -3,8 +3,8 @@
   "displayName": "SMS / Push Notifications",
   "category": "sms",
   "description": "Send SMS through Twilio or Vonage, with templates and delivery reports",
-  "version": "2.2.2",
-  "zveltioMinVersion": "3.0.0-beta.111",
+  "version": "2.3.0",
+  "zveltioMinVersion": "3.0.0-beta.133",
   "zveltioMaxVersion": "4.0.0",
   "package": "@zveltio/ext-sms",
   "permissions": [

@@ -50,6 +50,9 @@
     }
   ],
   "sort": "-created_at",
+  "facets": [
+    "status"
+  ],
   "search": true,
   "rowActions": [
     {

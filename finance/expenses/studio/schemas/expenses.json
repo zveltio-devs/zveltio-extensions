@@ -34,6 +34,9 @@
     }
   ],
   "sort": "-created_at",
+  "facets": [
+    "status"
+  ],
   "rowActions": [
     {
       "action": "recalculate",

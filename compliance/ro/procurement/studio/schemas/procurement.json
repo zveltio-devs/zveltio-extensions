@@ -42,6 +42,9 @@
         }
       ],
       "sort": "-date",
+      "facets": [
+        "status"
+      ],
       "rowActions": [
         {
           "action": "approveOrder",
@@ -168,6 +171,9 @@
         }
       ],
       "sort": "-date",
+      "facets": [
+        "status"
+      ],
       "rowActions": [
         {
           "action": "confirmReceptionNote",
@@ -273,6 +279,9 @@
         }
       ],
       "sort": "-created_at",
+      "facets": [
+        "status"
+      ],
       "edit": true,
       "create": true
     },

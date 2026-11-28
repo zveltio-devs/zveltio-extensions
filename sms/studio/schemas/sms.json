@@ -43,6 +43,9 @@
         }
       ],
       "sort": "-created_at",
+      "facets": [
+        "status"
+      ],
       "actions": [
         {
           "action": "send",
