@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.3.2 (2026-11-28)
+
+- test: `engine/webhook.test.ts` sets the environment's webhook secret as `ZVELTIO_EXT_BILLING__STRIPE_WEBHOOK_SECRET`; the engine stops reading the single-underscore spelling (extension-api v2 entry 6, ADR 0063). No code change; the version moves because the registry keeps a published version's archive immutable
+
 ## 2.3.1 (2026-11-20)
 
 - test: `engine/webhook.test.ts` deletes its audit rows through the harness's `asAuditOwner`; the trail is append-only from engine migration 129 (ADR 0060). No code change; the version moves because the registry keeps a published version's archive immutable

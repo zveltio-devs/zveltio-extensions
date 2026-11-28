@@ -80,7 +80,7 @@ d(`${NAME}: Stripe webhook -> applyEvent job`, () => {
   }
 
   beforeAll(async () => {
-    process.env.ZVELTIO_EXT_BILLING_STRIPE_WEBHOOK_SECRET = GLOBAL;
+    process.env.ZVELTIO_EXT_BILLING__STRIPE_WEBHOOK_SECRET = GLOBAL;
     const mod = (p: string) => import(join(ENGINE, p));
     ({ sql } = await import(join(ENGINE, '../node_modules/kysely/dist/index.js')));
     const { Hono } = await import(join(ENGINE, '../node_modules/hono/dist/index.js'));
@@ -131,7 +131,7 @@ d(`${NAME}: Stripe webhook -> applyEvent job`, () => {
   }, 120_000);
 
   afterAll(async () => {
-    delete process.env.ZVELTIO_EXT_BILLING_STRIPE_WEBHOOK_SECRET;
+    delete process.env.ZVELTIO_EXT_BILLING__STRIPE_WEBHOOK_SECRET;
     if (!db) return;
     await jobs.unregisterJobs(NAME);
     await sql`DELETE FROM zv_extension_registry WHERE name = ${NAME}`.execute(db);
