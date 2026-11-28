@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.3.0 (2026-11-28)
+
+- feat: the `requestLeave` dialog picks the employee from `hr/employees` instead of asking for an id (a view may now pick a required dependency's collection)
+
 ## 2.2.0 (2026-11-28)
 
 - feat: the list filter by status again: quick filters above the rows (`facets`, DR-45), one button per status
